@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* Police Unicode de fallback - TOUJOURS inclure */
+@font-face {
+  font-family: 'UthmanicHafs';
+  src: url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  /* Fond et cadres - Mushaf Medina 1405H */
+  --page-bg: #fdfaf3;
+  --frame-green-dark: #2d5016;
+  --frame-green-light: #4a7c23;
+  --frame-gold: #c9a959;
+
+  /* Texte */
+  --text-black: #1a1a1a;
+  --verse-number-green: #2d5016;
+
+  /* États quiz */
+  --blur-bg: rgba(253, 250, 243, 0.98);
+  --highlight-verse: rgba(255, 215, 0, 0.35);
+  --revealed-glow: rgba(74, 124, 35, 0.3);
+
+  --background: var(--page-bg);
+  --foreground: var(--text-black);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Police arabe générique (fallback) */
+.font-arabic {
+  font-family: 'Traditional Arabic', 'Scheherazade', 'Amiri', serif;
+}
+
+/* Animation de révélation du verset */
+@keyframes revealPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.verse-revealed {
+  animation: revealPulse 0.8s ease-out;
+}
+
+/* Animation du lecteur audio */
+@keyframes audioWave {
+  0%, 100% {
+    height: 8px;
+  }
+  50% {
+    height: 20px;
+  }
+}
+
+/* Transition de flou douce */
+.blur-transition {
+  transition: filter 0.3s ease-out;
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--page-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--frame-gold);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--frame-green-light);
+}
+
+/* Empêcher la sélection de texte pendant le quiz */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Animation de spinner */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reset global pour éviter tout espace */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Responsive - toujours 2 pages visibles */
+@media screen and (max-width: 480px) {
+  /* Petits écrans mobiles */
+  .quiz-overlay-text {
+    font-size: 14px;
+  }
+}
+
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  /* Tablettes portrait */
+}
+
+@media screen and (min-width: 769px) {
+  /* Tablettes paysage et desktop */
+}
+
+/* Safe area pour les appareils avec encoche */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Empêcher le zoom sur double-tap mobile */
+* {
+  touch-action: manipulation;
+}
