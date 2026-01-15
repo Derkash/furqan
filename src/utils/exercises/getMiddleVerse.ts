@@ -35,6 +35,7 @@ export function getMiddleVerse(pageVerses: PageVerses | null): VersePosition | n
   }
 
   let closestVerse: VersePosition | null = null;
+  let closestLine = 0;
   let minDistance = Infinity;
 
   for (const verse of pageVerses.verses) {
@@ -47,14 +48,25 @@ export function getMiddleVerse(pageVerses: PageVerses | null): VersePosition | n
     // Calculer la distance avec la position cible
     const distance = Math.abs(versePosition - TARGET_POSITION);
 
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestVerse = verse;
-    }
-
-    // Si on trouve un verset commençant exactement à la ligne 8
+    // Si on trouve un verset commençant exactement à la ligne 8, retourner immédiatement
     if (firstLine === TARGET_LINE) {
       return verse;
+    }
+
+    // Règle de sélection :
+    // 1. Préférer la distance la plus petite
+    // 2. En cas d'égalité, préférer le verset qui commence APRÈS la ligne 8
+    //    (car son début est "juste après" le milieu, sans contenu avant)
+    const isBetterDistance = distance < minDistance;
+    const isSameDistanceButAfter =
+      distance === minDistance &&
+      firstLine > TARGET_LINE &&
+      closestLine < TARGET_LINE;
+
+    if (isBetterDistance || isSameDistanceButAfter) {
+      minDistance = distance;
+      closestVerse = verse;
+      closestLine = firstLine;
     }
   }
 
