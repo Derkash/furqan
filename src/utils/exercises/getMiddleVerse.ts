@@ -13,44 +13,46 @@ const LAYOUT = {
 // Ligne cible (milieu visuel de la page)
 const TARGET_LINE = 8;
 
-// Position en % du CENTRE de la ligne 8 (milieu de la page)
-// Centre = top de ligne 8 + moitié de la hauteur de ligne
-const TARGET_POSITION = LAYOUT.marginTop + (TARGET_LINE - 1) * LAYOUT.lineHeight + LAYOUT.lineHeight / 2;
-// = 11.5 + 7 * 5.5 + 2.75 = 52.75%
+// Position cible = centre de la ligne 8 = 8.5 (en unité de lignes)
+const TARGET_POSITION = TARGET_LINE + 0.5;
 
 /**
- * Calcule la position verticale précise du début d'un verset.
- * Prend en compte la position horizontale sur la ligne (RTL).
+ * Calcule la position effective du début d'un verset en unité de lignes.
+ * Combine le numéro de ligne + la progression horizontale (0-1).
  *
- * @param box - Premier box du verset
- * @returns Position verticale en %
+ * @param line - Numéro de ligne (1-15)
+ * @param right - Position depuis le bord droit (%) du verse-map
+ * @returns Position effective en lignes (ex: 7.667 = ligne 7 à 66.7%)
  */
-function calculateVerseStartPosition(box: { top: number; right: number }): number {
-  // top = position verticale du haut de la ligne
-  // right = distance depuis le bord droit de la page (en RTL, début de ligne = petit right)
+function calculateEffectiveLinePosition(line: number, right: number): number {
+  // Calculer le pourcentage horizontal dans la ligne (0 = début RTL, 1 = fin RTL)
+  // right=7% (marge) = début de ligne = 0
+  // right=93% (autre marge) = fin de ligne = 1
+  const horizontalProgress = Math.max(0, Math.min(1, (right - LAYOUT.marginRight) / LAYOUT.textAreaWidth));
 
-  // Calculer le pourcentage horizontal dans la ligne (0% = début RTL, 100% = fin RTL)
-  // right=7% (marge) = début de ligne = 0%
-  // right=93% (autre marge) = fin de ligne = 100%
-  const horizontalProgress = Math.max(0, (box.right - LAYOUT.marginRight) / LAYOUT.textAreaWidth);
-
-  // Position verticale = top de la ligne + progression horizontale × hauteur de ligne
+  // Position = ligne + progression horizontale
   // Un verset qui commence tard dans la ligne (grand right) est plus proche de la ligne suivante
-  return box.top + horizontalProgress * LAYOUT.lineHeight;
+  return line + horizontalProgress;
 }
 
 /**
  * Trouve le verset dont le début est le plus proche du centre de la ligne 8 (milieu de la page).
  *
- * Utilise les positions précises en % du verse-map.json :
- * - Position verticale (top du premier box)
+ * Utilise les positions précises du verse-map.json :
+ * - Numéro de ligne (1-15)
  * - Position horizontale (right du premier box pour RTL)
  *
- * Le centre de la ligne 8 se situe à environ 52.75% depuis le haut de la page.
+ * Position effective = ligne + (progression horizontale de 0 à 1)
+ * Le centre de la ligne 8 = 8.5 (milieu de la ligne 8)
+ *
+ * Exemple page 3:
+ * - Verset 2:11 : ligne 7, right=64.33% → position = 7 + 0.667 = 7.667 → distance = 0.833
+ * - Verset 2:12 : ligne 9, right=7% → position = 9 + 0 = 9.0 → distance = 0.5
+ * → Verset 2:12 est plus proche du milieu (8.5)
  *
  * @param pageVerses - Données PageVerses pour une page
  * @param verseMapData - Données du verse-map pour cette page (optionnel mais recommandé)
- * @returns Le verset commençant le plus proche de la ligne 8, ou null
+ * @returns Le verset commençant le plus proche de la ligne 8.5, ou null
  */
 export function getMiddleVerse(
   pageVerses: PageVerses | null,
@@ -64,28 +66,28 @@ export function getMiddleVerse(
   let minDistance = Infinity;
 
   for (const verse of pageVerses.verses) {
-    let versePosition: number;
+    let effectivePosition: number;
 
     // Si on a les données du verse-map, utiliser la position exacte
     if (verseMapData && verseMapData[verse.verseKey]) {
       const verseEntry = verseMapData[verse.verseKey];
       if (verseEntry.boxes && verseEntry.boxes.length > 0) {
         const firstBox = verseEntry.boxes[0];
-        // Calculer la position précise avec la position horizontale
-        versePosition = calculateVerseStartPosition(firstBox);
+        // Calculer la position effective en lignes (ligne + progression horizontale)
+        effectivePosition = calculateEffectiveLinePosition(firstBox.line, firstBox.right);
       } else {
-        // Fallback: utiliser le centre de la ligne
+        // Fallback: utiliser le centre de la première ligne
         const firstLine = Math.min(...verse.lines);
-        versePosition = LAYOUT.marginTop + (firstLine - 1) * LAYOUT.lineHeight + LAYOUT.lineHeight / 2;
+        effectivePosition = firstLine + 0.5;
       }
     } else {
-      // Fallback sans verse-map: utiliser le centre de la ligne
+      // Fallback sans verse-map: utiliser le centre de la première ligne
       const firstLine = Math.min(...verse.lines);
-      versePosition = LAYOUT.marginTop + (firstLine - 1) * LAYOUT.lineHeight + LAYOUT.lineHeight / 2;
+      effectivePosition = firstLine + 0.5;
     }
 
-    // Calculer la distance avec le centre de la ligne 8 (52.75%)
-    const distance = Math.abs(versePosition - TARGET_POSITION);
+    // Calculer la distance avec le centre de la ligne 8 (8.5)
+    const distance = Math.abs(effectivePosition - TARGET_POSITION);
 
     if (distance < minDistance) {
       minDistance = distance;
@@ -98,6 +100,7 @@ export function getMiddleVerse(
 
 /**
  * Variante avec ligne cible configurable
+ * La position cible est le centre de la ligne spécifiée (ligne + 0.5)
  */
 export function getMiddleVerseAtLine(
   pageVerses: PageVerses | null,
@@ -108,27 +111,29 @@ export function getMiddleVerseAtLine(
     return null;
   }
 
-  const targetPosition = LAYOUT.marginTop + (targetLine - 1) * LAYOUT.lineHeight;
+  // Position cible = centre de la ligne spécifiée
+  const targetPosition = targetLine + 0.5;
   let closestVerse: VersePosition | null = null;
   let minDistance = Infinity;
 
   for (const verse of pageVerses.verses) {
-    let verseTopPosition: number;
+    let effectivePosition: number;
 
     if (verseMapData && verseMapData[verse.verseKey]) {
       const verseEntry = verseMapData[verse.verseKey];
       if (verseEntry.boxes && verseEntry.boxes.length > 0) {
-        verseTopPosition = verseEntry.boxes[0].top;
+        const firstBox = verseEntry.boxes[0];
+        effectivePosition = calculateEffectiveLinePosition(firstBox.line, firstBox.right);
       } else {
         const firstLine = Math.min(...verse.lines);
-        verseTopPosition = LAYOUT.marginTop + (firstLine - 1) * LAYOUT.lineHeight;
+        effectivePosition = firstLine + 0.5;
       }
     } else {
       const firstLine = Math.min(...verse.lines);
-      verseTopPosition = LAYOUT.marginTop + (firstLine - 1) * LAYOUT.lineHeight;
+      effectivePosition = firstLine + 0.5;
     }
 
-    const distance = Math.abs(verseTopPosition - targetPosition);
+    const distance = Math.abs(effectivePosition - targetPosition);
 
     if (distance < minDistance) {
       minDistance = distance;
