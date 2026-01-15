@@ -136,7 +136,7 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col">
+    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
       {/* Header avec progression */}
       <div className="flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
         <Link

@@ -121,8 +121,13 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
+}
+
+/* Pages qui nécessitent overflow hidden (practice) */
+.overflow-locked {
   overflow: hidden;
+  height: 100vh;
 }
 
 /* Responsive - toujours 2 pages visibles */
