@@ -9,7 +9,7 @@ interface ConfigScreenProps {
 }
 
 export default function ConfigScreen({ onStart }: ConfigScreenProps) {
-  const [startPage, setStartPage] = useState(1);
+  const [startPage, setStartPage] = useState(3);
   const [endPage, setEndPage] = useState(10);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,12 +18,12 @@ export default function ConfigScreen({ onStart }: ConfigScreenProps) {
     setError(null);
 
     // Validation
-    if (startPage < 1 || startPage > 604) {
-      setError('La page de début doit être entre 1 et 604');
+    if (startPage < 3 || startPage > 604) {
+      setError('La page de début doit être entre 3 et 604');
       return;
     }
-    if (endPage < 1 || endPage > 604) {
-      setError('La page de fin doit être entre 1 et 604');
+    if (endPage < 3 || endPage > 604) {
+      setError('La page de fin doit être entre 3 et 604');
       return;
     }
     if (startPage > endPage) {
@@ -57,7 +57,7 @@ export default function ConfigScreen({ onStart }: ConfigScreenProps) {
                 <input
                   type="number"
                   id="startPage"
-                  min={1}
+                  min={3}
                   max={604}
                   value={startPage}
                   onChange={(e) => setStartPage(Number(e.target.value))}
@@ -80,7 +80,7 @@ export default function ConfigScreen({ onStart }: ConfigScreenProps) {
                 <input
                   type="number"
                   id="endPage"
-                  min={1}
+                  min={3}
                   max={604}
                   value={endPage}
                   onChange={(e) => setEndPage(Number(e.target.value))}
