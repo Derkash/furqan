@@ -12,6 +12,7 @@ import type { PageVerses, PagePair } from '@/types';
 import { getExerciseDefinition } from '@/utils/exercises/exerciseRegistry';
 import { STEP_GENERATORS } from '@/lib/exercises/stepGenerators';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
+import { useVerseMap } from '@/hooks/useVerseMap';
 
 interface UseExerciseReturn {
   // State
@@ -69,6 +70,9 @@ export function useExercise(): UseExerciseReturn {
   const [rightPageVerses, setRightPageVerses] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Charger le verse-map pour les positions précises
+  const { getPageVerses: getVerseMapPage } = useVerseMap();
+
   // Current step
   const currentStep = useMemo(() => {
     if (!state.currentRound) return null;
@@ -121,7 +125,9 @@ export function useExercise(): UseExerciseReturn {
     setLoading(true);
     try {
       const pageVerses = await fetchPageVerses(state.progress.currentPage);
-      const steps = generator(pageVerses, state.progress.currentPage, state.config);
+      // Récupérer les données du verse-map pour les positions précises
+      const verseMapData = getVerseMapPage(state.progress.currentPage);
+      const steps = generator(pageVerses, state.progress.currentPage, state.config, verseMapData);
 
       const round: ExerciseRound = {
         roundIndex: state.progress.roundsCompleted,
@@ -137,7 +143,7 @@ export function useExercise(): UseExerciseReturn {
     } finally {
       setLoading(false);
     }
-  }, [state.exerciseId, state.progress.currentPage, state.config, state.progress.roundsCompleted, state.progress.totalPages]);
+  }, [state.exerciseId, state.progress.currentPage, state.config, state.progress.roundsCompleted, state.progress.totalPages, getVerseMapPage]);
 
   // Initialize
   const initialize = useCallback(async (config: ExerciseConfig) => {

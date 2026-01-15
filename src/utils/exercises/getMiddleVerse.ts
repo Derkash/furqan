@@ -1,4 +1,5 @@
 import type { PageVerses, VersePosition } from '@/types';
+import type { PageVerseMap, VerseMapEntry } from '@/hooks/useVerseMap';
 
 // Constantes de calibration (identiques à MushafPage.tsx)
 const CALIBRATION = {
@@ -14,59 +15,52 @@ const TARGET_LINE = 8;
 const TARGET_POSITION = CALIBRATION.marginTop + (TARGET_LINE - 1) * CALIBRATION.lineHeight;
 
 /**
- * Calcule la position verticale (%) du début d'une ligne
- */
-function getLinePosition(lineNumber: number): number {
-  return CALIBRATION.marginTop + (lineNumber - 1) * CALIBRATION.lineHeight;
-}
-
-/**
  * Trouve le verset dont le début est le plus proche de la ligne 8 (milieu de la page).
  *
- * Utilise les positions réelles en % basées sur le tableau de calibration.
+ * Utilise les positions précises en % du verse-map.json (valeur `top` du premier box).
  * La ligne 8 se situe à environ 47.9% depuis le haut de la page.
  *
  * @param pageVerses - Données PageVerses pour une page
+ * @param verseMapData - Données du verse-map pour cette page (optionnel mais recommandé)
  * @returns Le verset commençant le plus proche de la ligne 8, ou null
  */
-export function getMiddleVerse(pageVerses: PageVerses | null): VersePosition | null {
+export function getMiddleVerse(
+  pageVerses: PageVerses | null,
+  verseMapData?: PageVerseMap | null
+): VersePosition | null {
   if (!pageVerses?.verses || pageVerses.verses.length === 0) {
     return null;
   }
 
   let closestVerse: VersePosition | null = null;
-  let closestLine = 0;
   let minDistance = Infinity;
 
   for (const verse of pageVerses.verses) {
-    // Obtenir la première ligne de ce verset
-    const firstLine = Math.min(...verse.lines);
+    let verseTopPosition: number;
 
-    // Calculer la position réelle en %
-    const versePosition = getLinePosition(firstLine);
-
-    // Calculer la distance avec la position cible
-    const distance = Math.abs(versePosition - TARGET_POSITION);
-
-    // Si on trouve un verset commençant exactement à la ligne 8, retourner immédiatement
-    if (firstLine === TARGET_LINE) {
-      return verse;
+    // Si on a les données du verse-map, utiliser la position exacte du premier box
+    if (verseMapData && verseMapData[verse.verseKey]) {
+      const verseEntry = verseMapData[verse.verseKey];
+      if (verseEntry.boxes && verseEntry.boxes.length > 0) {
+        // Le premier box donne la position exacte où le verset commence
+        verseTopPosition = verseEntry.boxes[0].top;
+      } else {
+        // Fallback: calculer depuis le numéro de ligne
+        const firstLine = Math.min(...verse.lines);
+        verseTopPosition = CALIBRATION.marginTop + (firstLine - 1) * CALIBRATION.lineHeight;
+      }
+    } else {
+      // Fallback sans verse-map: calculer depuis le numéro de ligne
+      const firstLine = Math.min(...verse.lines);
+      verseTopPosition = CALIBRATION.marginTop + (firstLine - 1) * CALIBRATION.lineHeight;
     }
 
-    // Règle de sélection :
-    // 1. Préférer la distance la plus petite
-    // 2. En cas d'égalité, préférer le verset qui commence APRÈS la ligne 8
-    //    (car son début est "juste après" le milieu, sans contenu avant)
-    const isBetterDistance = distance < minDistance;
-    const isSameDistanceButAfter =
-      distance === minDistance &&
-      firstLine > TARGET_LINE &&
-      closestLine < TARGET_LINE;
+    // Calculer la distance avec la position cible (ligne 8 ≈ 47.9%)
+    const distance = Math.abs(verseTopPosition - TARGET_POSITION);
 
-    if (isBetterDistance || isSameDistanceButAfter) {
+    if (distance < minDistance) {
       minDistance = distance;
       closestVerse = verse;
-      closestLine = firstLine;
     }
   }
 
@@ -78,20 +72,34 @@ export function getMiddleVerse(pageVerses: PageVerses | null): VersePosition | n
  */
 export function getMiddleVerseAtLine(
   pageVerses: PageVerses | null,
-  targetLine: number = TARGET_LINE
+  targetLine: number = TARGET_LINE,
+  verseMapData?: PageVerseMap | null
 ): VersePosition | null {
   if (!pageVerses?.verses || pageVerses.verses.length === 0) {
     return null;
   }
 
-  const targetPosition = getLinePosition(targetLine);
+  const targetPosition = CALIBRATION.marginTop + (targetLine - 1) * CALIBRATION.lineHeight;
   let closestVerse: VersePosition | null = null;
   let minDistance = Infinity;
 
   for (const verse of pageVerses.verses) {
-    const firstLine = Math.min(...verse.lines);
-    const versePosition = getLinePosition(firstLine);
-    const distance = Math.abs(versePosition - targetPosition);
+    let verseTopPosition: number;
+
+    if (verseMapData && verseMapData[verse.verseKey]) {
+      const verseEntry = verseMapData[verse.verseKey];
+      if (verseEntry.boxes && verseEntry.boxes.length > 0) {
+        verseTopPosition = verseEntry.boxes[0].top;
+      } else {
+        const firstLine = Math.min(...verse.lines);
+        verseTopPosition = CALIBRATION.marginTop + (firstLine - 1) * CALIBRATION.lineHeight;
+      }
+    } else {
+      const firstLine = Math.min(...verse.lines);
+      verseTopPosition = CALIBRATION.marginTop + (firstLine - 1) * CALIBRATION.lineHeight;
+    }
+
+    const distance = Math.abs(verseTopPosition - targetPosition);
 
     if (distance < minDistance) {
       minDistance = distance;

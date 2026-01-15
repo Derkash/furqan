@@ -126,8 +126,11 @@ export interface ExerciseConfig extends QuizConfig {
 // STEP GENERATOR
 // ============================================
 
+import type { PageVerseMap } from '@/hooks/useVerseMap';
+
 export type StepGenerator = (
   pageVerses: PageVerses,
   pageNumber: number,
-  config: ExerciseConfig
+  config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
 ) => ExerciseStep[];

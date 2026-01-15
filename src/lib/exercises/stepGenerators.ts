@@ -1,5 +1,6 @@
 import type { ExerciseStep, ExerciseConfig, StepGenerator } from '@/types/exercises';
 import type { PageVerses, VersePosition } from '@/types';
+import type { PageVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 
 // ============================================
@@ -149,11 +150,14 @@ export const randomVerseSteps: StepGenerator = (
 // ============================================
 
 export const sequentialStartMiddleEndSteps: StepGenerator = (
-  pageVerses: PageVerses
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
   const steps: ExerciseStep[] = [];
   const { firstVerse, lastVerse } = pageVerses;
-  const middleVerse = getMiddleVerse(pageVerses);
+  const middleVerse = getMiddleVerse(pageVerses, verseMapData);
   const visibleVerses: string[] = [];
 
   // Premier verset
@@ -184,11 +188,14 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
 // ============================================
 
 export const randomStartMiddleEndSteps: StepGenerator = (
-  pageVerses: PageVerses
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
   const steps: ExerciseStep[] = [];
   const { firstVerse, lastVerse } = pageVerses;
-  const middleVerse = getMiddleVerse(pageVerses);
+  const middleVerse = getMiddleVerse(pageVerses, verseMapData);
 
   // Créer un tableau des 3 positions et mélanger
   const positions: Array<{ type: 'first' | 'middle' | 'last'; verse: VersePosition | null }> = [
@@ -314,9 +321,12 @@ export const startVerseBackwardSteps: StepGenerator = (
 // ============================================
 
 export const middleVerseForwardSteps: StepGenerator = (
-  pageVerses: PageVerses
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
-  const middleVerse = getMiddleVerse(pageVerses);
+  const middleVerse = getMiddleVerse(pageVerses, verseMapData);
   if (!middleVerse) return [];
 
   return [
@@ -340,9 +350,12 @@ export const middleVerseForwardSteps: StepGenerator = (
 };
 
 export const middleVerseBackwardSteps: StepGenerator = (
-  pageVerses: PageVerses
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
-  const middleVerse = getMiddleVerse(pageVerses);
+  const middleVerse = getMiddleVerse(pageVerses, verseMapData);
   if (!middleVerse) return [];
 
   return [
