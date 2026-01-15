@@ -199,9 +199,9 @@ export const randomStartMiddleEndSteps: StepGenerator = (
 
   // Créer un tableau des 3 positions et mélanger
   const positions: Array<{ type: 'first' | 'middle' | 'last'; verse: VersePosition | null }> = [
-    { type: 'first', verse: firstVerse },
-    { type: 'middle', verse: middleVerse },
-    { type: 'last', verse: lastVerse },
+    { type: 'first' as const, verse: firstVerse },
+    { type: 'middle' as const, verse: middleVerse },
+    { type: 'last' as const, verse: lastVerse },
   ].filter((p) => p.verse !== null);
 
   // Mélanger (Fisher-Yates)
