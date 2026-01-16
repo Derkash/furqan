@@ -4,52 +4,8 @@ import type { PageVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 
 // ============================================
-// HELPERS
-// ============================================
-
-function createRevealStep(
-  verse: VersePosition,
-  position: 'first' | 'middle' | 'last' | 'random',
-  title: string,
-  subtitle: string,
-  previousVerses: string[] = []
-): ExerciseStep {
-  return {
-    type: 'revealing',
-    targetPosition: position,
-    targetVerse: verse,
-    message: { title, subtitle },
-    ui: {
-      isBlurred: false,
-      maskAll: true,
-      visibleVerses: [...previousVerses, verse.verseKey],
-      highlightedVerse: verse.verseKey,
-    },
-  };
-}
-
-function createListeningStep(
-  verse: VersePosition,
-  position: 'first' | 'middle' | 'last' | 'random',
-  title: string,
-  subtitle: string
-): ExerciseStep {
-  return {
-    type: 'listening',
-    targetPosition: position,
-    targetVerse: verse,
-    question: 'recite_verse',
-    message: { title, subtitle },
-    ui: {
-      isBlurred: true,
-      maskAll: false,
-      visibleVerses: [],
-    },
-  };
-}
-
-// ============================================
-// 1. RANDOM VERSE (existant - adapté)
+// 1. RANDOM VERSE
+// Audio SEULEMENT pour la première étape (découverte)
 // ============================================
 
 export const randomVerseSteps: StepGenerator = (
@@ -66,7 +22,7 @@ export const randomVerseSteps: StepGenerator = (
 
   if (!targetVerse) return steps;
 
-  // Étape 1: Écoute (flou)
+  // Étape 1: Écoute du verset aléatoire (SEULE étape avec audio)
   steps.push({
     type: 'listening',
     targetPosition: 'random',
@@ -83,7 +39,7 @@ export const randomVerseSteps: StepGenerator = (
     },
   });
 
-  // Étape 2: Révélation du verset récité
+  // Étape 2: Révélation du verset récité (PAS d'audio)
   steps.push({
     type: 'revealing',
     targetPosition: 'random',
@@ -100,7 +56,7 @@ export const randomVerseSteps: StepGenerator = (
     },
   });
 
-  // Étape 3: Révélation premier verset
+  // Étape 3: Révélation premier verset (PAS d'audio)
   if (firstVerse) {
     steps.push({
       type: 'revealing',
@@ -119,14 +75,14 @@ export const randomVerseSteps: StepGenerator = (
     });
   }
 
-  // Étape 4: Révélation dernier verset
+  // Étape 4: Révélation dernier verset (PAS d'audio)
   if (lastVerse) {
     steps.push({
       type: 'revealing',
       targetPosition: 'last',
       targetVerse: lastVerse,
       message: {
-        title: 'Nouveau tour',
+        title: 'Page suivante',
         subtitle: 'Tapez pour continuer',
       },
       ui: {
@@ -147,6 +103,7 @@ export const randomVerseSteps: StepGenerator = (
 
 // ============================================
 // 2. SEQUENTIAL START-MIDDLE-END
+// Pas d'audio, pas de flou - juste révéler les versets un par un
 // ============================================
 
 export const sequentialStartMiddleEndSteps: StepGenerator = (
@@ -160,24 +117,64 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
   const middleVerse = getMiddleVerse(pageVerses, verseMapData);
   const visibleVerses: string[] = [];
 
-  // Premier verset
+  // Premier verset - juste révéler (pas d'audio)
   if (firstVerse) {
-    steps.push(createListeningStep(firstVerse, 'first', 'Écoutez le premier verset...', 'Puis récitez-le'));
     visibleVerses.push(firstVerse.verseKey);
-    steps.push(createRevealStep(firstVerse, 'first', 'Premier verset', 'Tapez pour continuer', []));
+    steps.push({
+      type: 'revealing',
+      targetPosition: 'first',
+      targetVerse: firstVerse,
+      message: {
+        title: 'Premier verset',
+        subtitle: 'Tapez pour continuer',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [...visibleVerses],
+        highlightedVerse: firstVerse.verseKey,
+      },
+    });
   }
 
-  // Verset du milieu
+  // Verset du milieu - juste révéler (pas d'audio)
   if (middleVerse) {
-    steps.push(createListeningStep(middleVerse, 'middle', 'Écoutez le verset du milieu...', 'Puis récitez-le'));
-    steps.push(createRevealStep(middleVerse, 'middle', 'Verset du milieu', 'Tapez pour continuer', [...visibleVerses]));
     visibleVerses.push(middleVerse.verseKey);
+    steps.push({
+      type: 'revealing',
+      targetPosition: 'middle',
+      targetVerse: middleVerse,
+      message: {
+        title: 'Verset du milieu',
+        subtitle: 'Tapez pour continuer',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [...visibleVerses],
+        highlightedVerse: middleVerse.verseKey,
+      },
+    });
   }
 
-  // Dernier verset
+  // Dernier verset - juste révéler (pas d'audio)
   if (lastVerse) {
-    steps.push(createListeningStep(lastVerse, 'last', 'Écoutez le dernier verset...', 'Puis récitez-le'));
-    steps.push(createRevealStep(lastVerse, 'last', 'Dernier verset', 'Page suivante', [...visibleVerses]));
+    visibleVerses.push(lastVerse.verseKey);
+    steps.push({
+      type: 'revealing',
+      targetPosition: 'last',
+      targetVerse: lastVerse,
+      message: {
+        title: 'Dernier verset',
+        subtitle: 'Page suivante',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [...visibleVerses],
+        highlightedVerse: lastVerse.verseKey,
+      },
+    });
   }
 
   return steps;
@@ -185,6 +182,7 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
 
 // ============================================
 // 3. RANDOM START-MIDDLE-END (Quiz sans audio)
+// Une seule étape par verset, garde les versets précédents visibles
 // ============================================
 
 export const randomStartMiddleEndSteps: StepGenerator = (
@@ -216,11 +214,15 @@ export const randomStartMiddleEndSteps: StepGenerator = (
     last: 'Dernier verset',
   };
 
-  // Pour chaque position (dans l'ordre mélangé)
+  // Accumuler les versets visibles
+  const visibleVerses: string[] = [];
+
+  // Une seule étape par verset (page + verset combinés)
   for (const { type, verse } of positions) {
     if (!verse) continue;
 
-    // Étape 1: Afficher le verset (questionner page)
+    visibleVerses.push(verse.verseKey);
+
     steps.push({
       type: 'questioning',
       targetPosition: type,
@@ -228,30 +230,12 @@ export const randomStartMiddleEndSteps: StepGenerator = (
       question: 'identify_page',
       message: {
         title: labels[type],
-        subtitle: 'Quel numéro de page ?',
+        subtitle: 'Page ? Verset ?',
       },
       ui: {
         isBlurred: false,
         maskAll: true,
-        visibleVerses: [verse.verseKey],
-        highlightedVerse: verse.verseKey,
-      },
-    });
-
-    // Étape 2: Questionner le verset
-    steps.push({
-      type: 'questioning',
-      targetPosition: type,
-      targetVerse: verse,
-      question: 'identify_verse',
-      message: {
-        title: labels[type],
-        subtitle: 'Quel numéro de verset ?',
-      },
-      ui: {
-        isBlurred: false,
-        maskAll: true,
-        visibleVerses: [verse.verseKey],
+        visibleVerses: [...visibleVerses],
         highlightedVerse: verse.verseKey,
       },
     });
@@ -262,6 +246,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
 
 // ============================================
 // 4-5. START VERSE FORWARD/BACKWARD
+// Pas de masquage - juste surligner le verset cible
 // ============================================
 
 export const startVerseForwardSteps: StepGenerator = (
@@ -282,8 +267,8 @@ export const startVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [firstVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: firstVerse.verseKey,
       },
     },
@@ -308,8 +293,8 @@ export const startVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [firstVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: firstVerse.verseKey,
       },
     },
@@ -318,6 +303,7 @@ export const startVerseBackwardSteps: StepGenerator = (
 
 // ============================================
 // 6-7. MIDDLE VERSE FORWARD/BACKWARD
+// Pas de masquage - juste surligner le verset cible
 // ============================================
 
 export const middleVerseForwardSteps: StepGenerator = (
@@ -341,8 +327,8 @@ export const middleVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [middleVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: middleVerse.verseKey,
       },
     },
@@ -370,8 +356,8 @@ export const middleVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [middleVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: middleVerse.verseKey,
       },
     },
@@ -380,6 +366,7 @@ export const middleVerseBackwardSteps: StepGenerator = (
 
 // ============================================
 // 8-9. END VERSE FORWARD/BACKWARD
+// Pas de masquage - juste surligner le verset cible
 // ============================================
 
 export const endVerseForwardSteps: StepGenerator = (
@@ -400,8 +387,8 @@ export const endVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [lastVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: lastVerse.verseKey,
       },
     },
@@ -426,8 +413,8 @@ export const endVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: true,
-        visibleVerses: [lastVerse.verseKey],
+        maskAll: false,
+        visibleVerses: [],
         highlightedVerse: lastVerse.verseKey,
       },
     },
