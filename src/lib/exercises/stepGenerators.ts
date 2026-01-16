@@ -237,7 +237,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
   };
 
   // Étape 1: Écoute du verset de la première question (avec audio et flou)
-  // La question demande où est CE verset (celui qu'on écoute)
+  // Ne pas révéler quel verset est récité
   if (firstQuestionVerse && firstQuestionType) {
     steps.push({
       type: 'listening',
@@ -245,7 +245,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
       targetVerse: firstQuestionVerse,
       question: 'locate_verse',
       message: {
-        title: `Écoutez le ${labels[firstQuestionType].toLowerCase()}...`,
+        title: 'Écoutez le verset...',
         subtitle: 'Où se trouve-t-il ?',
       },
       ui: {
