@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fourqan - Révision du Coran",
+  title: "AlFourqan - Révision du Coran",
   description: "Application de révision et mémorisation du Coran avec Mushaf Medina 1405H et audio Al-Husary",
   keywords: ["Quran", "Coran", "Mushaf", "Mémorisation", "Hifz", "Al-Husary"],
   authors: [{ name: "Abdoul-khader" }],

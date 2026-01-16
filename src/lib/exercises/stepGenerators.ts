@@ -103,7 +103,7 @@ export const randomVerseSteps: StepGenerator = (
 
 // ============================================
 // 2. SEQUENTIAL START-MIDDLE-END
-// Pas d'audio, pas de flou - juste révéler les versets un par un
+// Audio pour la première étape (écoute), puis révéler les versets un par un
 // ============================================
 
 export const sequentialStartMiddleEndSteps: StepGenerator = (
@@ -117,8 +117,25 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
   const middleVerse = getMiddleVerse(pageVerses, verseMapData);
   const visibleVerses: string[] = [];
 
-  // Premier verset - juste révéler (pas d'audio)
+  // Étape 1: Écoute du premier verset (avec audio et flou)
   if (firstVerse) {
+    steps.push({
+      type: 'listening',
+      targetPosition: 'first',
+      targetVerse: firstVerse,
+      question: 'locate_verse',
+      message: {
+        title: 'Écoutez le premier verset...',
+        subtitle: 'Où se trouve-t-il ?',
+      },
+      ui: {
+        isBlurred: true,
+        maskAll: false,
+        visibleVerses: [],
+      },
+    });
+
+    // Étape 2: Révélation du premier verset
     visibleVerses.push(firstVerse.verseKey);
     steps.push({
       type: 'revealing',
