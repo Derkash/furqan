@@ -246,7 +246,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
 
 // ============================================
 // 4-5. START VERSE FORWARD/BACKWARD
-// Pas de masquage - juste surligner le verset cible
+// Masquer tout sauf le verset cible (les versets de la double page s'accumulent via le hook)
 // ============================================
 
 export const startVerseForwardSteps: StepGenerator = (
@@ -267,8 +267,8 @@ export const startVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [firstVerse.verseKey],
         highlightedVerse: firstVerse.verseKey,
       },
     },
@@ -293,8 +293,8 @@ export const startVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [firstVerse.verseKey],
         highlightedVerse: firstVerse.verseKey,
       },
     },
@@ -303,7 +303,7 @@ export const startVerseBackwardSteps: StepGenerator = (
 
 // ============================================
 // 6-7. MIDDLE VERSE FORWARD/BACKWARD
-// Pas de masquage - juste surligner le verset cible
+// Masquer tout sauf le verset cible (les versets de la double page s'accumulent via le hook)
 // ============================================
 
 export const middleVerseForwardSteps: StepGenerator = (
@@ -327,8 +327,8 @@ export const middleVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [middleVerse.verseKey],
         highlightedVerse: middleVerse.verseKey,
       },
     },
@@ -356,8 +356,8 @@ export const middleVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [middleVerse.verseKey],
         highlightedVerse: middleVerse.verseKey,
       },
     },
@@ -366,7 +366,7 @@ export const middleVerseBackwardSteps: StepGenerator = (
 
 // ============================================
 // 8-9. END VERSE FORWARD/BACKWARD
-// Pas de masquage - juste surligner le verset cible
+// Masquer tout sauf le verset cible (les versets de la double page s'accumulent via le hook)
 // ============================================
 
 export const endVerseForwardSteps: StepGenerator = (
@@ -387,8 +387,8 @@ export const endVerseForwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [lastVerse.verseKey],
         highlightedVerse: lastVerse.verseKey,
       },
     },
@@ -413,8 +413,8 @@ export const endVerseBackwardSteps: StepGenerator = (
       },
       ui: {
         isBlurred: false,
-        maskAll: false,
-        visibleVerses: [],
+        maskAll: true,
+        visibleVerses: [lastVerse.verseKey],
         highlightedVerse: lastVerse.verseKey,
       },
     },

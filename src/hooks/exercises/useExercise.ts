@@ -70,6 +70,10 @@ export function useExercise(): UseExerciseReturn {
   const [rightPageVerses, setRightPageVerses] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Versets révélés sur la double page courante (persistent entre page droite et gauche)
+  const [doublePageRevealedVerses, setDoublePageRevealedVerses] = useState<Set<string>>(new Set());
+  const [currentDoublePage, setCurrentDoublePage] = useState<number | null>(null);
+
   // Charger le verse-map pour les positions précises
   const { getPageVerses: getVerseMapPage } = useVerseMap();
 
@@ -82,10 +86,15 @@ export function useExercise(): UseExerciseReturn {
   // UI state from current step
   const isBlurred = currentStep?.ui.isBlurred ?? false;
   const maskAll = currentStep?.ui.maskAll ?? false;
-  const visibleVerses = useMemo(
-    () => new Set(currentStep?.ui.visibleVerses ?? []),
-    [currentStep]
-  );
+
+  // Combiner les versets du step avec ceux révélés sur la double page
+  const visibleVerses = useMemo(() => {
+    const stepVerses = new Set(currentStep?.ui.visibleVerses ?? []);
+    // Ajouter les versets déjà révélés sur cette double page
+    doublePageRevealedVerses.forEach(v => stepVerses.add(v));
+    return stepVerses;
+  }, [currentStep, doublePageRevealedVerses]);
+
   const highlightedVerse = currentStep?.ui.highlightedVerse ?? null;
 
   // Page pair
@@ -93,6 +102,16 @@ export function useExercise(): UseExerciseReturn {
     () => getPagePair(state.progress.currentPage),
     [state.progress.currentPage]
   );
+
+  // Détecter changement de double page et réinitialiser les versets révélés
+  useEffect(() => {
+    const newDoublePage = pagePair.rightPage;
+    if (currentDoublePage !== null && currentDoublePage !== newDoublePage) {
+      // Nouvelle double page - réinitialiser
+      setDoublePageRevealedVerses(new Set());
+    }
+    setCurrentDoublePage(newDoublePage);
+  }, [pagePair.rightPage, currentDoublePage]);
 
   // Load pages when page changes
   useEffect(() => {
@@ -185,7 +204,17 @@ export function useExercise(): UseExerciseReturn {
     }
 
     const { currentStepIndex, steps } = state.currentRound;
+    const currentStepData = steps[currentStepIndex];
     const nextIndex = currentStepIndex + 1;
+
+    // Accumuler les versets révélés de l'étape courante
+    if (currentStepData?.ui.visibleVerses) {
+      setDoublePageRevealedVerses(prev => {
+        const newSet = new Set(prev);
+        currentStepData.ui.visibleVerses.forEach(v => newSet.add(v));
+        return newSet;
+      });
+    }
 
     if (nextIndex < steps.length) {
       // Move to next step
@@ -247,6 +276,8 @@ export function useExercise(): UseExerciseReturn {
     setState(initialState);
     setLeftPageVerses(null);
     setRightPageVerses(null);
+    setDoublePageRevealedVerses(new Set());
+    setCurrentDoublePage(null);
   }, []);
 
   return {
