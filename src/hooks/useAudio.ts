@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { AudioState, VersePosition } from '@/types';
 import { getAudioUrl } from '@/utils/ayahMapping';
 
@@ -107,10 +107,11 @@ export function useAudio(): UseAudioReturn {
     }
   }, []);
 
-  return {
+  // Mémoïser la valeur de retour pour éviter les boucles infinies dans useEffect
+  return useMemo(() => ({
     ...state,
     play,
     pause,
     stop,
-  };
+  }), [state, play, pause, stop]);
 }

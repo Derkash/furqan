@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useOrientation } from '@/hooks/useOrientation';
@@ -61,11 +61,15 @@ export default function PracticePage() {
   }, [initialized, state.status, start]);
 
   // Play audio when step is listening
+  // Note: on utilise audio.play dans une ref pour éviter les boucles infinies
+  const audioPlayRef = useRef(audio.play);
+  audioPlayRef.current = audio.play;
+
   useEffect(() => {
     if (currentStep?.type === 'listening' && currentStep.targetVerse) {
-      audio.play(currentStep.targetVerse);
+      audioPlayRef.current(currentStep.targetVerse);
     }
-  }, [currentStep, audio]);
+  }, [currentStep]);
 
   // Handle tap
   const handleTap = () => {
