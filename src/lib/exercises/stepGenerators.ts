@@ -200,7 +200,7 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
 // ============================================
 // 3. RANDOM START-MIDDLE-END (Quiz avec audio)
 // Écoute du verset de la première question, puis révélation des 3 versets
-// S'applique à une seule page (pas double page)
+// La question annonce toujours le PROCHAIN verset à découvrir
 // ============================================
 
 export const randomStartMiddleEndSteps: StepGenerator = (
@@ -237,6 +237,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
   };
 
   // Étape 1: Écoute du verset de la première question (avec audio et flou)
+  // La question demande où est CE verset (celui qu'on écoute)
   if (firstQuestionVerse && firstQuestionType) {
     steps.push({
       type: 'listening',
@@ -258,11 +259,16 @@ export const randomStartMiddleEndSteps: StepGenerator = (
   // Accumuler les versets visibles
   const visibleVerses: string[] = [];
 
-  // Une seule étape par verset (page + verset combinés)
-  for (const { type, verse } of positions) {
+  // Chaque étape révèle le verset courant ET demande le suivant
+  for (let i = 0; i < positions.length; i++) {
+    const { type, verse } = positions[i];
     if (!verse) continue;
 
     visibleVerses.push(verse.verseKey);
+
+    // Le prochain verset à demander (si il y en a un)
+    const nextPosition = positions[i + 1];
+    const isLastStep = i === positions.length - 1;
 
     steps.push({
       type: 'questioning',
@@ -271,7 +277,9 @@ export const randomStartMiddleEndSteps: StepGenerator = (
       question: 'identify_page',
       message: {
         title: labels[type],
-        subtitle: 'Page ? Verset ?',
+        subtitle: isLastStep
+          ? 'Double page suivante'
+          : `Où est le ${labels[nextPosition.type].toLowerCase()} ?`,
       },
       ui: {
         isBlurred: false,
