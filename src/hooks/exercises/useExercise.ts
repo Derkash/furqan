@@ -64,6 +64,9 @@ function getPagePair(page: number): PagePair {
   };
 }
 
+// Exercices qui interrogent sur une seule page aléatoire de la double page
+const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = ['random-start-middle-end'];
+
 export function useExercise(): UseExerciseReturn {
   const [state, setState] = useState<ExerciseState>(initialState);
   const [leftPageVerses, setLeftPageVerses] = useState<PageVerses | null>(null);
@@ -143,15 +146,23 @@ export function useExercise(): UseExerciseReturn {
 
     setLoading(true);
     try {
-      const pageVerses = await fetchPageVerses(state.progress.currentPage);
+      // Pour les exercices double-page aléatoire, choisir aléatoirement entre les deux pages
+      let pageToUse = state.progress.currentPage;
+      if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(state.exerciseId)) {
+        const pair = getPagePair(state.progress.currentPage);
+        // Choisir aléatoirement entre page gauche et page droite
+        pageToUse = Math.random() < 0.5 ? pair.rightPage : pair.leftPage;
+      }
+
+      const pageVerses = await fetchPageVerses(pageToUse);
       // Récupérer les données du verse-map pour les positions précises
-      const verseMapData = getVerseMapPage(state.progress.currentPage);
-      const steps = generator(pageVerses, state.progress.currentPage, state.config, verseMapData);
+      const verseMapData = getVerseMapPage(pageToUse);
+      const steps = generator(pageVerses, pageToUse, state.config, verseMapData);
 
       const round: ExerciseRound = {
         roundIndex: state.progress.roundsCompleted,
         totalRounds: state.progress.totalPages,
-        pageNumber: state.progress.currentPage,
+        pageNumber: pageToUse,
         steps,
         currentStepIndex: 0,
       };
@@ -231,7 +242,12 @@ export function useExercise(): UseExerciseReturn {
 
       const { currentPage, pagesCompleted, totalPages } = state.progress;
 
-      if (pagesCompleted + 1 >= totalPages) {
+      // Pour les exercices double-page aléatoire, avancer de 2 pages
+      const isDoublePageExercise = DOUBLE_PAGE_RANDOM_EXERCISES.includes(state.exerciseId);
+      const pageIncrement = isDoublePageExercise ? 2 : 1;
+      const pagesCompletedIncrement = isDoublePageExercise ? 2 : 1;
+
+      if (pagesCompleted + pagesCompletedIncrement >= totalPages) {
         // Exercise complete
         setState((prev) => ({ ...prev, status: 'completed' }));
         return;
@@ -239,7 +255,9 @@ export function useExercise(): UseExerciseReturn {
 
       // Calculate next page
       const nextPage =
-        definition.progression === 'backward' ? currentPage - 1 : currentPage + 1;
+        definition.progression === 'backward'
+          ? currentPage - pageIncrement
+          : currentPage + pageIncrement;
 
       setState((prev) => ({
         ...prev,
@@ -247,7 +265,7 @@ export function useExercise(): UseExerciseReturn {
         progress: {
           ...prev.progress,
           currentPage: nextPage,
-          pagesCompleted: pagesCompleted + 1,
+          pagesCompleted: pagesCompleted + pagesCompletedIncrement,
           roundsCompleted: prev.progress.roundsCompleted + 1,
         },
       }));

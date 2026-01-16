@@ -13,6 +13,8 @@ interface MushafDoublePageProps {
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
+  singlePage?: boolean; // Afficher une seule page (la page courante)
+  currentPage?: number; // Numéro de la page courante (pour mode singlePage)
   onTap: () => void;
 }
 
@@ -32,9 +34,43 @@ export default function MushafDoublePage({
   isBlurred = false,
   maskAll = false,
   loading = false,
+  singlePage = false,
+  currentPage,
   onTap,
 }: MushafDoublePageProps) {
   const isLandscape = orientation === 'landscape';
+
+  // Mode page unique : afficher seulement la page courante
+  if (singlePage && currentPage !== undefined) {
+    const isCurrentPageRight = currentPage === pagePair.rightPage;
+    const pageVerses = isCurrentPageRight ? rightPageVerses : leftPageVerses;
+
+    return (
+      <div
+        onClick={onTap}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '100%',
+          height: '100%',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ height: '100%', maxWidth: '100%', aspectRatio: '0.7' }}>
+          <MushafPage
+            pageNumber={currentPage}
+            pageVerses={pageVerses}
+            revealedVerses={revealedVerses}
+            visibleVerses={visibleVerses}
+            isBlurred={isBlurred}
+            maskAll={maskAll}
+            loading={loading && !pageVerses}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Page impaire (rightPage) à DROITE, page paire (leftPage) à GAUCHE
   // En flex row: on affiche d'abord gauche puis droite

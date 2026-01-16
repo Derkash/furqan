@@ -198,8 +198,9 @@ export const sequentialStartMiddleEndSteps: StepGenerator = (
 };
 
 // ============================================
-// 3. RANDOM START-MIDDLE-END (Quiz sans audio)
-// Une seule étape par verset, garde les versets précédents visibles
+// 3. RANDOM START-MIDDLE-END (Quiz avec audio)
+// Écoute du verset de la première question, puis révélation des 3 versets
+// S'applique à une seule page (pas double page)
 // ============================================
 
 export const randomStartMiddleEndSteps: StepGenerator = (
@@ -212,7 +213,7 @@ export const randomStartMiddleEndSteps: StepGenerator = (
   const { firstVerse, lastVerse } = pageVerses;
   const middleVerse = getMiddleVerse(pageVerses, verseMapData);
 
-  // Créer un tableau des 3 positions et mélanger
+  // Créer un tableau des 3 positions et mélanger AVANT de créer les étapes
   const positions: Array<{ type: 'first' | 'middle' | 'last'; verse: VersePosition | null }> = [
     { type: 'first' as const, verse: firstVerse },
     { type: 'middle' as const, verse: middleVerse },
@@ -225,11 +226,34 @@ export const randomStartMiddleEndSteps: StepGenerator = (
     [positions[i], positions[j]] = [positions[j], positions[i]];
   }
 
+  // Le premier verset interrogé est celui qui sort en premier du mélange
+  const firstQuestionVerse = positions[0]?.verse;
+  const firstQuestionType = positions[0]?.type;
+
   const labels = {
     first: 'Premier verset',
     middle: 'Verset du milieu',
     last: 'Dernier verset',
   };
+
+  // Étape 1: Écoute du verset de la première question (avec audio et flou)
+  if (firstQuestionVerse && firstQuestionType) {
+    steps.push({
+      type: 'listening',
+      targetPosition: firstQuestionType,
+      targetVerse: firstQuestionVerse,
+      question: 'locate_verse',
+      message: {
+        title: `Écoutez le ${labels[firstQuestionType].toLowerCase()}...`,
+        subtitle: 'Où se trouve-t-il ?',
+      },
+      ui: {
+        isBlurred: true,
+        maskAll: false,
+        visibleVerses: [],
+      },
+    });
+  }
 
   // Accumuler les versets visibles
   const visibleVerses: string[] = [];

@@ -73,6 +73,9 @@ export default function PracticePage() {
 
   // Handle tap
   const handleTap = () => {
+    // Arrêter l'audio en cours si il y en a
+    audio.stop();
+
     if (state.status === 'completed') {
       router.push(`/exercises/${exerciseId}/setup`);
       return;
@@ -157,6 +160,34 @@ export default function PracticePage() {
         <span className="text-xs opacity-75">{exercise?.name}</span>
       </div>
 
+      {/* Overlay avec message - sous la barre verte */}
+      {currentStep && (
+        <div className="flex-none bg-[#2d5016]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
+          {audio.isPlaying && (
+            <div className="flex gap-0.5">
+              <span
+                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                style={{ animationDelay: '0ms' }}
+              />
+              <span
+                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                style={{ animationDelay: '150ms' }}
+              />
+              <span
+                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                style={{ animationDelay: '300ms' }}
+              />
+            </div>
+          )}
+          <span className="text-base font-medium">
+            {currentStep.message.title}
+          </span>
+          <span className="text-[#c9a959] text-sm">
+            {currentStep.message.subtitle}
+          </span>
+        </div>
+      )}
+
       {/* Zone Mushaf */}
       <div className="flex-1 min-h-0 relative">
         <MushafDoublePage
@@ -171,36 +202,6 @@ export default function PracticePage() {
           loading={loading}
           onTap={handleTap}
         />
-
-        {/* Overlay avec message */}
-        {currentStep && (
-          <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none z-50">
-            <div className="bg-[#2d5016]/95 text-white px-6 py-2 rounded-lg shadow-2xl text-center max-w-sm mx-4">
-              {audio.isPlaying && (
-                <div className="flex justify-center gap-1 mb-2">
-                  <span
-                    className="w-1 h-4 bg-[#c9a959] rounded-full animate-bounce"
-                    style={{ animationDelay: '0ms' }}
-                  />
-                  <span
-                    className="w-1 h-4 bg-[#c9a959] rounded-full animate-bounce"
-                    style={{ animationDelay: '150ms' }}
-                  />
-                  <span
-                    className="w-1 h-4 bg-[#c9a959] rounded-full animate-bounce"
-                    style={{ animationDelay: '300ms' }}
-                  />
-                </div>
-              )}
-              <h3 className="text-lg font-semibold mb-0.5">
-                {currentStep.message.title}
-              </h3>
-              <p className="text-[#c9a959] text-sm">
-                {currentStep.message.subtitle}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
