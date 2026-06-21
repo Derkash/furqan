@@ -1,0 +1,302 @@
+[
+  {
+    "hizb": 1,
+    "startPage": 1,
+    "endPage": 10
+  },
+  {
+    "hizb": 2,
+    "startPage": 11,
+    "endPage": 21
+  },
+  {
+    "hizb": 3,
+    "startPage": 22,
+    "endPage": 31
+  },
+  {
+    "hizb": 4,
+    "startPage": 32,
+    "endPage": 41
+  },
+  {
+    "hizb": 5,
+    "startPage": 42,
+    "endPage": 50
+  },
+  {
+    "hizb": 6,
+    "startPage": 51,
+    "endPage": 61
+  },
+  {
+    "hizb": 7,
+    "startPage": 62,
+    "endPage": 71
+  },
+  {
+    "hizb": 8,
+    "startPage": 72,
+    "endPage": 81
+  },
+  {
+    "hizb": 9,
+    "startPage": 82,
+    "endPage": 91
+  },
+  {
+    "hizb": 10,
+    "startPage": 92,
+    "endPage": 101
+  },
+  {
+    "hizb": 11,
+    "startPage": 102,
+    "endPage": 111
+  },
+  {
+    "hizb": 12,
+    "startPage": 112,
+    "endPage": 120
+  },
+  {
+    "hizb": 13,
+    "startPage": 121,
+    "endPage": 131
+  },
+  {
+    "hizb": 14,
+    "startPage": 132,
+    "endPage": 141
+  },
+  {
+    "hizb": 15,
+    "startPage": 142,
+    "endPage": 150
+  },
+  {
+    "hizb": 16,
+    "startPage": 151,
+    "endPage": 161
+  },
+  {
+    "hizb": 17,
+    "startPage": 162,
+    "endPage": 172
+  },
+  {
+    "hizb": 18,
+    "startPage": 173,
+    "endPage": 181
+  },
+  {
+    "hizb": 19,
+    "startPage": 182,
+    "endPage": 191
+  },
+  {
+    "hizb": 20,
+    "startPage": 192,
+    "endPage": 200
+  },
+  {
+    "hizb": 21,
+    "startPage": 201,
+    "endPage": 211
+  },
+  {
+    "hizb": 22,
+    "startPage": 212,
+    "endPage": 221
+  },
+  {
+    "hizb": 23,
+    "startPage": 222,
+    "endPage": 230
+  },
+  {
+    "hizb": 24,
+    "startPage": 231,
+    "endPage": 241
+  },
+  {
+    "hizb": 25,
+    "startPage": 242,
+    "endPage": 251
+  },
+  {
+    "hizb": 26,
+    "startPage": 252,
+    "endPage": 261
+  },
+  {
+    "hizb": 27,
+    "startPage": 262,
+    "endPage": 271
+  },
+  {
+    "hizb": 28,
+    "startPage": 272,
+    "endPage": 281
+  },
+  {
+    "hizb": 29,
+    "startPage": 282,
+    "endPage": 291
+  },
+  {
+    "hizb": 30,
+    "startPage": 292,
+    "endPage": 301
+  },
+  {
+    "hizb": 31,
+    "startPage": 302,
+    "endPage": 311
+  },
+  {
+    "hizb": 32,
+    "startPage": 312,
+    "endPage": 321
+  },
+  {
+    "hizb": 33,
+    "startPage": 322,
+    "endPage": 331
+  },
+  {
+    "hizb": 34,
+    "startPage": 332,
+    "endPage": 341
+  },
+  {
+    "hizb": 35,
+    "startPage": 342,
+    "endPage": 351
+  },
+  {
+    "hizb": 36,
+    "startPage": 352,
+    "endPage": 361
+  },
+  {
+    "hizb": 37,
+    "startPage": 362,
+    "endPage": 370
+  },
+  {
+    "hizb": 38,
+    "startPage": 371,
+    "endPage": 381
+  },
+  {
+    "hizb": 39,
+    "startPage": 382,
+    "endPage": 391
+  },
+  {
+    "hizb": 40,
+    "startPage": 392,
+    "endPage": 401
+  },
+  {
+    "hizb": 41,
+    "startPage": 402,
+    "endPage": 412
+  },
+  {
+    "hizb": 42,
+    "startPage": 413,
+    "endPage": 421
+  },
+  {
+    "hizb": 43,
+    "startPage": 422,
+    "endPage": 430
+  },
+  {
+    "hizb": 44,
+    "startPage": 431,
+    "endPage": 441
+  },
+  {
+    "hizb": 45,
+    "startPage": 442,
+    "endPage": 450
+  },
+  {
+    "hizb": 46,
+    "startPage": 451,
+    "endPage": 461
+  },
+  {
+    "hizb": 47,
+    "startPage": 462,
+    "endPage": 471
+  },
+  {
+    "hizb": 48,
+    "startPage": 472,
+    "endPage": 481
+  },
+  {
+    "hizb": 49,
+    "startPage": 482,
+    "endPage": 490
+  },
+  {
+    "hizb": 50,
+    "startPage": 491,
+    "endPage": 501
+  },
+  {
+    "hizb": 51,
+    "startPage": 502,
+    "endPage": 512
+  },
+  {
+    "hizb": 52,
+    "startPage": 513,
+    "endPage": 521
+  },
+  {
+    "hizb": 53,
+    "startPage": 522,
+    "endPage": 530
+  },
+  {
+    "hizb": 54,
+    "startPage": 531,
+    "endPage": 541
+  },
+  {
+    "hizb": 55,
+    "startPage": 542,
+    "endPage": 552
+  },
+  {
+    "hizb": 56,
+    "startPage": 553,
+    "endPage": 561
+  },
+  {
+    "hizb": 57,
+    "startPage": 562,
+    "endPage": 571
+  },
+  {
+    "hizb": 58,
+    "startPage": 572,
+    "endPage": 581
+  },
+  {
+    "hizb": 59,
+    "startPage": 582,
+    "endPage": 590
+  },
+  {
+    "hizb": 60,
+    "startPage": 591,
+    "endPage": 604
+  }
+]

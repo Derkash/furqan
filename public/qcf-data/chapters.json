@@ -2,685 +2,1255 @@
   {
     "id": 1,
     "name_arabic": "الفاتحة",
+    "name_simple": "Al-Fatihah",
     "bismillah_pre": false,
-    "verses_count": 7
+    "verses_count": 7,
+    "pages": [
+      1,
+      1
+    ]
   },
   {
     "id": 2,
     "name_arabic": "البقرة",
+    "name_simple": "Al-Baqarah",
     "bismillah_pre": true,
-    "verses_count": 286
+    "verses_count": 286,
+    "pages": [
+      2,
+      49
+    ]
   },
   {
     "id": 3,
     "name_arabic": "آل عمران",
+    "name_simple": "Ali 'Imran",
     "bismillah_pre": true,
-    "verses_count": 200
+    "verses_count": 200,
+    "pages": [
+      50,
+      76
+    ]
   },
   {
     "id": 4,
     "name_arabic": "النساء",
+    "name_simple": "An-Nisa",
     "bismillah_pre": true,
-    "verses_count": 176
+    "verses_count": 176,
+    "pages": [
+      77,
+      106
+    ]
   },
   {
     "id": 5,
     "name_arabic": "المائدة",
+    "name_simple": "Al-Ma'idah",
     "bismillah_pre": true,
-    "verses_count": 120
+    "verses_count": 120,
+    "pages": [
+      106,
+      127
+    ]
   },
   {
     "id": 6,
     "name_arabic": "الأنعام",
+    "name_simple": "Al-An'am",
     "bismillah_pre": true,
-    "verses_count": 165
+    "verses_count": 165,
+    "pages": [
+      128,
+      150
+    ]
   },
   {
     "id": 7,
     "name_arabic": "الأعراف",
+    "name_simple": "Al-A'raf",
     "bismillah_pre": true,
-    "verses_count": 206
+    "verses_count": 206,
+    "pages": [
+      151,
+      176
+    ]
   },
   {
     "id": 8,
     "name_arabic": "الأنفال",
+    "name_simple": "Al-Anfal",
     "bismillah_pre": true,
-    "verses_count": 75
+    "verses_count": 75,
+    "pages": [
+      177,
+      186
+    ]
   },
   {
     "id": 9,
     "name_arabic": "التوبة",
+    "name_simple": "At-Tawbah",
     "bismillah_pre": false,
-    "verses_count": 129
+    "verses_count": 129,
+    "pages": [
+      187,
+      207
+    ]
   },
   {
     "id": 10,
     "name_arabic": "يونس",
+    "name_simple": "Yunus",
     "bismillah_pre": true,
-    "verses_count": 109
+    "verses_count": 109,
+    "pages": [
+      208,
+      221
+    ]
   },
   {
     "id": 11,
     "name_arabic": "هود",
+    "name_simple": "Hud",
     "bismillah_pre": true,
-    "verses_count": 123
+    "verses_count": 123,
+    "pages": [
+      221,
+      235
+    ]
   },
   {
     "id": 12,
     "name_arabic": "يوسف",
+    "name_simple": "Yusuf",
     "bismillah_pre": true,
-    "verses_count": 111
+    "verses_count": 111,
+    "pages": [
+      235,
+      248
+    ]
   },
   {
     "id": 13,
     "name_arabic": "الرعد",
+    "name_simple": "Ar-Ra'd",
     "bismillah_pre": true,
-    "verses_count": 43
+    "verses_count": 43,
+    "pages": [
+      249,
+      255
+    ]
   },
   {
     "id": 14,
     "name_arabic": "ابراهيم",
+    "name_simple": "Ibrahim",
     "bismillah_pre": true,
-    "verses_count": 52
+    "verses_count": 52,
+    "pages": [
+      255,
+      261
+    ]
   },
   {
     "id": 15,
     "name_arabic": "الحجر",
+    "name_simple": "Al-Hijr",
     "bismillah_pre": true,
-    "verses_count": 99
+    "verses_count": 99,
+    "pages": [
+      262,
+      267
+    ]
   },
   {
     "id": 16,
     "name_arabic": "النحل",
+    "name_simple": "An-Nahl",
     "bismillah_pre": true,
-    "verses_count": 128
+    "verses_count": 128,
+    "pages": [
+      267,
+      281
+    ]
   },
   {
     "id": 17,
     "name_arabic": "الإسراء",
+    "name_simple": "Al-Isra",
     "bismillah_pre": true,
-    "verses_count": 111
+    "verses_count": 111,
+    "pages": [
+      282,
+      293
+    ]
   },
   {
     "id": 18,
     "name_arabic": "الكهف",
+    "name_simple": "Al-Kahf",
     "bismillah_pre": true,
-    "verses_count": 110
+    "verses_count": 110,
+    "pages": [
+      293,
+      304
+    ]
   },
   {
     "id": 19,
     "name_arabic": "مريم",
+    "name_simple": "Maryam",
     "bismillah_pre": true,
-    "verses_count": 98
+    "verses_count": 98,
+    "pages": [
+      305,
+      312
+    ]
   },
   {
     "id": 20,
     "name_arabic": "طه",
+    "name_simple": "Taha",
     "bismillah_pre": true,
-    "verses_count": 135
+    "verses_count": 135,
+    "pages": [
+      312,
+      321
+    ]
   },
   {
     "id": 21,
     "name_arabic": "الأنبياء",
+    "name_simple": "Al-Anbya",
     "bismillah_pre": true,
-    "verses_count": 112
+    "verses_count": 112,
+    "pages": [
+      322,
+      331
+    ]
   },
   {
     "id": 22,
     "name_arabic": "الحج",
+    "name_simple": "Al-Hajj",
     "bismillah_pre": true,
-    "verses_count": 78
+    "verses_count": 78,
+    "pages": [
+      332,
+      341
+    ]
   },
   {
     "id": 23,
     "name_arabic": "المؤمنون",
+    "name_simple": "Al-Mu'minun",
     "bismillah_pre": true,
-    "verses_count": 118
+    "verses_count": 118,
+    "pages": [
+      342,
+      349
+    ]
   },
   {
     "id": 24,
     "name_arabic": "النور",
+    "name_simple": "An-Nur",
     "bismillah_pre": true,
-    "verses_count": 64
+    "verses_count": 64,
+    "pages": [
+      350,
+      359
+    ]
   },
   {
     "id": 25,
     "name_arabic": "الفرقان",
+    "name_simple": "Al-Furqan",
     "bismillah_pre": true,
-    "verses_count": 77
+    "verses_count": 77,
+    "pages": [
+      359,
+      366
+    ]
   },
   {
     "id": 26,
     "name_arabic": "الشعراء",
+    "name_simple": "Ash-Shu'ara",
     "bismillah_pre": true,
-    "verses_count": 227
+    "verses_count": 227,
+    "pages": [
+      367,
+      376
+    ]
   },
   {
     "id": 27,
     "name_arabic": "النمل",
+    "name_simple": "An-Naml",
     "bismillah_pre": true,
-    "verses_count": 93
+    "verses_count": 93,
+    "pages": [
+      377,
+      385
+    ]
   },
   {
     "id": 28,
     "name_arabic": "القصص",
+    "name_simple": "Al-Qasas",
     "bismillah_pre": true,
-    "verses_count": 88
+    "verses_count": 88,
+    "pages": [
+      385,
+      396
+    ]
   },
   {
     "id": 29,
     "name_arabic": "العنكبوت",
+    "name_simple": "Al-'Ankabut",
     "bismillah_pre": true,
-    "verses_count": 69
+    "verses_count": 69,
+    "pages": [
+      396,
+      404
+    ]
   },
   {
     "id": 30,
     "name_arabic": "الروم",
+    "name_simple": "Ar-Rum",
     "bismillah_pre": true,
-    "verses_count": 60
+    "verses_count": 60,
+    "pages": [
+      404,
+      410
+    ]
   },
   {
     "id": 31,
     "name_arabic": "لقمان",
+    "name_simple": "Luqman",
     "bismillah_pre": true,
-    "verses_count": 34
+    "verses_count": 34,
+    "pages": [
+      411,
+      414
+    ]
   },
   {
     "id": 32,
     "name_arabic": "السجدة",
+    "name_simple": "As-Sajdah",
     "bismillah_pre": true,
-    "verses_count": 30
+    "verses_count": 30,
+    "pages": [
+      415,
+      417
+    ]
   },
   {
     "id": 33,
     "name_arabic": "الأحزاب",
+    "name_simple": "Al-Ahzab",
     "bismillah_pre": true,
-    "verses_count": 73
+    "verses_count": 73,
+    "pages": [
+      418,
+      427
+    ]
   },
   {
     "id": 34,
     "name_arabic": "سبإ",
+    "name_simple": "Saba",
     "bismillah_pre": true,
-    "verses_count": 54
+    "verses_count": 54,
+    "pages": [
+      428,
+      434
+    ]
   },
   {
     "id": 35,
     "name_arabic": "فاطر",
+    "name_simple": "Fatir",
     "bismillah_pre": true,
-    "verses_count": 45
+    "verses_count": 45,
+    "pages": [
+      434,
+      440
+    ]
   },
   {
     "id": 36,
     "name_arabic": "يس",
+    "name_simple": "Ya-Sin",
     "bismillah_pre": true,
-    "verses_count": 83
+    "verses_count": 83,
+    "pages": [
+      440,
+      445
+    ]
   },
   {
     "id": 37,
     "name_arabic": "الصافات",
+    "name_simple": "As-Saffat",
     "bismillah_pre": true,
-    "verses_count": 182
+    "verses_count": 182,
+    "pages": [
+      446,
+      452
+    ]
   },
   {
     "id": 38,
     "name_arabic": "ص",
+    "name_simple": "Sad",
     "bismillah_pre": true,
-    "verses_count": 88
+    "verses_count": 88,
+    "pages": [
+      453,
+      458
+    ]
   },
   {
     "id": 39,
     "name_arabic": "الزمر",
+    "name_simple": "Az-Zumar",
     "bismillah_pre": true,
-    "verses_count": 75
+    "verses_count": 75,
+    "pages": [
+      458,
+      467
+    ]
   },
   {
     "id": 40,
     "name_arabic": "غافر",
+    "name_simple": "Ghafir",
     "bismillah_pre": true,
-    "verses_count": 85
+    "verses_count": 85,
+    "pages": [
+      467,
+      476
+    ]
   },
   {
     "id": 41,
     "name_arabic": "فصلت",
+    "name_simple": "Fussilat",
     "bismillah_pre": true,
-    "verses_count": 54
+    "verses_count": 54,
+    "pages": [
+      477,
+      482
+    ]
   },
   {
     "id": 42,
     "name_arabic": "الشورى",
+    "name_simple": "Ash-Shuraa",
     "bismillah_pre": true,
-    "verses_count": 53
+    "verses_count": 53,
+    "pages": [
+      483,
+      489
+    ]
   },
   {
     "id": 43,
     "name_arabic": "الزخرف",
+    "name_simple": "Az-Zukhruf",
     "bismillah_pre": true,
-    "verses_count": 89
+    "verses_count": 89,
+    "pages": [
+      489,
+      495
+    ]
   },
   {
     "id": 44,
     "name_arabic": "الدخان",
+    "name_simple": "Ad-Dukhan",
     "bismillah_pre": true,
-    "verses_count": 59
+    "verses_count": 59,
+    "pages": [
+      496,
+      498
+    ]
   },
   {
     "id": 45,
     "name_arabic": "الجاثية",
+    "name_simple": "Al-Jathiyah",
     "bismillah_pre": true,
-    "verses_count": 37
+    "verses_count": 37,
+    "pages": [
+      499,
+      502
+    ]
   },
   {
     "id": 46,
     "name_arabic": "الأحقاف",
+    "name_simple": "Al-Ahqaf",
     "bismillah_pre": true,
-    "verses_count": 35
+    "verses_count": 35,
+    "pages": [
+      502,
+      506
+    ]
   },
   {
     "id": 47,
     "name_arabic": "محمد",
+    "name_simple": "Muhammad",
     "bismillah_pre": true,
-    "verses_count": 38
+    "verses_count": 38,
+    "pages": [
+      507,
+      510
+    ]
   },
   {
     "id": 48,
     "name_arabic": "الفتح",
+    "name_simple": "Al-Fath",
     "bismillah_pre": true,
-    "verses_count": 29
+    "verses_count": 29,
+    "pages": [
+      511,
+      515
+    ]
   },
   {
     "id": 49,
     "name_arabic": "الحجرات",
+    "name_simple": "Al-Hujurat",
     "bismillah_pre": true,
-    "verses_count": 18
+    "verses_count": 18,
+    "pages": [
+      515,
+      517
+    ]
   },
   {
     "id": 50,
     "name_arabic": "ق",
+    "name_simple": "Qaf",
     "bismillah_pre": true,
-    "verses_count": 45
+    "verses_count": 45,
+    "pages": [
+      518,
+      520
+    ]
   },
   {
     "id": 51,
     "name_arabic": "الذاريات",
+    "name_simple": "Adh-Dhariyat",
     "bismillah_pre": true,
-    "verses_count": 60
+    "verses_count": 60,
+    "pages": [
+      520,
+      523
+    ]
   },
   {
     "id": 52,
     "name_arabic": "الطور",
+    "name_simple": "At-Tur",
     "bismillah_pre": true,
-    "verses_count": 49
+    "verses_count": 49,
+    "pages": [
+      523,
+      525
+    ]
   },
   {
     "id": 53,
     "name_arabic": "النجم",
+    "name_simple": "An-Najm",
     "bismillah_pre": true,
-    "verses_count": 62
+    "verses_count": 62,
+    "pages": [
+      526,
+      528
+    ]
   },
   {
     "id": 54,
     "name_arabic": "القمر",
+    "name_simple": "Al-Qamar",
     "bismillah_pre": true,
-    "verses_count": 55
+    "verses_count": 55,
+    "pages": [
+      528,
+      531
+    ]
   },
   {
     "id": 55,
     "name_arabic": "الرحمن",
+    "name_simple": "Ar-Rahman",
     "bismillah_pre": true,
-    "verses_count": 78
+    "verses_count": 78,
+    "pages": [
+      531,
+      534
+    ]
   },
   {
     "id": 56,
     "name_arabic": "الواقعة",
+    "name_simple": "Al-Waqi'ah",
     "bismillah_pre": true,
-    "verses_count": 96
+    "verses_count": 96,
+    "pages": [
+      534,
+      537
+    ]
   },
   {
     "id": 57,
     "name_arabic": "الحديد",
+    "name_simple": "Al-Hadid",
     "bismillah_pre": true,
-    "verses_count": 29
+    "verses_count": 29,
+    "pages": [
+      537,
+      541
+    ]
   },
   {
     "id": 58,
     "name_arabic": "المجادلة",
+    "name_simple": "Al-Mujadila",
     "bismillah_pre": true,
-    "verses_count": 22
+    "verses_count": 22,
+    "pages": [
+      542,
+      545
+    ]
   },
   {
     "id": 59,
     "name_arabic": "الحشر",
+    "name_simple": "Al-Hashr",
     "bismillah_pre": true,
-    "verses_count": 24
+    "verses_count": 24,
+    "pages": [
+      545,
+      548
+    ]
   },
   {
     "id": 60,
     "name_arabic": "الممتحنة",
+    "name_simple": "Al-Mumtahanah",
     "bismillah_pre": true,
-    "verses_count": 13
+    "verses_count": 13,
+    "pages": [
+      549,
+      551
+    ]
   },
   {
     "id": 61,
     "name_arabic": "الصف",
+    "name_simple": "As-Saf",
     "bismillah_pre": true,
-    "verses_count": 14
+    "verses_count": 14,
+    "pages": [
+      551,
+      552
+    ]
   },
   {
     "id": 62,
     "name_arabic": "الجمعة",
+    "name_simple": "Al-Jumu'ah",
     "bismillah_pre": true,
-    "verses_count": 11
+    "verses_count": 11,
+    "pages": [
+      553,
+      554
+    ]
   },
   {
     "id": 63,
     "name_arabic": "المنافقون",
+    "name_simple": "Al-Munafiqun",
     "bismillah_pre": true,
-    "verses_count": 11
+    "verses_count": 11,
+    "pages": [
+      554,
+      555
+    ]
   },
   {
     "id": 64,
     "name_arabic": "التغابن",
+    "name_simple": "At-Taghabun",
     "bismillah_pre": true,
-    "verses_count": 18
+    "verses_count": 18,
+    "pages": [
+      556,
+      557
+    ]
   },
   {
     "id": 65,
     "name_arabic": "الطلاق",
+    "name_simple": "At-Talaq",
     "bismillah_pre": true,
-    "verses_count": 12
+    "verses_count": 12,
+    "pages": [
+      558,
+      559
+    ]
   },
   {
     "id": 66,
     "name_arabic": "التحريم",
+    "name_simple": "At-Tahrim",
     "bismillah_pre": true,
-    "verses_count": 12
+    "verses_count": 12,
+    "pages": [
+      560,
+      561
+    ]
   },
   {
     "id": 67,
     "name_arabic": "الملك",
+    "name_simple": "Al-Mulk",
     "bismillah_pre": true,
-    "verses_count": 30
+    "verses_count": 30,
+    "pages": [
+      562,
+      564
+    ]
   },
   {
     "id": 68,
     "name_arabic": "القلم",
+    "name_simple": "Al-Qalam",
     "bismillah_pre": true,
-    "verses_count": 52
+    "verses_count": 52,
+    "pages": [
+      564,
+      566
+    ]
   },
   {
     "id": 69,
     "name_arabic": "الحاقة",
+    "name_simple": "Al-Haqqah",
     "bismillah_pre": true,
-    "verses_count": 52
+    "verses_count": 52,
+    "pages": [
+      566,
+      568
+    ]
   },
   {
     "id": 70,
     "name_arabic": "المعارج",
+    "name_simple": "Al-Ma'arij",
     "bismillah_pre": true,
-    "verses_count": 44
+    "verses_count": 44,
+    "pages": [
+      568,
+      570
+    ]
   },
   {
     "id": 71,
     "name_arabic": "نوح",
+    "name_simple": "Nuh",
     "bismillah_pre": true,
-    "verses_count": 28
+    "verses_count": 28,
+    "pages": [
+      570,
+      571
+    ]
   },
   {
     "id": 72,
     "name_arabic": "الجن",
+    "name_simple": "Al-Jinn",
     "bismillah_pre": true,
-    "verses_count": 28
+    "verses_count": 28,
+    "pages": [
+      572,
+      573
+    ]
   },
   {
     "id": 73,
     "name_arabic": "المزمل",
+    "name_simple": "Al-Muzzammil",
     "bismillah_pre": true,
-    "verses_count": 20
+    "verses_count": 20,
+    "pages": [
+      574,
+      575
+    ]
   },
   {
     "id": 74,
     "name_arabic": "المدثر",
+    "name_simple": "Al-Muddaththir",
     "bismillah_pre": true,
-    "verses_count": 56
+    "verses_count": 56,
+    "pages": [
+      575,
+      577
+    ]
   },
   {
     "id": 75,
     "name_arabic": "القيامة",
+    "name_simple": "Al-Qiyamah",
     "bismillah_pre": true,
-    "verses_count": 40
+    "verses_count": 40,
+    "pages": [
+      577,
+      578
+    ]
   },
   {
     "id": 76,
     "name_arabic": "الانسان",
+    "name_simple": "Al-Insan",
     "bismillah_pre": true,
-    "verses_count": 31
+    "verses_count": 31,
+    "pages": [
+      578,
+      580
+    ]
   },
   {
     "id": 77,
     "name_arabic": "المرسلات",
+    "name_simple": "Al-Mursalat",
     "bismillah_pre": true,
-    "verses_count": 50
+    "verses_count": 50,
+    "pages": [
+      580,
+      581
+    ]
   },
   {
     "id": 78,
     "name_arabic": "النبإ",
+    "name_simple": "An-Naba",
     "bismillah_pre": true,
-    "verses_count": 40
+    "verses_count": 40,
+    "pages": [
+      582,
+      583
+    ]
   },
   {
     "id": 79,
     "name_arabic": "النازعات",
+    "name_simple": "An-Nazi'at",
     "bismillah_pre": true,
-    "verses_count": 46
+    "verses_count": 46,
+    "pages": [
+      583,
+      584
+    ]
   },
   {
     "id": 80,
     "name_arabic": "عبس",
+    "name_simple": "'Abasa",
     "bismillah_pre": true,
-    "verses_count": 42
+    "verses_count": 42,
+    "pages": [
+      585,
+      585
+    ]
   },
   {
     "id": 81,
     "name_arabic": "التكوير",
+    "name_simple": "At-Takwir",
     "bismillah_pre": true,
-    "verses_count": 29
+    "verses_count": 29,
+    "pages": [
+      586,
+      586
+    ]
   },
   {
     "id": 82,
     "name_arabic": "الإنفطار",
+    "name_simple": "Al-Infitar",
     "bismillah_pre": true,
-    "verses_count": 19
+    "verses_count": 19,
+    "pages": [
+      587,
+      587
+    ]
   },
   {
     "id": 83,
     "name_arabic": "المطففين",
+    "name_simple": "Al-Mutaffifin",
     "bismillah_pre": true,
-    "verses_count": 36
+    "verses_count": 36,
+    "pages": [
+      587,
+      589
+    ]
   },
   {
     "id": 84,
     "name_arabic": "الإنشقاق",
+    "name_simple": "Al-Inshiqaq",
     "bismillah_pre": true,
-    "verses_count": 25
+    "verses_count": 25,
+    "pages": [
+      589,
+      589
+    ]
   },
   {
     "id": 85,
     "name_arabic": "البروج",
+    "name_simple": "Al-Buruj",
     "bismillah_pre": true,
-    "verses_count": 22
+    "verses_count": 22,
+    "pages": [
+      590,
+      590
+    ]
   },
   {
     "id": 86,
     "name_arabic": "الطارق",
+    "name_simple": "At-Tariq",
     "bismillah_pre": true,
-    "verses_count": 17
+    "verses_count": 17,
+    "pages": [
+      591,
+      591
+    ]
   },
   {
     "id": 87,
     "name_arabic": "الأعلى",
+    "name_simple": "Al-A'la",
     "bismillah_pre": true,
-    "verses_count": 19
+    "verses_count": 19,
+    "pages": [
+      591,
+      592
+    ]
   },
   {
     "id": 88,
     "name_arabic": "الغاشية",
+    "name_simple": "Al-Ghashiyah",
     "bismillah_pre": true,
-    "verses_count": 26
+    "verses_count": 26,
+    "pages": [
+      592,
+      592
+    ]
   },
   {
     "id": 89,
     "name_arabic": "الفجر",
+    "name_simple": "Al-Fajr",
     "bismillah_pre": true,
-    "verses_count": 30
+    "verses_count": 30,
+    "pages": [
+      593,
+      594
+    ]
   },
   {
     "id": 90,
     "name_arabic": "البلد",
+    "name_simple": "Al-Balad",
     "bismillah_pre": true,
-    "verses_count": 20
+    "verses_count": 20,
+    "pages": [
+      594,
+      594
+    ]
   },
   {
     "id": 91,
     "name_arabic": "الشمس",
+    "name_simple": "Ash-Shams",
     "bismillah_pre": true,
-    "verses_count": 15
+    "verses_count": 15,
+    "pages": [
+      595,
+      595
+    ]
   },
   {
     "id": 92,
     "name_arabic": "الليل",
+    "name_simple": "Al-Layl",
     "bismillah_pre": true,
-    "verses_count": 21
+    "verses_count": 21,
+    "pages": [
+      595,
+      596
+    ]
   },
   {
     "id": 93,
     "name_arabic": "الضحى",
+    "name_simple": "Ad-Duhaa",
     "bismillah_pre": true,
-    "verses_count": 11
+    "verses_count": 11,
+    "pages": [
+      596,
+      596
+    ]
   },
   {
     "id": 94,
     "name_arabic": "الشرح",
+    "name_simple": "Ash-Sharh",
     "bismillah_pre": true,
-    "verses_count": 8
+    "verses_count": 8,
+    "pages": [
+      596,
+      596
+    ]
   },
   {
     "id": 95,
     "name_arabic": "التين",
+    "name_simple": "At-Tin",
     "bismillah_pre": true,
-    "verses_count": 8
+    "verses_count": 8,
+    "pages": [
+      597,
+      597
+    ]
   },
   {
     "id": 96,
     "name_arabic": "العلق",
+    "name_simple": "Al-'Alaq",
     "bismillah_pre": true,
-    "verses_count": 19
+    "verses_count": 19,
+    "pages": [
+      597,
+      597
+    ]
   },
   {
     "id": 97,
     "name_arabic": "القدر",
+    "name_simple": "Al-Qadr",
     "bismillah_pre": true,
-    "verses_count": 5
+    "verses_count": 5,
+    "pages": [
+      598,
+      598
+    ]
   },
   {
     "id": 98,
     "name_arabic": "البينة",
+    "name_simple": "Al-Bayyinah",
     "bismillah_pre": true,
-    "verses_count": 8
+    "verses_count": 8,
+    "pages": [
+      598,
+      599
+    ]
   },
   {
     "id": 99,
     "name_arabic": "الزلزلة",
+    "name_simple": "Az-Zalzalah",
     "bismillah_pre": true,
-    "verses_count": 8
+    "verses_count": 8,
+    "pages": [
+      599,
+      599
+    ]
   },
   {
     "id": 100,
     "name_arabic": "العاديات",
+    "name_simple": "Al-'Adiyat",
     "bismillah_pre": true,
-    "verses_count": 11
+    "verses_count": 11,
+    "pages": [
+      599,
+      600
+    ]
   },
   {
     "id": 101,
     "name_arabic": "القارعة",
+    "name_simple": "Al-Qari'ah",
     "bismillah_pre": true,
-    "verses_count": 11
+    "verses_count": 11,
+    "pages": [
+      600,
+      600
+    ]
   },
   {
     "id": 102,
     "name_arabic": "التكاثر",
+    "name_simple": "At-Takathur",
     "bismillah_pre": true,
-    "verses_count": 8
+    "verses_count": 8,
+    "pages": [
+      600,
+      600
+    ]
   },
   {
     "id": 103,
     "name_arabic": "العصر",
+    "name_simple": "Al-'Asr",
     "bismillah_pre": true,
-    "verses_count": 3
+    "verses_count": 3,
+    "pages": [
+      601,
+      601
+    ]
   },
   {
     "id": 104,
     "name_arabic": "الهمزة",
+    "name_simple": "Al-Humazah",
     "bismillah_pre": true,
-    "verses_count": 9
+    "verses_count": 9,
+    "pages": [
+      601,
+      601
+    ]
   },
   {
     "id": 105,
     "name_arabic": "الفيل",
+    "name_simple": "Al-Fil",
     "bismillah_pre": true,
-    "verses_count": 5
+    "verses_count": 5,
+    "pages": [
+      601,
+      601
+    ]
   },
   {
     "id": 106,
     "name_arabic": "قريش",
+    "name_simple": "Quraysh",
     "bismillah_pre": true,
-    "verses_count": 4
+    "verses_count": 4,
+    "pages": [
+      602,
+      602
+    ]
   },
   {
     "id": 107,
     "name_arabic": "الماعون",
+    "name_simple": "Al-Ma'un",
     "bismillah_pre": true,
-    "verses_count": 7
+    "verses_count": 7,
+    "pages": [
+      602,
+      602
+    ]
   },
   {
     "id": 108,
     "name_arabic": "الكوثر",
+    "name_simple": "Al-Kawthar",
     "bismillah_pre": true,
-    "verses_count": 3
+    "verses_count": 3,
+    "pages": [
+      602,
+      602
+    ]
   },
   {
     "id": 109,
     "name_arabic": "الكافرون",
+    "name_simple": "Al-Kafirun",
     "bismillah_pre": true,
-    "verses_count": 6
+    "verses_count": 6,
+    "pages": [
+      603,
+      603
+    ]
   },
   {
     "id": 110,
     "name_arabic": "النصر",
+    "name_simple": "An-Nasr",
     "bismillah_pre": true,
-    "verses_count": 3
+    "verses_count": 3,
+    "pages": [
+      603,
+      603
+    ]
   },
   {
     "id": 111,
     "name_arabic": "المسد",
+    "name_simple": "Al-Masad",
     "bismillah_pre": true,
-    "verses_count": 5
+    "verses_count": 5,
+    "pages": [
+      603,
+      603
+    ]
   },
   {
     "id": 112,
     "name_arabic": "الإخلاص",
+    "name_simple": "Al-Ikhlas",
     "bismillah_pre": true,
-    "verses_count": 4
+    "verses_count": 4,
+    "pages": [
+      604,
+      604
+    ]
   },
   {
     "id": 113,
     "name_arabic": "الفلق",
+    "name_simple": "Al-Falaq",
     "bismillah_pre": true,
-    "verses_count": 5
+    "verses_count": 5,
+    "pages": [
+      604,
+      604
+    ]
   },
   {
     "id": 114,
     "name_arabic": "الناس",
+    "name_simple": "An-Nas",
     "bismillah_pre": true,
-    "verses_count": 6
+    "verses_count": 6,
+    "pages": [
+      604,
+      604
+    ]
   }
 ]
