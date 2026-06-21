@@ -364,6 +364,10 @@ export default function MushafPage({
           transition: color 0.25s ease, background-color 0.25s ease;
           display: inline-block;
           color: #1a1a1a;
+          /* Crucial : certains "mots" QCF V1 contiennent 2 glyphes séparés par un espace
+             (ex. Rub al-Hizb + mot suivant). Sans nowrap, le span peut wrapper en interne
+             quand le flex serre les items, et la 2e partie tombe à la ligne suivante. */
+          white-space: nowrap;
         }
         .verse-word.hidden {
           color: transparent;
