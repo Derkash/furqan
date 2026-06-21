@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   ExerciseState,
   ExerciseConfig,
@@ -80,12 +80,41 @@ const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = [
 // Exercices affichés en single page (une seule page à la fois, pas de double page)
 const SINGLE_PAGE_EXERCISES: ExerciseId[] = ['hifz'];
 
+/**
+ * Tire une page aléatoire dans [startPage, endPage] en évitant les `avoidRecent`
+ * dernières pages visitées. Réinitialise correctement si toute la fenêtre
+ * récente couvre la plage.
+ */
+function pickRandomPage(
+  startPage: number,
+  endPage: number,
+  recent: number[],
+  avoidRecent = 5
+): number {
+  const rangeSize = endPage - startPage + 1;
+  if (rangeSize <= 1) return startPage;
+
+  const window = Math.min(avoidRecent, rangeSize - 1);
+  const blocked = new Set(recent.slice(-window));
+
+  const available: number[] = [];
+  for (let p = startPage; p <= endPage; p++) {
+    if (!blocked.has(p)) available.push(p);
+  }
+
+  const pool = available.length > 0 ? available : Array.from({ length: rangeSize }, (_, i) => startPage + i);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export function useExercise(): UseExerciseReturn {
   const [state, setState] = useState<ExerciseState>(initialState);
   const [leftPageVerses, setLeftPageVerses] = useState<PageVerses | null>(null);
   const [rightPageVerses, setRightPageVerses] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
   const [hifzLevel, setHifzLevel] = useState(0);
+
+  // Historique des pages récemment visitées (pour éviter les répétitions immédiates)
+  const recentPagesRef = useRef<number[]>([]);
 
   // Charger le verse-map pour les positions précises
   const { getPageVerses: getVerseMapPage } = useVerseMap();
@@ -149,14 +178,10 @@ export function useExercise(): UseExerciseReturn {
 
     setLoading(true);
     try {
-      // Pour les exercices double-page aléatoire, choisir aléatoirement entre les deux pages
-      let pageToUse = state.progress.currentPage;
-      if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(state.exerciseId)) {
-        const pair = getPagePair(state.progress.currentPage);
-        // Choisir aléatoirement entre page gauche et page droite
-        pageToUse = Math.random() < 0.5 ? pair.rightPage : pair.leftPage;
-      }
-
+      // La page courante a déjà été tirée au sort (par initialize ou nextStep) avec
+      // pickRandomPage, donc on l'utilise telle quelle — pas besoin d'un second tirage
+      // entre gauche/droite qui sortirait des pages que recentPagesRef ne connaît pas.
+      const pageToUse = state.progress.currentPage;
       const pageVerses = await fetchPageVerses(pageToUse);
       // Récupérer les données du verse-map pour les positions précises
       const verseMapData = getVerseMapPage(pageToUse);
@@ -187,8 +212,21 @@ export function useExercise(): UseExerciseReturn {
     }
 
     const totalPages = config.endPage - config.startPage + 1;
-    const startPage =
-      definition.progression === 'backward' ? config.endPage : config.startPage;
+
+    // Reset historique pour le nouvel exercice
+    recentPagesRef.current = [];
+
+    // Page de départ : aléatoire pour les exos random, sinon début/fin selon progression
+    let startPage: number;
+    if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(config.exerciseId)) {
+      startPage = pickRandomPage(config.startPage, config.endPage, []);
+    } else if (definition.progression === 'backward') {
+      startPage = config.endPage;
+    } else {
+      startPage = config.startPage;
+    }
+
+    recentPagesRef.current.push(startPage);
 
     setState({
       exerciseId: config.exerciseId,
@@ -248,21 +286,8 @@ export function useExercise(): UseExerciseReturn {
       let nextPage: number;
 
       if (isDoublePageExercise) {
-        // Calculer une double page aléatoire dans la plage restante
-        // Nombre de doubles pages disponibles
-        const startDoublePage = Math.floor((startPage - 1) / 2);
-        const endDoublePage = Math.floor((endPage - 1) / 2);
-        const totalDoublePages = endDoublePage - startDoublePage + 1;
-
-        // Choisir une double page aléatoire
-        const randomDoublePageIndex = Math.floor(Math.random() * totalDoublePages);
-        const randomDoublePage = startDoublePage + randomDoublePageIndex;
-
-        // Convertir en numéro de page (page impaire de la double page)
-        nextPage = randomDoublePage * 2 + 1;
-
-        // S'assurer qu'on reste dans la plage
-        nextPage = Math.max(startPage, Math.min(endPage, nextPage));
+        // Page aléatoire dans la plage en évitant les pages récemment vues
+        nextPage = pickRandomPage(startPage, endPage, recentPagesRef.current);
       } else {
         // Progression normale page par page
         nextPage =
@@ -270,6 +295,10 @@ export function useExercise(): UseExerciseReturn {
             ? currentPage - 1
             : currentPage + 1;
       }
+
+      recentPagesRef.current.push(nextPage);
+      // Garde un historique borné pour éviter qu'il grossisse indéfiniment
+      if (recentPagesRef.current.length > 20) recentPagesRef.current.shift();
 
       setState((prev) => ({
         ...prev,
