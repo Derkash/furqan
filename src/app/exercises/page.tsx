@@ -8,25 +8,65 @@ export default function ExercisesPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#fdfaf3] p-4 pb-8"
+      className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] pb-12"
       style={{
-        overflow: 'auto',
-        height: '100vh',
+        minHeight: '100dvh',
         WebkitOverflowScrolling: 'touch',
       }}
     >
-      <div className="max-w-2xl mx-auto">
-        <header className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-[#2d5016] font-arabic">فرقان</h1>
-          <p className="text-[#4a7c23] mt-1">Choisissez un exercice</p>
-        </header>
+      {/* Header décoratif type Mushaf */}
+      <header className="relative pt-10 pb-8 px-5">
+        {/* Ornement décoratif en haut */}
+        <div className="flex justify-center mb-4">
+          <svg width="120" height="22" viewBox="0 0 120 22" aria-hidden>
+            <defs>
+              <pattern id="hpattern" patternUnits="userSpaceOnUse" width="14" height="22">
+                <path d="M7 3 L13 11 L7 19 L1 11 Z" fill="none" stroke="#c9a959" strokeWidth="0.8" />
+                <circle cx="7" cy="11" r="1.5" fill="#c9a959" />
+              </pattern>
+            </defs>
+            <rect x="10" y="0" width="100" height="22" fill="url(#hpattern)" />
+            <line x1="0" y1="11" x2="10" y2="11" stroke="#c9a959" strokeWidth="1" />
+            <line x1="110" y1="11" x2="120" y2="11" stroke="#c9a959" strokeWidth="1" />
+          </svg>
+        </div>
 
-        <div className="grid gap-3 pb-4">
-          {exercises.map((exercise) => (
-            <ExerciseCard key={exercise.id} exercise={exercise} />
+        {/* Titre arabe principal */}
+        <h1 className="text-center text-[#2d5016] font-bold text-5xl tracking-tight" dir="rtl" style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}>
+          المراجعة
+        </h1>
+
+        {/* Sous-titre latin */}
+        <p className="text-center text-[#7a8b3e] font-semibold text-lg mt-1 tracking-widest uppercase">
+          Al-Muraja3a
+        </p>
+
+        {/* Tagline */}
+        <p className="text-center text-[#4a7c23]/80 text-sm mt-3 max-w-xs mx-auto">
+          Révision et mémorisation du Saint Coran
+        </p>
+
+        {/* Petit séparateur en bas */}
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <div className="h-px w-12 bg-gradient-to-r from-transparent to-[#c9a959]" />
+          <span className="text-[#c9a959] text-xs uppercase tracking-[0.3em] font-semibold">Exercices</span>
+          <div className="h-px w-12 bg-gradient-to-l from-transparent to-[#c9a959]" />
+        </div>
+      </header>
+
+      {/* Liste des exercices */}
+      <main className="px-4">
+        <div className="max-w-2xl mx-auto space-y-3">
+          {exercises.map((exercise, idx) => (
+            <ExerciseCard key={exercise.id} exercise={exercise} index={idx} />
           ))}
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-10 text-center text-[#4a7c23]/60 text-xs">
+        <p dir="rtl" className="font-arabic">بارك الله فيك</p>
+      </footer>
     </div>
   );
 }
