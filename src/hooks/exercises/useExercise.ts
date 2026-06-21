@@ -87,10 +87,6 @@ export function useExercise(): UseExerciseReturn {
   const [loading, setLoading] = useState(false);
   const [hifzLevel, setHifzLevel] = useState(0);
 
-  // Versets révélés sur la double page courante (persistent entre page droite et gauche)
-  const [doublePageRevealedVerses, setDoublePageRevealedVerses] = useState<Set<string>>(new Set());
-  const [currentDoublePage, setCurrentDoublePage] = useState<number | null>(null);
-
   // Charger le verse-map pour les positions précises
   const { getPageVerses: getVerseMapPage } = useVerseMap();
 
@@ -100,17 +96,18 @@ export function useExercise(): UseExerciseReturn {
     return state.currentRound.steps[state.currentRound.currentStepIndex] || null;
   }, [state.currentRound]);
 
-  // UI state from current step
-  const isBlurred = currentStep?.ui.isBlurred ?? false;
-  const maskAll = currentStep?.ui.maskAll ?? false;
+  // Pendant les transitions entre rounds (running mais step non encore prêt),
+  // on garde le mode masqué+flou pour éviter l'éclair où tout le texte apparaît.
+  const inTransition = state.status === 'running' && !currentStep;
+  const isBlurred = currentStep?.ui.isBlurred ?? inTransition;
+  const maskAll = currentStep?.ui.maskAll ?? inTransition;
 
-  // Combiner les versets du step avec ceux révélés sur la double page
+  // Versets visibles : uniquement ceux du step courant. Pas d'accumulation cross-round
+  // (sinon les versets révélés sur la double page précédente persistent quand on tire
+  //  une nouvelle question sur la même page).
   const visibleVerses = useMemo(() => {
-    const stepVerses = new Set(currentStep?.ui.visibleVerses ?? []);
-    // Ajouter les versets déjà révélés sur cette double page
-    doublePageRevealedVerses.forEach(v => stepVerses.add(v));
-    return stepVerses;
-  }, [currentStep, doublePageRevealedVerses]);
+    return new Set(currentStep?.ui.visibleVerses ?? []);
+  }, [currentStep]);
 
   const highlightedVerse = currentStep?.ui.highlightedVerse ?? null;
   const singlePage = currentStep?.ui.singlePage ?? SINGLE_PAGE_EXERCISES.includes(state.exerciseId);
@@ -121,16 +118,6 @@ export function useExercise(): UseExerciseReturn {
     () => getPagePair(state.progress.currentPage),
     [state.progress.currentPage]
   );
-
-  // Détecter changement de double page et réinitialiser les versets révélés
-  useEffect(() => {
-    const newDoublePage = pagePair.rightPage;
-    if (currentDoublePage !== null && currentDoublePage !== newDoublePage) {
-      // Nouvelle double page - réinitialiser
-      setDoublePageRevealedVerses(new Set());
-    }
-    setCurrentDoublePage(newDoublePage);
-  }, [pagePair.rightPage, currentDoublePage]);
 
   // Load pages when page changes
   useEffect(() => {
@@ -231,17 +218,7 @@ export function useExercise(): UseExerciseReturn {
     }
 
     const { currentStepIndex, steps } = state.currentRound;
-    const currentStepData = steps[currentStepIndex];
     const nextIndex = currentStepIndex + 1;
-
-    // Accumuler les versets révélés de l'étape courante
-    if (currentStepData?.ui.visibleVerses) {
-      setDoublePageRevealedVerses(prev => {
-        const newSet = new Set(prev);
-        currentStepData.ui.visibleVerses.forEach(v => newSet.add(v));
-        return newSet;
-      });
-    }
 
     if (nextIndex < steps.length) {
       // Move to next step
@@ -329,8 +306,6 @@ export function useExercise(): UseExerciseReturn {
     setState(initialState);
     setLeftPageVerses(null);
     setRightPageVerses(null);
-    setDoublePageRevealedVerses(new Set());
-    setCurrentDoublePage(null);
     setHifzLevel(0);
   }, []);
 

@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
-import { useOrientation } from '@/hooks/useOrientation';
 import { useAudio } from '@/hooks/useAudio';
+import type { Orientation } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import type { ExerciseId } from '@/types/exercises';
@@ -40,7 +40,8 @@ export default function PracticePage() {
     reset,
   } = useExercise();
 
-  const orientation = useOrientation();
+  // Double page côte à côte forcée pour tous les exercices (Hifz utilise singlePage et ignore l'orientation)
+  const orientation: Orientation = 'landscape';
   const audio = useAudio();
   const [initialized, setInitialized] = useState(false);
 
