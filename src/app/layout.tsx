@@ -2,9 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AlFourqan - Révision du Coran",
-  description: "Application de révision et mémorisation du Coran avec Mushaf Medina 1405H et audio Al-Husary",
-  keywords: ["Quran", "Coran", "Mushaf", "Mémorisation", "Hifz", "Al-Husary"],
+  metadataBase: new URL("https://almuraja3a.com"),
+  title: "Al-Muraja3a — Révision du Coran",
+  description: "Application de révision et mémorisation du Coran avec Mushaf Medina (QCF V1) et audio Al-Husary",
+  keywords: ["Quran", "Coran", "Mushaf", "Mémorisation", "Hifz", "Al-Husary", "Mouraja3a"],
   authors: [{ name: "Abdoul-khader" }],
 };
 
