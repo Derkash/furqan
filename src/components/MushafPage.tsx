@@ -362,13 +362,7 @@ export default function MushafPage({
           color: #1a1a1a;
         }
         .verse-word.hidden {
-          /* Masque les 75% inférieurs du mot : les marques de waqf (haut) restent visibles. */
           color: transparent;
-        }
-        .verse-word.hidden.hifz {
-          color: #1a1a1a;
-          -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 30%);
-          mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 30%);
         }
         .verse-word.ayah-marker {
           color: #2d5016;
@@ -472,11 +466,7 @@ export default function MushafPage({
                       const isHighlighted =
                         highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
                       const classes = ['verse-word'];
-                      if (shouldHide) {
-                        classes.push('hidden');
-                        // En Hifz : préserve les marques de waqf via mask top-only
-                        if (hifzHide) classes.push('hifz');
-                      }
+                      if (shouldHide) classes.push('hidden');
                       if (isHighlighted) classes.push('highlighted');
                       if (w.isAyahMarker) classes.push('ayah-marker');
                       return (
