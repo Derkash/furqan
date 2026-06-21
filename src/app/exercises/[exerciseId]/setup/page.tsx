@@ -13,7 +13,10 @@ export default function SetupPage() {
 
   const [startPage, setStartPage] = useState(3);
   const [endPage, setEndPage] = useState(10);
+  const [singlePageValue, setSinglePageValue] = useState(3);
   const [error, setError] = useState<string | null>(null);
+
+  const isSinglePageExercise = exerciseId === 'hifz';
 
   if (!isValidExerciseId(exerciseId)) {
     return (
@@ -37,6 +40,17 @@ export default function SetupPage() {
     e.preventDefault();
     setError(null);
 
+    if (isSinglePageExercise) {
+      if (singlePageValue < 1 || singlePageValue > 604) {
+        setError('La page doit être entre 1 et 604');
+        return;
+      }
+      router.push(
+        `/exercises/${exerciseId}/practice?start=${singlePageValue}&end=${singlePageValue}`
+      );
+      return;
+    }
+
     if (startPage < 3 || startPage > 604) {
       setError('La page de début doit être entre 3 et 604');
       return;
@@ -50,7 +64,6 @@ export default function SetupPage() {
       return;
     }
 
-    // Navigate to practice with query params
     router.push(
       `/exercises/${exerciseId}/practice?start=${startPage}&end=${endPage}`
     );
@@ -73,53 +86,69 @@ export default function SetupPage() {
         <p className="text-gray-500 text-sm mb-6">{exercise.description}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label
-                htmlFor="startPage"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Page de début
+          {isSinglePageExercise ? (
+            <div>
+              <label htmlFor="singlePage" className="block text-sm font-medium text-gray-700 mb-1">
+                Page à mémoriser
               </label>
               <div className="relative">
                 <input
                   type="number"
-                  id="startPage"
-                  min={3}
+                  id="singlePage"
+                  min={1}
                   max={604}
-                  value={startPage}
-                  onChange={(e) => setStartPage(Number(e.target.value))}
+                  value={singlePageValue}
+                  onChange={(e) => setSinglePageValue(Number(e.target.value))}
                   className="w-full px-4 py-2 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg">
-                  {toArabicNumbers(startPage)}
+                  {toArabicNumbers(singlePageValue)}
                 </span>
               </div>
             </div>
+          ) : (
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label htmlFor="startPage" className="block text-sm font-medium text-gray-700 mb-1">
+                  Page de début
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    id="startPage"
+                    min={3}
+                    max={604}
+                    value={startPage}
+                    onChange={(e) => setStartPage(Number(e.target.value))}
+                    className="w-full px-4 py-2 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg">
+                    {toArabicNumbers(startPage)}
+                  </span>
+                </div>
+              </div>
 
-            <div className="flex-1">
-              <label
-                htmlFor="endPage"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Page de fin
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  id="endPage"
-                  min={3}
-                  max={604}
-                  value={endPage}
-                  onChange={(e) => setEndPage(Number(e.target.value))}
-                  className="w-full px-4 py-2 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
-                />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg">
-                  {toArabicNumbers(endPage)}
-                </span>
+              <div className="flex-1">
+                <label htmlFor="endPage" className="block text-sm font-medium text-gray-700 mb-1">
+                  Page de fin
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    id="endPage"
+                    min={3}
+                    max={604}
+                    value={endPage}
+                    onChange={(e) => setEndPage(Number(e.target.value))}
+                    className="w-full px-4 py-2 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg">
+                    {toArabicNumbers(endPage)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
@@ -131,9 +160,11 @@ export default function SetupPage() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-500">
-          Plage : {toArabicNumbers(endPage - startPage + 1)} pages
-        </p>
+        {!isSinglePageExercise && (
+          <p className="mt-4 text-center text-sm text-gray-500">
+            Plage : {toArabicNumbers(endPage - startPage + 1)} pages
+          </p>
+        )}
       </div>
     </div>
   );

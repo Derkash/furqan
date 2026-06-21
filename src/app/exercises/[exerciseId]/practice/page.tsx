@@ -29,6 +29,10 @@ export default function PracticePage() {
     isBlurred,
     maskAll,
     visibleVerses,
+    singlePage,
+    hifzLevel,
+    setHifzLevel,
+    displayedPage,
     loading,
     initialize,
     start,
@@ -80,6 +84,8 @@ export default function PracticePage() {
       router.push(`/exercises/${exerciseId}/setup`);
       return;
     }
+    // En Hifz, on reste sur la page : pas d'avancement au tap
+    if (exerciseId === 'hifz') return;
     nextStep();
   };
 
@@ -188,6 +194,29 @@ export default function PracticePage() {
         </div>
       )}
 
+      {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz) */}
+      {exerciseId === 'hifz' && (
+        <div className="flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
+          <span className="text-xs uppercase tracking-wide text-[#c9a959] mr-2">Niveau</span>
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
+            <button
+              key={lvl}
+              onClick={(e) => {
+                e.stopPropagation();
+                setHifzLevel(lvl);
+              }}
+              className={`min-w-[36px] h-8 px-2 rounded-md text-sm font-bold transition-colors ${
+                hifzLevel === lvl
+                  ? 'bg-[#c9a959] text-[#2d5016] shadow-md'
+                  : 'bg-[#2d5016] hover:bg-[#3e6b1d] text-[#c9a959] border border-[#4a7c23]'
+              }`}
+            >
+              {lvl}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Zone Mushaf */}
       <div className="flex-1 min-h-0 relative">
         <MushafDoublePage
@@ -200,6 +229,9 @@ export default function PracticePage() {
           isBlurred={isBlurred}
           maskAll={maskAll}
           loading={loading}
+          singlePage={singlePage}
+          currentPage={singlePage ? displayedPage : undefined}
+          hifzLevel={exerciseId === 'hifz' ? hifzLevel : undefined}
           onTap={handleTap}
         />
       </div>

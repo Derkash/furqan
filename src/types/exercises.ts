@@ -5,6 +5,7 @@ import type { VersePosition, PageVerses, QuizConfig } from './index';
 // ============================================
 
 export type ExerciseId =
+  | 'find-recited-verse'
   | 'random-verse'
   | 'sequential-start-middle-end'
   | 'random-start-middle-end'
@@ -13,7 +14,8 @@ export type ExerciseId =
   | 'middle-verse-forward'
   | 'middle-verse-backward'
   | 'end-verse-forward'
-  | 'end-verse-backward';
+  | 'end-verse-backward'
+  | 'hifz';
 
 // ============================================
 // EXERCISE ENUMS
@@ -70,6 +72,10 @@ export interface ExerciseStepUI {
   maskAll: boolean;
   visibleVerses: string[];
   highlightedVerse?: string;
+  /** Si true, n'affiche qu'une seule page (pas double page). */
+  singlePage?: boolean;
+  /** Niveau Hifz par défaut (0-8). */
+  hifzLevel?: number;
 }
 
 export interface ExerciseStep {

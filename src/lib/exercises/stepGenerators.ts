@@ -4,6 +4,89 @@ import type { PageVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 
 // ============================================
+// 0. FIND RECITED VERSE
+// Écoute un verset, le trouve, on révèle. Puis on passe à la page suivante.
+// ============================================
+
+export const findRecitedVerseSteps: StepGenerator = (
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig
+): ExerciseStep[] => {
+  const { verses } = pageVerses;
+  if (verses.length === 0) return [];
+
+  const randomIndex = Math.floor(Math.random() * verses.length);
+  const targetVerse = verses[randomIndex];
+  if (!targetVerse) return [];
+
+  return [
+    // Étape 1 : écoute (page floutée, audio joué)
+    {
+      type: 'listening',
+      targetPosition: 'random',
+      targetVerse,
+      question: 'locate_verse',
+      message: {
+        title: 'Écoutez le verset...',
+        subtitle: 'Où se trouve-t-il ?',
+      },
+      ui: {
+        isBlurred: true,
+        maskAll: false,
+        visibleVerses: [],
+      },
+    },
+    // Étape 2 : révélation du verset récité
+    {
+      type: 'revealing',
+      targetPosition: 'random',
+      targetVerse,
+      message: {
+        title: 'Verset récité',
+        subtitle: 'Tapez pour le suivant →',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [targetVerse.verseKey],
+        highlightedVerse: targetVerse.verseKey,
+      },
+    },
+  ];
+};
+
+// ============================================
+// HIFZ
+// Une seule page affichée, l'utilisateur choisit son niveau de masquage (0-8).
+// Un seul step : la page est affichée, le niveau est contrôlé par l'UI.
+// ============================================
+
+export const hifzSteps: StepGenerator = (
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig
+): ExerciseStep[] => {
+  if (pageVerses.verses.length === 0) return [];
+  return [
+    {
+      type: 'revealing',
+      message: {
+        title: 'Hifz',
+        subtitle: 'Choisis le niveau de masquage',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: false,
+        visibleVerses: pageVerses.verses.map((v) => v.verseKey),
+        singlePage: true,
+        hifzLevel: 0,
+      },
+    },
+  ];
+};
+
+// ============================================
 // 1. RANDOM VERSE
 // Audio SEULEMENT pour la première étape (découverte)
 // ============================================
@@ -477,6 +560,7 @@ export const endVerseBackwardSteps: StepGenerator = (
 import type { ExerciseId } from '@/types/exercises';
 
 export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
+  'find-recited-verse': findRecitedVerseSteps,
   'random-verse': randomVerseSteps,
   'sequential-start-middle-end': sequentialStartMiddleEndSteps,
   'random-start-middle-end': randomStartMiddleEndSteps,
@@ -486,4 +570,5 @@ export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   'middle-verse-backward': middleVerseBackwardSteps,
   'end-verse-forward': endVerseForwardSteps,
   'end-verse-backward': endVerseBackwardSteps,
+  'hifz': hifzSteps,
 };

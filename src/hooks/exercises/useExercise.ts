@@ -29,6 +29,11 @@ interface UseExerciseReturn {
   maskAll: boolean;
   visibleVerses: Set<string>;
   highlightedVerse: string | null;
+  singlePage: boolean;
+  hifzLevel: number;
+  setHifzLevel: (level: number) => void;
+  /** Page courante affichée (utile en singlePage mode). */
+  displayedPage: number;
 
   // Loading
   loading: boolean;
@@ -66,13 +71,21 @@ function getPagePair(page: number): PagePair {
 
 // Exercices qui interrogent sur une seule page aléatoire de la double page
 // et sautent des doubles pages aléatoirement
-const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = ['random-start-middle-end', 'random-verse'];
+const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = [
+  'random-start-middle-end',
+  'random-verse',
+  'find-recited-verse',
+];
+
+// Exercices affichés en single page (une seule page à la fois, pas de double page)
+const SINGLE_PAGE_EXERCISES: ExerciseId[] = ['hifz'];
 
 export function useExercise(): UseExerciseReturn {
   const [state, setState] = useState<ExerciseState>(initialState);
   const [leftPageVerses, setLeftPageVerses] = useState<PageVerses | null>(null);
   const [rightPageVerses, setRightPageVerses] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hifzLevel, setHifzLevel] = useState(0);
 
   // Versets révélés sur la double page courante (persistent entre page droite et gauche)
   const [doublePageRevealedVerses, setDoublePageRevealedVerses] = useState<Set<string>>(new Set());
@@ -100,6 +113,8 @@ export function useExercise(): UseExerciseReturn {
   }, [currentStep, doublePageRevealedVerses]);
 
   const highlightedVerse = currentStep?.ui.highlightedVerse ?? null;
+  const singlePage = currentStep?.ui.singlePage ?? SINGLE_PAGE_EXERCISES.includes(state.exerciseId);
+  const displayedPage = state.currentRound?.pageNumber ?? state.progress.currentPage;
 
   // Page pair
   const pagePair = useMemo(
@@ -316,6 +331,7 @@ export function useExercise(): UseExerciseReturn {
     setRightPageVerses(null);
     setDoublePageRevealedVerses(new Set());
     setCurrentDoublePage(null);
+    setHifzLevel(0);
   }, []);
 
   return {
@@ -328,6 +344,10 @@ export function useExercise(): UseExerciseReturn {
     maskAll,
     visibleVerses,
     highlightedVerse,
+    singlePage,
+    hifzLevel,
+    setHifzLevel,
+    displayedPage,
     loading,
     initialize,
     start,

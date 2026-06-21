@@ -1,530 +1,524 @@
 'use client';
 
-import Image from 'next/image';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PageVerses } from '@/types';
 import BlurOverlay from './BlurOverlay';
-import { useVerseMap } from '@/hooks/useVerseMap';
-import { PAGE_BACKGROUND } from '@/utils/maskCalculations';
+import { toArabicNumbers } from '@/utils/arabicNumbers';
+
+export interface FrameConfig {
+  outerInsetH: number; // % from left/right of page where outer gold line sits
+  outerInsetV: number; // % from top/bottom
+  bandWidth: number; // % of page width that the decorative band occupies (between outer and inner gold lines)
+  textInsetH: number; // % from left/right where text content starts
+  textInsetTop: number; // % from top
+  textInsetBottom: number; // % from bottom
+  textFontSize: number; // cqi (% of container width) for verse text
+  pageNumberSize: number; // cqi for page number font size
+  pageNumberBottom: number; // % from bottom for page number position
+  showPattern: boolean;
+  topGap: number; // px between the top of the wrapper and the top of the page
+}
+
+export const DEFAULT_FRAME: FrameConfig = {
+  outerInsetH: 2.1,
+  outerInsetV: 5.3,
+  bandWidth: 1.2,
+  textInsetH: 8.2,
+  textInsetTop: 8.6,
+  textInsetBottom: 9,
+  textFontSize: 6,
+  pageNumberSize: 3.2,
+  pageNumberBottom: 2.1,
+  showPattern: true,
+  topGap: 0,
+};
 
 interface MushafPageProps {
   pageNumber: number;
-  pageVerses: PageVerses | null;
-  revealedVerses: Set<string>;
+  pageVerses?: PageVerses | null;
+  revealedVerses?: Set<string>;
   visibleVerses?: Set<string>;
+  highlightedVerseKey?: string;
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
+  frameConfig?: Partial<FrameConfig>;
+  /**
+   * Niveau de Hifz (0-8). 0 = tout visible, 8 = quasi rien.
+   * Lorsque défini, override le masquage par verset (maskAll est ignoré pour les mots non-marker).
+   */
+  hifzLevel?: number;
 }
 
-// ============================================
-// CALIBRATION - Ajuster ces valeurs pour aligner les masques
-// ============================================
-// Calibration pour pages IMPAIRES (droite de l'écran)
-const CALIBRATION_ODD = {
-  marginTop: 12.2,
-  marginBottom: 9.2,
-  marginLeft: 9.12,
-  marginRight: 19.12,
-  linesPerPage: 15,
-  lineHeight: 5.10,
-};
-
-// Calibration pour pages PAIRES (gauche de l'écran)
-// Décalée de 6% vers la gauche et 0.5% vers le haut
-const CALIBRATION_EVEN = {
-  marginTop: CALIBRATION_ODD.marginTop - 0.5, // 0.5% vers le haut
-  marginBottom: CALIBRATION_ODD.marginBottom + 0.5,
-  marginLeft: CALIBRATION_ODD.marginLeft + 7.5, // 7.5% vers la gauche
-  marginRight: CALIBRATION_ODD.marginRight - 7.5, // 7.5% vers la gauche
-  linesPerPage: 15,
-  lineHeight: 5.10,
-};
-
-// Fonction pour obtenir la calibration selon la parité
-const getCalibration = (pageNumber: number) => {
-  return pageNumber % 2 === 1 ? CALIBRATION_ODD : CALIBRATION_EVEN;
-};
-
-// Calcul de la hauteur de ligne (même pour les deux)
-const LINE_HEIGHT = CALIBRATION_ODD.lineHeight ||
-  (100 - CALIBRATION_ODD.marginTop - CALIBRATION_ODD.marginBottom) / CALIBRATION_ODD.linesPerPage;
-
-// Mode debug - mettre à true pour voir les indicateurs de lignes
-const DEBUG_MODE = false;
-
-// Mode debug couleurs - mettre à true pour voir l'échantillonnage de couleurs
-const COLOR_DEBUG_MODE = false;
-
-// Palette de couleurs pour le masquage (élargie)
-const COLOR_SAMPLES = [
-  // Blancs
-  { id: 1, color: '#ffffff' },
-  { id: 2, color: '#fffffe' },
-  { id: 3, color: '#fffffc' },
-  { id: 4, color: '#fffefa' },
-  { id: 5, color: '#fffef8' },
-  // Blancs chauds
-  { id: 6, color: '#fffdf5' },
-  { id: 7, color: '#fffcf2' },
-  { id: 8, color: '#fffbf0' },
-  { id: 9, color: '#fffaed' },
-  { id: 10, color: '#fff9ea' },
-  // Crèmes clairs
-  { id: 11, color: '#fff8e7' },
-  { id: 12, color: '#fff7e4' },
-  { id: 13, color: '#fff6e1' },
-  { id: 14, color: '#fff5de' },
-  { id: 15, color: '#fff4db' },
-  // Crèmes
-  { id: 16, color: '#fdfaf3' },
-  { id: 17, color: '#fcf9f1' },
-  { id: 18, color: '#fbf8ef' },
-  { id: 19, color: '#faf7ed' },
-  { id: 20, color: '#f9f6eb' },
-  // Ivoires
-  { id: 21, color: '#f8f5e9' },
-  { id: 22, color: '#f7f4e7' },
-  { id: 23, color: '#f6f3e5' },
-  { id: 24, color: '#f5f2e3' },
-  { id: 25, color: '#f4f1e1' },
-  // Beiges clairs
-  { id: 26, color: '#f3f0df' },
-  { id: 27, color: '#f2efdd' },
-  { id: 28, color: '#f1eedb' },
-  { id: 29, color: '#f0edd9' },
-  { id: 30, color: '#efecd7' },
-  // Parchemins
-  { id: 31, color: '#eeebd5' },
-  { id: 32, color: '#edead3' },
-  { id: 33, color: '#ece9d1' },
-  { id: 34, color: '#ebe8cf' },
-  { id: 35, color: '#eae7cd' },
-  // Sables
-  { id: 36, color: '#e9e6cb' },
-  { id: 37, color: '#e8e5c9' },
-  { id: 38, color: '#e7e4c7' },
-  { id: 39, color: '#e6e3c5' },
-  { id: 40, color: '#e5e2c3' },
-];
-
 /**
- * Composant d'affichage d'une page du Mushaf
+ * Hash déterministe pour décider si un mot doit être caché à un niveau de Hifz donné.
+ * Retourne un nombre dans [0, 1[.
  */
+function wordHash(pageNumber: number, verseKey: string, position: number): number {
+  let h = pageNumber * 2654435761;
+  const key = `${verseKey}#${position}`;
+  for (let i = 0; i < key.length; i++) {
+    h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+  }
+  // Convertir en [0, 1[
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+interface WordData {
+  verseKey: string;
+  code: string;
+  position: number;
+  isAyahMarker: boolean;
+}
+
+type LineType = 'content' | 'announcement' | 'basmala' | 'empty';
+
+interface LineData {
+  line: number;
+  type: LineType;
+  words?: WordData[];
+  surah?: number;
+  nameArabic?: string;
+}
+
+interface PageData {
+  page: number;
+  font: string;
+  verses: string[];
+  lines: LineData[];
+}
+
+const BASMALA_TEXT = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
+
+const loadedFonts = new Set<string>();
+
+function ensureFontLoaded(fontFamily: string) {
+  if (typeof document === 'undefined') return;
+  if (loadedFonts.has(fontFamily)) return;
+  loadedFonts.add(fontFamily);
+  const styleEl = document.createElement('style');
+  styleEl.setAttribute('data-qcf-font', fontFamily);
+  styleEl.textContent = `@font-face { font-family: '${fontFamily}'; src: url('/fonts/qcf-v2/${fontFamily}.woff2') format('woff2'); font-display: block; }`;
+  document.head.appendChild(styleEl);
+}
+
+const PAGE_VB_W = 759;
+const PAGE_VB_H = 1100;
+
+function MushafFrame({ config }: { config: FrameConfig }) {
+  const outerX = (config.outerInsetH / 100) * PAGE_VB_W;
+  const outerY = (config.outerInsetV / 100) * PAGE_VB_H;
+  const outerW = PAGE_VB_W - 2 * outerX;
+  const outerH = PAGE_VB_H - 2 * outerY;
+
+  const bandPxH = (config.bandWidth / 100) * PAGE_VB_W;
+  const bandPxV = (config.bandWidth / 100) * PAGE_VB_W; // use width-based for uniformity
+
+  const innerX = outerX + bandPxH;
+  const innerY = outerY + bandPxV;
+  const innerW = outerW - 2 * bandPxH;
+  const innerH = outerH - 2 * bandPxV;
+
+  return (
+    <svg
+      viewBox={`0 0 ${PAGE_VB_W} ${PAGE_VB_H}`}
+      preserveAspectRatio="none"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 1,
+      }}
+      aria-hidden
+    >
+      <defs>
+        <pattern
+          id="mushaf-diamonds"
+          x="0"
+          y="0"
+          width="34"
+          height="34"
+          patternUnits="userSpaceOnUse"
+        >
+          <rect width="34" height="34" fill="#2d5016" />
+          <path
+            d="M17 4 L30 17 L17 30 L4 17 Z"
+            fill="#c9a959"
+            stroke="#2d5016"
+            strokeWidth="0.5"
+          />
+          <path d="M17 10 L24 17 L17 24 L10 17 Z" fill="#2d5016" />
+          <circle cx="17" cy="17" r="1.5" fill="#c9a959" />
+        </pattern>
+        <mask id="mushaf-frame-ring">
+          <rect x={outerX} y={outerY} width={outerW} height={outerH} fill="white" />
+          <rect x={innerX} y={innerY} width={innerW} height={innerH} fill="black" />
+        </mask>
+      </defs>
+
+      {/* Decorative band */}
+      <rect
+        x={outerX}
+        y={outerY}
+        width={outerW}
+        height={outerH}
+        fill={config.showPattern ? 'url(#mushaf-diamonds)' : '#2d5016'}
+        mask="url(#mushaf-frame-ring)"
+      />
+
+      {/* Outer gold line */}
+      <rect
+        x={outerX}
+        y={outerY}
+        width={outerW}
+        height={outerH}
+        fill="none"
+        stroke="#b8860b"
+        strokeWidth="2"
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* Inner gold line */}
+      <rect
+        x={innerX}
+        y={innerY}
+        width={innerW}
+        height={innerH}
+        fill="none"
+        stroke="#b8860b"
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 export default function MushafPage({
   pageNumber,
-  pageVerses,
-  revealedVerses,
   visibleVerses = new Set(),
+  highlightedVerseKey,
   isBlurred = false,
   maskAll = false,
   loading = false,
+  frameConfig,
+  hifzLevel,
 }: MushafPageProps) {
-  const { getVerseOnPage, getPageVerses: getVerseMapPage, loading: mapLoading } = useVerseMap();
+  const config: FrameConfig = { ...DEFAULT_FRAME, ...(frameConfig ?? {}) };
+  const [data, setData] = useState<PageData | null>(null);
+  const padded = String(pageNumber).padStart(3, '0');
+  const fontFamily = `QCF_P${padded}`;
 
-  // Récupérer les données de la page depuis verse-map
-  const pageData = useMemo(() => {
-    return getVerseMapPage(pageNumber);
-  }, [pageNumber, getVerseMapPage]);
-
-  // Obtenir la calibration pour cette page
-  const CALIBRATION = getCalibration(pageNumber);
-
-  // Calculer les masques avec les nouvelles valeurs de calibration
-  const masks = useMemo(() => {
-    if (isBlurred || !maskAll || !pageData) return [];
-
-    const calibration = getCalibration(pageNumber);
-    const masks: Array<{
-      top: number;
-      height: number;
-      left: number;
-      right: number;
-      verseKey: string;
-    }> = [];
-
-    for (const [verseKey, verse] of Object.entries(pageData)) {
-      if (visibleVerses.has(verseKey)) continue;
-
-      for (const segment of verse.segments) {
-        const { line, startWord, endWord, totalWordsOnLine } = segment;
-
-        // Calcul de la position verticale avec calibration
-        const top = calibration.marginTop + (line - 1) * LINE_HEIGHT;
-        const height = LINE_HEIGHT;
-
-        // Calcul de la position horizontale (RTL)
-        const lineWidth = 100 - calibration.marginLeft - calibration.marginRight;
-        const wordWidth = lineWidth / totalWordsOnLine;
-
-        // En RTL: mot 0 est à droite
-        const right = calibration.marginRight + (startWord * wordWidth);
-        const left = calibration.marginLeft + ((totalWordsOnLine - 1 - endWord) * wordWidth);
-
-        masks.push({ top, height, left, right, verseKey });
+  /**
+   * Calcule, pour chaque verset, les positions de mots à masquer au niveau Hifz courant.
+   *
+   * Règle :
+   *   - Niveau N → masque MAX(N, ⌊N/8 × (longueur-1)⌋) mots par verset
+   *   - Au moins 1 mot reste visible par verset
+   *   - Sélection déterministe : les mots avec le plus petit hash sont masqués en premier
+   *
+   * Conséquence : sur une page avec un seul long verset, le niveau 1 masque déjà
+   * beaucoup de mots (proportionnellement à la longueur). Sur une page avec des
+   * versets courts, ~N mots par verset.
+   */
+  const hifzHidden = useMemo(() => {
+    if (!data || !hifzLevel || hifzLevel <= 0) return null;
+    const versePositions = new Map<string, number[]>();
+    for (const line of data.lines) {
+      if (line.type !== 'content' || !line.words) continue;
+      for (const w of line.words) {
+        if (w.isAyahMarker) continue;
+        if (!versePositions.has(w.verseKey)) versePositions.set(w.verseKey, []);
+        versePositions.get(w.verseKey)!.push(w.position);
       }
     }
-
-    return masks;
-  }, [pageData, visibleVerses, isBlurred, maskAll, pageNumber]);
-
-  const imageSrc = `/mushaf-pages/page-${pageNumber.toString().padStart(3, '0')}.png`;
-
-  // Générer les lignes de debug
-  const debugLines = useMemo(() => {
-    if (!DEBUG_MODE) return [];
-    const calibration = getCalibration(pageNumber);
-    return Array.from({ length: calibration.linesPerPage }, (_, i) => ({
-      line: i + 1,
-      top: calibration.marginTop + i * LINE_HEIGHT,
-    }));
-  }, [pageNumber]);
-
-  // Générer les indicateurs de début/fin de versets
-  const verseMarkers = useMemo(() => {
-    if (!DEBUG_MODE || !pageData) return [];
-
-    const calibration = getCalibration(pageNumber);
-    const markers: Array<{
-      verseKey: string;
-      line: number;
-      top: number;
-      startPos: number; // position horizontale du début (depuis la droite en RTL)
-      endPos: number;   // position horizontale de la fin (depuis la gauche en RTL)
-      isStart: boolean; // true si c'est le début du verset sur cette page
-      isEnd: boolean;   // true si c'est la fin du verset sur cette page
-    }> = [];
-
-    const lineWidth = 100 - calibration.marginLeft - calibration.marginRight;
-
-    for (const [verseKey, verse] of Object.entries(pageData)) {
-      const segments = verse.segments;
-
-      segments.forEach((segment, idx) => {
-        const { line, startWord, endWord, totalWordsOnLine } = segment;
-        const wordWidth = lineWidth / totalWordsOnLine;
-
-        const top = calibration.marginTop + (line - 1) * LINE_HEIGHT;
-
-        // Position du début (premier mot, à droite en RTL)
-        const startPos = calibration.marginRight + (startWord * wordWidth);
-        // Position de la fin (dernier mot, à gauche en RTL)
-        const endPos = calibration.marginLeft + ((totalWordsOnLine - 1 - endWord) * wordWidth);
-
-        markers.push({
-          verseKey,
-          line,
-          top,
-          startPos,
-          endPos,
-          isStart: idx === 0,
-          isEnd: idx === segments.length - 1,
-        });
-      });
+    const result = new Map<string, Set<number>>();
+    for (const [verseKey, positions] of versePositions) {
+      const length = positions.length;
+      if (length === 0) {
+        result.set(verseKey, new Set());
+        continue;
+      }
+      const linearCount = hifzLevel; // N mots par verset
+      const proportionalCount = Math.floor((hifzLevel / 8) * (length - 1));
+      const count = Math.min(length - 1, Math.max(linearCount, proportionalCount));
+      if (count <= 0) {
+        result.set(verseKey, new Set());
+        continue;
+      }
+      const ranked = positions
+        .map((p) => ({ p, h: wordHash(pageNumber, verseKey, p) }))
+        .sort((a, b) => a.h - b.h);
+      result.set(verseKey, new Set(ranked.slice(0, count).map((r) => r.p)));
     }
+    return result;
+  }, [data, hifzLevel, pageNumber]);
 
-    return markers;
-  }, [pageData, pageNumber]);
+  useEffect(() => {
+    ensureFontLoaded(fontFamily);
+    let cancelled = false;
+    setData(null);
+    fetch(`/qcf-data/page-${padded}.json`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pageNumber, padded, fontFamily]);
 
-  // Alignement pour coller les pages au milieu
-  // Page paire (gauche de l'écran) → alignée à droite (flex-end)
-  // Page impaire (droite de l'écran) → alignée à gauche (flex-start)
+  // Page paire (left side of spread) sticks to its right edge (the gutter)
+  // Page impaire (right side of spread) sticks to its left edge (the gutter)
+  // → pages adjacentes, pas d'espace vide entre elles
   const isOddPage = pageNumber % 2 === 1;
+  const wrapperJustify = isOddPage ? 'flex-start' : 'flex-end';
 
   return (
     <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: isOddPage ? 'flex-start' : 'flex-end',
-        margin: 0,
-        padding: 0,
-        overflow: 'hidden',
-      }}
+      className="mushaf-page-wrapper"
+      style={{ justifyContent: wrapperJustify, paddingTop: `${config.topGap}px` }}
     >
-      {/* Conteneur avec ratio fixe 759:1100 */}
-      <div
-        style={{
-          position: 'relative',
-          aspectRatio: '759 / 1100',
-          height: '100%',
-          maxWidth: '100%',
-        }}
-      >
-        {/* Image de la page */}
-        <Image
-          src={imageSrc}
-          alt={`Page ${pageNumber}`}
-          fill
-          style={{ objectFit: 'contain' }}
-          priority={pageNumber <= 10}
-          sizes="50vw"
-        />
+      <style>{`
+        .mushaf-page-wrapper {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: flex-start;
+          box-sizing: border-box;
+        }
+        .mushaf-page {
+          position: relative;
+          aspect-ratio: 759 / 1100;
+          height: 100%;
+          max-width: 100%;
+          background: #fdfaf3;
+          color: #1a1a1a;
+          box-sizing: border-box;
+          container-type: inline-size;
+          overflow: hidden;
+        }
+        .mushaf-line {
+          line-height: 1;
+          direction: rtl;
+          color: #1a1a1a;
+          display: flex;
+          flex-direction: row;
+          flex-wrap: nowrap;
+          justify-content: space-between;
+          align-items: baseline;
+        }
+        .mushaf-line.empty { visibility: hidden; }
+        .mushaf-cartouche-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 2%;
+          gap: 4%;
+        }
+        .mushaf-cartouche-row .endcap {
+          width: 4cqi;
+          height: 4cqi;
+          flex-shrink: 0;
+          color: #b8860b;
+        }
+        .mushaf-cartouche {
+          position: relative;
+          flex: 1;
+          max-width: 75%;
+          padding: 0.35em 1.8em;
+          border-radius: 6px;
+          text-align: center;
+          font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;
+          color: #2d5016;
+          background:
+            repeating-linear-gradient(
+              45deg,
+              transparent 0 4px,
+              rgba(184, 134, 11, 0.25) 4px 5px
+            ),
+            #fdfaf3;
+          box-shadow:
+            inset 0 0 0 2px #b8860b,
+            inset 0 0 0 3px #fdfaf3,
+            inset 0 0 0 4.5px #b8860b,
+            0 0 0 0.5px rgba(0,0,0,0.05);
+          letter-spacing: 0.02em;
+          direction: rtl;
+        }
+        .mushaf-cartouche.announcement {
+          font-size: 3.6cqi;
+          font-weight: 700;
+        }
+        .mushaf-cartouche.basmala {
+          font-size: 3.4cqi;
+          font-weight: 600;
+        }
+        .verse-word {
+          transition: color 0.25s ease, background-color 0.25s ease;
+          display: inline-block;
+          color: #1a1a1a;
+        }
+        .verse-word.hidden {
+          /* Masque les 75% inférieurs du mot : les marques de waqf (haut) restent visibles. */
+          color: transparent;
+        }
+        .verse-word.hidden.hifz {
+          color: #1a1a1a;
+          -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 30%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 30%);
+        }
+        .verse-word.ayah-marker {
+          color: #2d5016;
+        }
+        .verse-word.highlighted {
+          background-color: rgba(255, 215, 0, 0.35);
+          border-radius: 6px;
+          padding: 0 2px;
+        }
+        .mushaf-loader {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: rgba(253, 250, 243, 0.6);
+          z-index: 30;
+        }
+        .mushaf-loader-spinner {
+          width: 48px;
+          height: 48px;
+          border: 4px solid #2d5016;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div className="mushaf-page">
+        <MushafFrame config={config} />
 
-        {/* BlurOverlay */}
+        <div
+          className="mushaf-content"
+          style={{
+            position: 'absolute',
+            top: `${config.textInsetTop}%`,
+            right: `${config.textInsetH}%`,
+            bottom: `${config.textInsetBottom}%`,
+            left: `${config.textInsetH}%`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            zIndex: 2,
+          }}
+        >
+          {data
+            ? data.lines.map((line) => {
+                if (line.type === 'empty') {
+                  return <div key={line.line} className="mushaf-line empty" />;
+                }
+                if (line.type === 'announcement') {
+                  return (
+                    <div key={line.line} className="mushaf-cartouche-row">
+                      <svg className="endcap" viewBox="0 0 20 20" aria-hidden>
+                        <polygon points="10,2 14,10 10,18 6,10" fill="currentColor" opacity="0.8" />
+                        <circle cx="10" cy="10" r="2" fill="#fdfaf3" />
+                      </svg>
+                      <div className="mushaf-cartouche announcement">
+                        سُورَةُ {line.nameArabic}
+                      </div>
+                      <svg className="endcap" viewBox="0 0 20 20" aria-hidden>
+                        <polygon points="10,2 14,10 10,18 6,10" fill="currentColor" opacity="0.8" />
+                        <circle cx="10" cy="10" r="2" fill="#fdfaf3" />
+                      </svg>
+                    </div>
+                  );
+                }
+                if (line.type === 'basmala') {
+                  return (
+                    <div key={line.line} className="mushaf-cartouche-row">
+                      <svg className="endcap" viewBox="0 0 20 20" aria-hidden>
+                        <polygon points="10,2 14,10 10,18 6,10" fill="currentColor" opacity="0.8" />
+                        <circle cx="10" cy="10" r="2" fill="#fdfaf3" />
+                      </svg>
+                      <div className="mushaf-cartouche basmala">
+                        {BASMALA_TEXT}
+                      </div>
+                      <svg className="endcap" viewBox="0 0 20 20" aria-hidden>
+                        <polygon points="10,2 14,10 10,18 6,10" fill="currentColor" opacity="0.8" />
+                        <circle cx="10" cy="10" r="2" fill="#fdfaf3" />
+                      </svg>
+                    </div>
+                  );
+                }
+                // content
+                return (
+                  <div
+                    key={line.line}
+                    className="mushaf-line"
+                    style={{ fontFamily: `'${fontFamily}', serif`, fontSize: `${config.textFontSize}cqi` }}
+                  >
+                    {(line.words ?? []).map((w, i) => {
+                      const verseMaskHide = maskAll && !visibleVerses.has(w.verseKey) && !w.isAyahMarker;
+                      const hifzHide =
+                        hifzHidden && !w.isAyahMarker
+                          ? hifzHidden.get(w.verseKey)?.has(w.position) ?? false
+                          : false;
+                      const shouldHide = verseMaskHide || hifzHide;
+                      const isHighlighted =
+                        highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
+                      const classes = ['verse-word'];
+                      if (shouldHide) {
+                        classes.push('hidden');
+                        // En Hifz : préserve les marques de waqf via mask top-only
+                        if (hifzHide) classes.push('hifz');
+                      }
+                      if (isHighlighted) classes.push('highlighted');
+                      if (w.isAyahMarker) classes.push('ayah-marker');
+                      return (
+                        <span
+                          key={`${line.line}-${i}`}
+                          className={classes.join(' ')}
+                          data-verse={w.verseKey}
+                        >
+                          {w.code}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })
+            : null}
+        </div>
+
+        <div
+          className="mushaf-page-number"
+          style={{
+            position: 'absolute',
+            bottom: `${config.pageNumberBottom}%`,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            fontFamily: "'Amiri', 'Scheherazade New', serif",
+            fontSize: `${config.pageNumberSize}cqi`,
+            fontWeight: 600,
+            color: '#1a1a1a',
+            letterSpacing: '0.05em',
+            zIndex: 2,
+          }}
+        >
+          {toArabicNumbers(pageNumber)}
+        </div>
+
         <BlurOverlay isActive={isBlurred} />
 
-        {/* DEBUG: Échantillonnage de couleurs en bas de page */}
-        {COLOR_DEBUG_MODE && isOddPage && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '5px',
-              left: 0,
-              right: 0,
-              zIndex: 100,
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: '2px',
-            }}
-          >
-            {COLOR_SAMPLES.map((sample) => (
-              <div
-                key={sample.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                }}
-              >
-                <div
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    backgroundColor: sample.color,
-                  }}
-                />
-                <span style={{ fontSize: '7px', fontWeight: 'bold' }}>{sample.id}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* GROS ENCART DE DEBUG POUR CALIBRATION */}
-        {DEBUG_MODE && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
-              border: '4px solid magenta',
-              backgroundColor: 'rgba(255, 0, 255, 0.1)',
-              zIndex: 50,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
-              paddingBottom: '20px',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: 'magenta',
-                backgroundColor: 'white',
-                padding: '8px 16px',
-              }}
-            >
-              Page {pageNumber} ({pageNumber % 2 === 1 ? 'IMPAIRE' : 'PAIRE'})
-            </span>
-          </div>
-        )}
-
-
-        {/* DEBUG: Indicateurs de lignes */}
-        {DEBUG_MODE && debugLines.map((line) => (
-          <div
-            key={`debug-line-${line.line}`}
-            style={{
-              position: 'absolute',
-              top: `${line.top}%`,
-              left: 0,
-              right: 0,
-              height: '1px',
-              backgroundColor: 'rgba(255, 0, 0, 0.5)',
-              zIndex: 20,
-              pointerEvents: 'none',
-            }}
-          >
-            {/* Numéro de ligne à gauche */}
-            <span
-              style={{
-                position: 'absolute',
-                left: '2px',
-                top: '-8px',
-                fontSize: '10px',
-                color: 'red',
-                backgroundColor: 'white',
-                padding: '0 2px',
-              }}
-            >
-              L{line.line}
-            </span>
-          </div>
-        ))}
-
-        {/* DEBUG: Marqueurs de début/fin de versets */}
-        {DEBUG_MODE && verseMarkers.map((marker, index) => (
-          <div key={`marker-${index}`}>
-            {/* Marqueur de début de verset (triangle vert à droite) */}
-            {marker.isStart && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: `${marker.top}%`,
-                  right: `${marker.startPos}%`,
-                  width: 0,
-                  height: 0,
-                  borderTop: '6px solid transparent',
-                  borderBottom: '6px solid transparent',
-                  borderRight: '8px solid #00ff00',
-                  zIndex: 25,
-                  transform: 'translateY(50%)',
-                }}
-                title={`Début ${marker.verseKey}`}
-              />
-            )}
-            {/* Marqueur de fin de verset (triangle rouge à gauche) */}
-            {marker.isEnd && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: `${marker.top}%`,
-                  left: `${marker.endPos}%`,
-                  width: 0,
-                  height: 0,
-                  borderTop: '6px solid transparent',
-                  borderBottom: '6px solid transparent',
-                  borderLeft: '8px solid #ff0000',
-                  zIndex: 25,
-                  transform: 'translateY(50%)',
-                }}
-                title={`Fin ${marker.verseKey}`}
-              />
-            )}
-            {/* Numéro du verset au début */}
-            {marker.isStart && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: `${marker.top + LINE_HEIGHT * 0.2}%`,
-                  right: `${marker.startPos + 1}%`,
-                  fontSize: '8px',
-                  color: '#00aa00',
-                  fontWeight: 'bold',
-                  zIndex: 25,
-                  backgroundColor: 'rgba(255,255,255,0.8)',
-                  padding: '0 2px',
-                }}
-              >
-                {marker.verseKey}
-              </span>
-            )}
-          </div>
-        ))}
-
-        {/* DEBUG: Bordures de la zone de texte */}
-        {DEBUG_MODE && (
-          <>
-            {/* Bordure haute */}
-            <div
-              style={{
-                position: 'absolute',
-                top: `${CALIBRATION.marginTop}%`,
-                left: `${CALIBRATION.marginLeft}%`,
-                right: `${CALIBRATION.marginRight}%`,
-                height: '2px',
-                backgroundColor: 'blue',
-                zIndex: 20,
-              }}
-            />
-            {/* Bordure basse */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: `${CALIBRATION.marginBottom}%`,
-                left: `${CALIBRATION.marginLeft}%`,
-                right: `${CALIBRATION.marginRight}%`,
-                height: '2px',
-                backgroundColor: 'blue',
-                zIndex: 20,
-              }}
-            />
-            {/* Bordure gauche */}
-            <div
-              style={{
-                position: 'absolute',
-                top: `${CALIBRATION.marginTop}%`,
-                bottom: `${CALIBRATION.marginBottom}%`,
-                left: `${CALIBRATION.marginLeft}%`,
-                width: '2px',
-                backgroundColor: 'green',
-                zIndex: 20,
-              }}
-            />
-            {/* Bordure droite */}
-            <div
-              style={{
-                position: 'absolute',
-                top: `${CALIBRATION.marginTop}%`,
-                bottom: `${CALIBRATION.marginBottom}%`,
-                right: `${CALIBRATION.marginRight}%`,
-                width: '2px',
-                backgroundColor: 'green',
-                zIndex: 20,
-              }}
-            />
-          </>
-        )}
-
-        {/* Masques mot par mot */}
-        {masks.map((box, index) => (
-          <div
-            key={`mask-${index}`}
-            style={{
-              position: 'absolute',
-              top: `${box.top}%`,
-              height: `${box.height}%`,
-              left: `${box.left}%`,
-              right: `${box.right}%`,
-              backgroundColor: DEBUG_MODE ? 'rgba(253, 250, 243, 0.85)' : PAGE_BACKGROUND,
-              border: DEBUG_MODE ? '1px solid orange' : 'none',
-              zIndex: 10,
-              pointerEvents: 'none',
-            }}
-          />
-        ))}
-
-        {/* Indicateur de chargement */}
-        {(loading || mapLoading) && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(253, 250, 243, 0.8)',
-              zIndex: 30,
-            }}
-          >
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                border: '4px solid #2d5016',
-                borderTopColor: 'transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
+        {(loading || !data) && (
+          <div className="mushaf-loader">
+            <div className="mushaf-loader-spinner" />
           </div>
         )}
       </div>

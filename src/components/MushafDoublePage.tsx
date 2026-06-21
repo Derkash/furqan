@@ -10,11 +10,13 @@ interface MushafDoublePageProps {
   orientation: Orientation;
   revealedVerses: Set<string>;
   visibleVerses?: Set<string>;
+  highlightedVerseKey?: string;
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
   singlePage?: boolean; // Afficher une seule page (la page courante)
   currentPage?: number; // Numéro de la page courante (pour mode singlePage)
+  hifzLevel?: number; // Niveau de Hifz (0-8)
   onTap: () => void;
 }
 
@@ -31,11 +33,13 @@ export default function MushafDoublePage({
   orientation,
   revealedVerses,
   visibleVerses = new Set(),
+  highlightedVerseKey,
   isBlurred = false,
   maskAll = false,
   loading = false,
   singlePage = false,
   currentPage,
+  hifzLevel,
   onTap,
 }: MushafDoublePageProps) {
   const isLandscape = orientation === 'landscape';
@@ -63,8 +67,10 @@ export default function MushafDoublePage({
             pageVerses={pageVerses}
             revealedVerses={revealedVerses}
             visibleVerses={visibleVerses}
+            highlightedVerseKey={highlightedVerseKey}
             isBlurred={isBlurred}
             maskAll={maskAll}
+            hifzLevel={hifzLevel}
             loading={loading && !pageVerses}
           />
         </div>
@@ -100,8 +106,10 @@ export default function MushafDoublePage({
               pageVerses={leftPageVerses}
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
+              highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />
           </div>
@@ -113,8 +121,10 @@ export default function MushafDoublePage({
               pageVerses={rightPageVerses}
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
+              highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
           </div>
@@ -128,8 +138,10 @@ export default function MushafDoublePage({
               pageVerses={rightPageVerses}
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
+              highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
           </div>
@@ -141,8 +153,10 @@ export default function MushafDoublePage({
               pageVerses={leftPageVerses}
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
+              highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />
           </div>

@@ -13,6 +13,19 @@ const EXERCISE_REGISTRY = new Map<ExerciseId, RegisteredExercise>();
 
 export const EXERCISES: ExerciseDefinition[] = [
   {
+    id: 'find-recited-verse',
+    name: 'Trouver le verset récité',
+    nameArabic: 'اعثر على الآية المتلوة',
+    description: 'Écoutez un verset, trouvez-le, puis passez au suivant',
+    category: 'random',
+    hasAudio: true,
+    progression: 'random',
+    versePositions: ['random'],
+    questions: ['locate_verse'],
+    icon: 'ear',
+    difficulty: 1,
+  },
+  {
     id: 'random-verse',
     name: 'Verset aléatoire',
     nameArabic: 'آية عشوائية',
@@ -128,6 +141,19 @@ export const EXERCISES: ExerciseDefinition[] = [
     questions: ['recite_verse'],
     icon: 'arrow-left',
     difficulty: 3,
+  },
+  {
+    id: 'hifz',
+    name: 'Hifz',
+    nameArabic: 'حفظ',
+    description: '8 niveaux de masquage progressif sur une page unique',
+    category: 'positional',
+    hasAudio: false,
+    progression: 'forward',
+    versePositions: ['first'],
+    questions: ['recite_verse'],
+    icon: 'brain',
+    difficulty: 4,
   },
 ];
 

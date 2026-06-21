@@ -16,6 +16,7 @@ interface UseQuizReturn {
   // Helpers pour l'affichage
   isBlurred: boolean;
   visibleVerses: Set<string>;
+  highlightedVerseKey?: string;
   maskAll: boolean;
   loading: boolean;
 }
@@ -243,6 +244,12 @@ export function useQuiz(): UseQuizReturn {
 
   const visibleVerses = getVisibleVerses();
 
+  // Verset à surligner en doré (uniquement pendant les étapes de révélation)
+  const highlightedVerseKey =
+    ['reveal_recited', 'reveal_first', 'reveal_last'].includes(state.step) && state.targetVerse
+      ? state.targetVerse.verseKey
+      : undefined;
+
   return {
     state,
     startQuiz,
@@ -253,6 +260,7 @@ export function useQuiz(): UseQuizReturn {
     pagePair,
     isBlurred,
     visibleVerses,
+    highlightedVerseKey,
     maskAll,
     loading,
   };

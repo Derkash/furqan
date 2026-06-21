@@ -1,0 +1,686 @@
+[
+  {
+    "id": 1,
+    "name_arabic": "الفاتحة",
+    "bismillah_pre": false,
+    "verses_count": 7
+  },
+  {
+    "id": 2,
+    "name_arabic": "البقرة",
+    "bismillah_pre": true,
+    "verses_count": 286
+  },
+  {
+    "id": 3,
+    "name_arabic": "آل عمران",
+    "bismillah_pre": true,
+    "verses_count": 200
+  },
+  {
+    "id": 4,
+    "name_arabic": "النساء",
+    "bismillah_pre": true,
+    "verses_count": 176
+  },
+  {
+    "id": 5,
+    "name_arabic": "المائدة",
+    "bismillah_pre": true,
+    "verses_count": 120
+  },
+  {
+    "id": 6,
+    "name_arabic": "الأنعام",
+    "bismillah_pre": true,
+    "verses_count": 165
+  },
+  {
+    "id": 7,
+    "name_arabic": "الأعراف",
+    "bismillah_pre": true,
+    "verses_count": 206
+  },
+  {
+    "id": 8,
+    "name_arabic": "الأنفال",
+    "bismillah_pre": true,
+    "verses_count": 75
+  },
+  {
+    "id": 9,
+    "name_arabic": "التوبة",
+    "bismillah_pre": false,
+    "verses_count": 129
+  },
+  {
+    "id": 10,
+    "name_arabic": "يونس",
+    "bismillah_pre": true,
+    "verses_count": 109
+  },
+  {
+    "id": 11,
+    "name_arabic": "هود",
+    "bismillah_pre": true,
+    "verses_count": 123
+  },
+  {
+    "id": 12,
+    "name_arabic": "يوسف",
+    "bismillah_pre": true,
+    "verses_count": 111
+  },
+  {
+    "id": 13,
+    "name_arabic": "الرعد",
+    "bismillah_pre": true,
+    "verses_count": 43
+  },
+  {
+    "id": 14,
+    "name_arabic": "ابراهيم",
+    "bismillah_pre": true,
+    "verses_count": 52
+  },
+  {
+    "id": 15,
+    "name_arabic": "الحجر",
+    "bismillah_pre": true,
+    "verses_count": 99
+  },
+  {
+    "id": 16,
+    "name_arabic": "النحل",
+    "bismillah_pre": true,
+    "verses_count": 128
+  },
+  {
+    "id": 17,
+    "name_arabic": "الإسراء",
+    "bismillah_pre": true,
+    "verses_count": 111
+  },
+  {
+    "id": 18,
+    "name_arabic": "الكهف",
+    "bismillah_pre": true,
+    "verses_count": 110
+  },
+  {
+    "id": 19,
+    "name_arabic": "مريم",
+    "bismillah_pre": true,
+    "verses_count": 98
+  },
+  {
+    "id": 20,
+    "name_arabic": "طه",
+    "bismillah_pre": true,
+    "verses_count": 135
+  },
+  {
+    "id": 21,
+    "name_arabic": "الأنبياء",
+    "bismillah_pre": true,
+    "verses_count": 112
+  },
+  {
+    "id": 22,
+    "name_arabic": "الحج",
+    "bismillah_pre": true,
+    "verses_count": 78
+  },
+  {
+    "id": 23,
+    "name_arabic": "المؤمنون",
+    "bismillah_pre": true,
+    "verses_count": 118
+  },
+  {
+    "id": 24,
+    "name_arabic": "النور",
+    "bismillah_pre": true,
+    "verses_count": 64
+  },
+  {
+    "id": 25,
+    "name_arabic": "الفرقان",
+    "bismillah_pre": true,
+    "verses_count": 77
+  },
+  {
+    "id": 26,
+    "name_arabic": "الشعراء",
+    "bismillah_pre": true,
+    "verses_count": 227
+  },
+  {
+    "id": 27,
+    "name_arabic": "النمل",
+    "bismillah_pre": true,
+    "verses_count": 93
+  },
+  {
+    "id": 28,
+    "name_arabic": "القصص",
+    "bismillah_pre": true,
+    "verses_count": 88
+  },
+  {
+    "id": 29,
+    "name_arabic": "العنكبوت",
+    "bismillah_pre": true,
+    "verses_count": 69
+  },
+  {
+    "id": 30,
+    "name_arabic": "الروم",
+    "bismillah_pre": true,
+    "verses_count": 60
+  },
+  {
+    "id": 31,
+    "name_arabic": "لقمان",
+    "bismillah_pre": true,
+    "verses_count": 34
+  },
+  {
+    "id": 32,
+    "name_arabic": "السجدة",
+    "bismillah_pre": true,
+    "verses_count": 30
+  },
+  {
+    "id": 33,
+    "name_arabic": "الأحزاب",
+    "bismillah_pre": true,
+    "verses_count": 73
+  },
+  {
+    "id": 34,
+    "name_arabic": "سبإ",
+    "bismillah_pre": true,
+    "verses_count": 54
+  },
+  {
+    "id": 35,
+    "name_arabic": "فاطر",
+    "bismillah_pre": true,
+    "verses_count": 45
+  },
+  {
+    "id": 36,
+    "name_arabic": "يس",
+    "bismillah_pre": true,
+    "verses_count": 83
+  },
+  {
+    "id": 37,
+    "name_arabic": "الصافات",
+    "bismillah_pre": true,
+    "verses_count": 182
+  },
+  {
+    "id": 38,
+    "name_arabic": "ص",
+    "bismillah_pre": true,
+    "verses_count": 88
+  },
+  {
+    "id": 39,
+    "name_arabic": "الزمر",
+    "bismillah_pre": true,
+    "verses_count": 75
+  },
+  {
+    "id": 40,
+    "name_arabic": "غافر",
+    "bismillah_pre": true,
+    "verses_count": 85
+  },
+  {
+    "id": 41,
+    "name_arabic": "فصلت",
+    "bismillah_pre": true,
+    "verses_count": 54
+  },
+  {
+    "id": 42,
+    "name_arabic": "الشورى",
+    "bismillah_pre": true,
+    "verses_count": 53
+  },
+  {
+    "id": 43,
+    "name_arabic": "الزخرف",
+    "bismillah_pre": true,
+    "verses_count": 89
+  },
+  {
+    "id": 44,
+    "name_arabic": "الدخان",
+    "bismillah_pre": true,
+    "verses_count": 59
+  },
+  {
+    "id": 45,
+    "name_arabic": "الجاثية",
+    "bismillah_pre": true,
+    "verses_count": 37
+  },
+  {
+    "id": 46,
+    "name_arabic": "الأحقاف",
+    "bismillah_pre": true,
+    "verses_count": 35
+  },
+  {
+    "id": 47,
+    "name_arabic": "محمد",
+    "bismillah_pre": true,
+    "verses_count": 38
+  },
+  {
+    "id": 48,
+    "name_arabic": "الفتح",
+    "bismillah_pre": true,
+    "verses_count": 29
+  },
+  {
+    "id": 49,
+    "name_arabic": "الحجرات",
+    "bismillah_pre": true,
+    "verses_count": 18
+  },
+  {
+    "id": 50,
+    "name_arabic": "ق",
+    "bismillah_pre": true,
+    "verses_count": 45
+  },
+  {
+    "id": 51,
+    "name_arabic": "الذاريات",
+    "bismillah_pre": true,
+    "verses_count": 60
+  },
+  {
+    "id": 52,
+    "name_arabic": "الطور",
+    "bismillah_pre": true,
+    "verses_count": 49
+  },
+  {
+    "id": 53,
+    "name_arabic": "النجم",
+    "bismillah_pre": true,
+    "verses_count": 62
+  },
+  {
+    "id": 54,
+    "name_arabic": "القمر",
+    "bismillah_pre": true,
+    "verses_count": 55
+  },
+  {
+    "id": 55,
+    "name_arabic": "الرحمن",
+    "bismillah_pre": true,
+    "verses_count": 78
+  },
+  {
+    "id": 56,
+    "name_arabic": "الواقعة",
+    "bismillah_pre": true,
+    "verses_count": 96
+  },
+  {
+    "id": 57,
+    "name_arabic": "الحديد",
+    "bismillah_pre": true,
+    "verses_count": 29
+  },
+  {
+    "id": 58,
+    "name_arabic": "المجادلة",
+    "bismillah_pre": true,
+    "verses_count": 22
+  },
+  {
+    "id": 59,
+    "name_arabic": "الحشر",
+    "bismillah_pre": true,
+    "verses_count": 24
+  },
+  {
+    "id": 60,
+    "name_arabic": "الممتحنة",
+    "bismillah_pre": true,
+    "verses_count": 13
+  },
+  {
+    "id": 61,
+    "name_arabic": "الصف",
+    "bismillah_pre": true,
+    "verses_count": 14
+  },
+  {
+    "id": 62,
+    "name_arabic": "الجمعة",
+    "bismillah_pre": true,
+    "verses_count": 11
+  },
+  {
+    "id": 63,
+    "name_arabic": "المنافقون",
+    "bismillah_pre": true,
+    "verses_count": 11
+  },
+  {
+    "id": 64,
+    "name_arabic": "التغابن",
+    "bismillah_pre": true,
+    "verses_count": 18
+  },
+  {
+    "id": 65,
+    "name_arabic": "الطلاق",
+    "bismillah_pre": true,
+    "verses_count": 12
+  },
+  {
+    "id": 66,
+    "name_arabic": "التحريم",
+    "bismillah_pre": true,
+    "verses_count": 12
+  },
+  {
+    "id": 67,
+    "name_arabic": "الملك",
+    "bismillah_pre": true,
+    "verses_count": 30
+  },
+  {
+    "id": 68,
+    "name_arabic": "القلم",
+    "bismillah_pre": true,
+    "verses_count": 52
+  },
+  {
+    "id": 69,
+    "name_arabic": "الحاقة",
+    "bismillah_pre": true,
+    "verses_count": 52
+  },
+  {
+    "id": 70,
+    "name_arabic": "المعارج",
+    "bismillah_pre": true,
+    "verses_count": 44
+  },
+  {
+    "id": 71,
+    "name_arabic": "نوح",
+    "bismillah_pre": true,
+    "verses_count": 28
+  },
+  {
+    "id": 72,
+    "name_arabic": "الجن",
+    "bismillah_pre": true,
+    "verses_count": 28
+  },
+  {
+    "id": 73,
+    "name_arabic": "المزمل",
+    "bismillah_pre": true,
+    "verses_count": 20
+  },
+  {
+    "id": 74,
+    "name_arabic": "المدثر",
+    "bismillah_pre": true,
+    "verses_count": 56
+  },
+  {
+    "id": 75,
+    "name_arabic": "القيامة",
+    "bismillah_pre": true,
+    "verses_count": 40
+  },
+  {
+    "id": 76,
+    "name_arabic": "الانسان",
+    "bismillah_pre": true,
+    "verses_count": 31
+  },
+  {
+    "id": 77,
+    "name_arabic": "المرسلات",
+    "bismillah_pre": true,
+    "verses_count": 50
+  },
+  {
+    "id": 78,
+    "name_arabic": "النبإ",
+    "bismillah_pre": true,
+    "verses_count": 40
+  },
+  {
+    "id": 79,
+    "name_arabic": "النازعات",
+    "bismillah_pre": true,
+    "verses_count": 46
+  },
+  {
+    "id": 80,
+    "name_arabic": "عبس",
+    "bismillah_pre": true,
+    "verses_count": 42
+  },
+  {
+    "id": 81,
+    "name_arabic": "التكوير",
+    "bismillah_pre": true,
+    "verses_count": 29
+  },
+  {
+    "id": 82,
+    "name_arabic": "الإنفطار",
+    "bismillah_pre": true,
+    "verses_count": 19
+  },
+  {
+    "id": 83,
+    "name_arabic": "المطففين",
+    "bismillah_pre": true,
+    "verses_count": 36
+  },
+  {
+    "id": 84,
+    "name_arabic": "الإنشقاق",
+    "bismillah_pre": true,
+    "verses_count": 25
+  },
+  {
+    "id": 85,
+    "name_arabic": "البروج",
+    "bismillah_pre": true,
+    "verses_count": 22
+  },
+  {
+    "id": 86,
+    "name_arabic": "الطارق",
+    "bismillah_pre": true,
+    "verses_count": 17
+  },
+  {
+    "id": 87,
+    "name_arabic": "الأعلى",
+    "bismillah_pre": true,
+    "verses_count": 19
+  },
+  {
+    "id": 88,
+    "name_arabic": "الغاشية",
+    "bismillah_pre": true,
+    "verses_count": 26
+  },
+  {
+    "id": 89,
+    "name_arabic": "الفجر",
+    "bismillah_pre": true,
+    "verses_count": 30
+  },
+  {
+    "id": 90,
+    "name_arabic": "البلد",
+    "bismillah_pre": true,
+    "verses_count": 20
+  },
+  {
+    "id": 91,
+    "name_arabic": "الشمس",
+    "bismillah_pre": true,
+    "verses_count": 15
+  },
+  {
+    "id": 92,
+    "name_arabic": "الليل",
+    "bismillah_pre": true,
+    "verses_count": 21
+  },
+  {
+    "id": 93,
+    "name_arabic": "الضحى",
+    "bismillah_pre": true,
+    "verses_count": 11
+  },
+  {
+    "id": 94,
+    "name_arabic": "الشرح",
+    "bismillah_pre": true,
+    "verses_count": 8
+  },
+  {
+    "id": 95,
+    "name_arabic": "التين",
+    "bismillah_pre": true,
+    "verses_count": 8
+  },
+  {
+    "id": 96,
+    "name_arabic": "العلق",
+    "bismillah_pre": true,
+    "verses_count": 19
+  },
+  {
+    "id": 97,
+    "name_arabic": "القدر",
+    "bismillah_pre": true,
+    "verses_count": 5
+  },
+  {
+    "id": 98,
+    "name_arabic": "البينة",
+    "bismillah_pre": true,
+    "verses_count": 8
+  },
+  {
+    "id": 99,
+    "name_arabic": "الزلزلة",
+    "bismillah_pre": true,
+    "verses_count": 8
+  },
+  {
+    "id": 100,
+    "name_arabic": "العاديات",
+    "bismillah_pre": true,
+    "verses_count": 11
+  },
+  {
+    "id": 101,
+    "name_arabic": "القارعة",
+    "bismillah_pre": true,
+    "verses_count": 11
+  },
+  {
+    "id": 102,
+    "name_arabic": "التكاثر",
+    "bismillah_pre": true,
+    "verses_count": 8
+  },
+  {
+    "id": 103,
+    "name_arabic": "العصر",
+    "bismillah_pre": true,
+    "verses_count": 3
+  },
+  {
+    "id": 104,
+    "name_arabic": "الهمزة",
+    "bismillah_pre": true,
+    "verses_count": 9
+  },
+  {
+    "id": 105,
+    "name_arabic": "الفيل",
+    "bismillah_pre": true,
+    "verses_count": 5
+  },
+  {
+    "id": 106,
+    "name_arabic": "قريش",
+    "bismillah_pre": true,
+    "verses_count": 4
+  },
+  {
+    "id": 107,
+    "name_arabic": "الماعون",
+    "bismillah_pre": true,
+    "verses_count": 7
+  },
+  {
+    "id": 108,
+    "name_arabic": "الكوثر",
+    "bismillah_pre": true,
+    "verses_count": 3
+  },
+  {
+    "id": 109,
+    "name_arabic": "الكافرون",
+    "bismillah_pre": true,
+    "verses_count": 6
+  },
+  {
+    "id": 110,
+    "name_arabic": "النصر",
+    "bismillah_pre": true,
+    "verses_count": 3
+  },
+  {
+    "id": 111,
+    "name_arabic": "المسد",
+    "bismillah_pre": true,
+    "verses_count": 5
+  },
+  {
+    "id": 112,
+    "name_arabic": "الإخلاص",
+    "bismillah_pre": true,
+    "verses_count": 4
+  },
+  {
+    "id": 113,
+    "name_arabic": "الفلق",
+    "bismillah_pre": true,
+    "verses_count": 5
+  },
+  {
+    "id": 114,
+    "name_arabic": "الناس",
+    "bismillah_pre": true,
+    "verses_count": 6
+  }
+]
