@@ -288,12 +288,16 @@ export default function MushafPage({
           display: flex;
           align-items: flex-start;
           box-sizing: border-box;
+          container-type: size;
         }
         .mushaf-page {
           position: relative;
           aspect-ratio: 759 / 1100;
-          height: 100%;
-          max-width: 100%;
+          /* Fit-contain : la page prend la plus grande taille possible dans le wrapper
+             tout en gardant l'aspect-ratio. Indispensable pour que 2 pages côte à côte
+             rentrent toujours dans l'écran, même en portrait étroit. */
+          width: min(100cqi, calc(100cqb * 759 / 1100));
+          height: min(100cqb, calc(100cqi * 1100 / 759));
           background: #fdfaf3;
           color: #1a1a1a;
           box-sizing: border-box;
