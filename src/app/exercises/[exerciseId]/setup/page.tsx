@@ -77,7 +77,7 @@ export default function SetupPage() {
   const pageCount = Math.abs(range.endPage - range.startPage) + 1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] p-4 pb-12">
+    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] p-4 pb-12" dir="ltr">
       <div className="max-w-md mx-auto">
         <Link
           href="/exercises"

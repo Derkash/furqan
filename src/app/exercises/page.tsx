@@ -13,6 +13,7 @@ export default function ExercisesPage() {
         minHeight: '100dvh',
         WebkitOverflowScrolling: 'touch',
       }}
+      dir="ltr"
     >
       {/* Header décoratif type Mushaf */}
       <header className="relative pt-10 pb-8 px-5">

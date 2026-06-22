@@ -245,7 +245,7 @@ export default function RangePicker({ value, onChange }: RangePickerProps) {
   };
 
   return (
-    <div>
+    <div dir="ltr">
       {/* Tabs mode */}
       <div className="flex gap-1 p-1 bg-[#2d5016]/5 rounded-xl mb-4">
         {(Object.keys(TAB_LABELS) as RangeMode[]).map((m) => {
