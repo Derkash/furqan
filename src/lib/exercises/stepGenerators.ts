@@ -58,8 +58,9 @@ export const findRecitedVerseSteps: StepGenerator = (
 
 // ============================================
 // HIFZ
-// Une seule page affichée, l'utilisateur choisit son niveau de masquage (0-8).
-// Un seul step : la page est affichée, le niveau est contrôlé par l'UI.
+// Double page affichée, l'utilisateur choisit son niveau de masquage (0-8)
+// et feuillette la plage avec les boutons gauche/droite.
+// Un seul step : les pages sont affichées, le niveau est contrôlé par l'UI.
 // ============================================
 
 export const hifzSteps: StepGenerator = (
@@ -67,7 +68,6 @@ export const hifzSteps: StepGenerator = (
   _pageNumber: number,
   _config: ExerciseConfig
 ): ExerciseStep[] => {
-  if (pageVerses.verses.length === 0) return [];
   return [
     {
       type: 'revealing',
@@ -79,7 +79,7 @@ export const hifzSteps: StepGenerator = (
         isBlurred: false,
         maskAll: false,
         visibleVerses: pageVerses.verses.map((v) => v.verseKey),
-        singlePage: true,
+        singlePage: false,
         hifzLevel: 0,
       },
     },

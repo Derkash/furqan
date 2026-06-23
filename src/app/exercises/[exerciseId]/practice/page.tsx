@@ -34,6 +34,9 @@ export default function PracticePage() {
     setHifzLevel,
     displayedPage,
     loading,
+    canFlipPrev,
+    canFlipNext,
+    flipPair,
     initialize,
     start,
     nextStep,
@@ -160,9 +163,17 @@ export default function PracticePage() {
           ← Retour
         </Link>
         <span className="text-sm font-medium">
-          Page {toArabicNumbers(state.progress.currentPage)} •{' '}
-          {toArabicNumbers(state.progress.pagesCompleted + 1)}/
-          {toArabicNumbers(state.progress.totalPages)}
+          {exerciseId === 'hifz' ? (
+            <>
+              Pages {toArabicNumbers(pagePair.rightPage)}–{toArabicNumbers(pagePair.leftPage)}
+            </>
+          ) : (
+            <>
+              Page {toArabicNumbers(state.progress.currentPage)} •{' '}
+              {toArabicNumbers(state.progress.pagesCompleted + 1)}/
+              {toArabicNumbers(state.progress.totalPages)}
+            </>
+          )}
         </span>
         <span className="text-xs opacity-75">{exercise?.name}</span>
       </div>
@@ -235,6 +246,52 @@ export default function PracticePage() {
           hifzLevel={exerciseId === 'hifz' ? hifzLevel : undefined}
           onTap={handleTap}
         />
+
+        {/* Boutons de feuilletage (Hifz) : extrémités gauche/droite, centrés verticalement.
+            Lecture RTL : avancer (pages suivantes) = aller vers la GAUCHE. */}
+        {exerciseId === 'hifz' && (
+          <>
+            {/* Droite de l'écran → pages précédentes (numéros plus petits) */}
+            <button
+              type="button"
+              aria-label="Pages précédentes"
+              disabled={!canFlipPrev}
+              onClick={(e) => {
+                e.stopPropagation();
+                flipPair('prev');
+              }}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+                canFlipPrev
+                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
+                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+              }`}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+
+            {/* Gauche de l'écran → pages suivantes (numéros plus grands) */}
+            <button
+              type="button"
+              aria-label="Pages suivantes"
+              disabled={!canFlipNext}
+              onClick={(e) => {
+                e.stopPropagation();
+                flipPair('next');
+              }}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+                canFlipNext
+                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
+                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+              }`}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 6-6 6 6 6" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

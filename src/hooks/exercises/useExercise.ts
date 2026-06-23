@@ -38,6 +38,11 @@ interface UseExerciseReturn {
   // Loading
   loading: boolean;
 
+  // Navigation double page (feuilleter) — utilisé par Hifz
+  canFlipPrev: boolean;
+  canFlipNext: boolean;
+  flipPair: (direction: 'prev' | 'next') => void;
+
   // Actions
   initialize: (config: ExerciseConfig) => Promise<void>;
   start: () => void;
@@ -78,7 +83,13 @@ const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = [
 ];
 
 // Exercices affichés en single page (une seule page à la fois, pas de double page)
-const SINGLE_PAGE_EXERCISES: ExerciseId[] = ['hifz'];
+// (Hifz est désormais affiché en double page, comme les autres exercices.)
+const SINGLE_PAGE_EXERCISES: ExerciseId[] = [];
+
+/** Renvoie la page impaire (droite) de la double page contenant `page`. */
+function pairRightPage(page: number): number {
+  return Math.max(1, page % 2 === 1 ? page : page - 1);
+}
 
 /**
  * Tire une page aléatoire dans [startPage, endPage] en évitant les `avoidRecent`
@@ -330,6 +341,34 @@ export function useExercise(): UseExerciseReturn {
     setState((prev) => ({ ...prev, status: 'running' }));
   }, []);
 
+  // Navigation double page (feuilleter) dans la plage [startPage, endPage].
+  // Ne régénère pas le round : on déplace simplement la double page courante, ce qui
+  // déclenche le rechargement des pages via l'effet de chargement. Le niveau de Hifz
+  // courant est conservé.
+  const { startPage: cfgStart, endPage: cfgEnd } = state.config;
+  const flipBounds = useMemo(() => {
+    const lo = pairRightPage(Math.min(cfgStart, cfgEnd));
+    const hi = pairRightPage(Math.max(cfgStart, cfgEnd));
+    const cur = pairRightPage(state.progress.currentPage);
+    return { lo, hi, cur };
+  }, [cfgStart, cfgEnd, state.progress.currentPage]);
+
+  const canFlipPrev = flipBounds.cur > flipBounds.lo;
+  const canFlipNext = flipBounds.cur < flipBounds.hi;
+
+  const flipPair = useCallback((direction: 'prev' | 'next') => {
+    setState((prev) => {
+      const lo = pairRightPage(Math.min(prev.config.startPage, prev.config.endPage));
+      const hi = pairRightPage(Math.max(prev.config.startPage, prev.config.endPage));
+      const cur = pairRightPage(prev.progress.currentPage);
+      let target = cur + (direction === 'next' ? 2 : -2);
+      if (target < lo) target = lo;
+      if (target > hi) target = hi;
+      if (target === cur) return prev;
+      return { ...prev, progress: { ...prev.progress, currentPage: target } };
+    });
+  }, []);
+
   // Reset
   const reset = useCallback(() => {
     setState(initialState);
@@ -353,6 +392,9 @@ export function useExercise(): UseExerciseReturn {
     setHifzLevel,
     displayedPage,
     loading,
+    canFlipPrev,
+    canFlipNext,
+    flipPair,
     initialize,
     start,
     nextStep,

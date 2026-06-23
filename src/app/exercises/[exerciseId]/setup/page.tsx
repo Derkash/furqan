@@ -19,10 +19,7 @@ export default function SetupPage() {
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
-  const [singlePageValue, setSinglePageValue] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const isSinglePageExercise = exerciseId === 'hifz';
 
   // Restauration des dernières valeurs saisies pour cet exercice (proposées par défaut).
   // On lit le localStorage après le montage : le 1er rendu (serveur + client) reste vide,
@@ -31,15 +28,15 @@ export default function SetupPage() {
   useEffect(() => {
     const saved = loadSetup(exerciseId);
     if (!saved) return;
-    if (saved.singlePage != null) {
-      setSinglePageValue(saved.singlePage);
-    }
     if (saved.mode != null || saved.start != null || saved.end != null) {
       setRange({
         mode: saved.mode ?? 'page',
         start: saved.start ?? null,
         end: saved.end ?? null,
       });
+    } else if (saved.singlePage != null) {
+      // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
+      setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
   }, [exerciseId]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -70,18 +67,6 @@ export default function SetupPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (isSinglePageExercise) {
-      if (singlePageValue == null || singlePageValue < 1 || singlePageValue > 604) {
-        setError('La page doit être entre 1 et 604');
-        return;
-      }
-      saveSetup(exerciseId, { singlePage: singlePageValue });
-      router.push(
-        `/exercises/${exerciseId}/practice?start=${singlePageValue}&end=${singlePageValue}`
-      );
-      return;
-    }
 
     if (range.start == null || range.end == null) {
       setError('Veuillez saisir un début et une fin');
@@ -126,55 +111,24 @@ export default function SetupPage() {
           <p className="text-gray-500 text-sm mb-5">{exercise.description}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSinglePageExercise ? (
-              <div>
-                <label htmlFor="singlePage" className="block text-sm font-medium text-gray-700 mb-1">
-                  Page à mémoriser
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    id="singlePage"
-                    inputMode="numeric"
-                    min={1}
-                    max={604}
-                    placeholder="1–604"
-                    value={singlePageValue === null ? '' : singlePageValue}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setSinglePageValue(raw === '' ? null : Number(raw));
-                    }}
-                    className="w-full px-4 py-2.5 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
-                  />
-                  {singlePageValue !== null && (
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg pointer-events-none">
-                      {toArabicNumbers(singlePageValue)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <>
-                <RangePicker value={range} onChange={setRange} />
+            <RangePicker value={range} onChange={setRange} />
 
-                {/* Récap de la plage en pages */}
-                <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
-                  <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
-                    Plage de pages
-                  </div>
-                  <div className="text-lg font-bold text-[#2d5016] mt-1">
-                    {hasPageRange
-                      ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
-                      : '—'}
-                  </div>
-                  <div className="text-xs text-[#7a8b3e] mt-0.5">
-                    {hasPageRange
-                      ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
-                      : 'Saisissez un début et une fin'}
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Récap de la plage en pages */}
+            <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
+              <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
+                Plage de pages
+              </div>
+              <div className="text-lg font-bold text-[#2d5016] mt-1">
+                {hasPageRange
+                  ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
+                  : '—'}
+              </div>
+              <div className="text-xs text-[#7a8b3e] mt-0.5">
+                {hasPageRange
+                  ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
+                  : 'Saisissez un début et une fin'}
+              </div>
+            </div>
 
             {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
