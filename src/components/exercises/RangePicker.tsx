@@ -5,6 +5,7 @@ import {
   MODE_ARABIC,
   MODE_LABELS,
   MODE_MAX,
+  type ChapterEntry,
   type RangeMode,
 } from '@/utils/exercises/rangeToPages';
 
@@ -19,6 +20,8 @@ export interface RangePickerValue {
 interface RangePickerProps {
   value: RangePickerValue;
   onChange: (next: RangePickerValue) => void;
+  /** Liste des 114 sourates (numéro + nom) pour le mode "Sourate" en liste déroulante. */
+  chapters?: ChapterEntry[];
 }
 
 interface NumberFieldProps {
@@ -67,8 +70,43 @@ function NumberField({ label, value, max, onChange }: NumberFieldProps) {
   );
 }
 
-export default function RangePicker({ value, onChange }: RangePickerProps) {
+interface SurahFieldProps {
+  label: string;
+  value: number | null;
+  chapters: ChapterEntry[];
+  onChange: (v: number | null) => void;
+}
+
+function SurahField({ label, value, chapters, onChange }: SurahFieldProps) {
+  const loading = chapters.length === 0;
+  return (
+    <div className="flex-1 min-w-0">
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] text-center mb-1.5">
+        {label}
+      </label>
+      <select
+        disabled={loading}
+        value={value === null ? '' : String(value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          onChange(raw === '' ? null : Number(raw));
+        }}
+        className="w-full px-3 py-2.5 text-sm font-semibold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] transition disabled:opacity-60"
+      >
+        <option value="">{loading ? 'Chargement…' : '— Sourate —'}</option>
+        {chapters.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.id} · {c.name_simple} — {c.name_arabic}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export default function RangePicker({ value, onChange, chapters = [] }: RangePickerProps) {
   const max = MODE_MAX[value.mode];
+  const isSurah = value.mode === 'surah';
 
   const updateMode = (mode: RangeMode) => {
     // Aucune valeur pré-saisie : on repart sur des champs vides pour le nouveau mode.
@@ -104,14 +142,23 @@ export default function RangePicker({ value, onChange }: RangePickerProps) {
         })}
       </div>
 
-      {/* Champs Début / Fin (saisie libre) */}
+      {/* Champs Début / Fin : liste déroulante pour Sourate, saisie libre sinon */}
       <div className="flex gap-3 items-end">
-        <NumberField
-          label="Début"
-          value={value.start}
-          max={max}
-          onChange={(v) => onChange({ ...value, start: v })}
-        />
+        {isSurah ? (
+          <SurahField
+            label="Début"
+            value={value.start}
+            chapters={chapters}
+            onChange={(v) => onChange({ ...value, start: v })}
+          />
+        ) : (
+          <NumberField
+            label="Début"
+            value={value.start}
+            max={max}
+            onChange={(v) => onChange({ ...value, start: v })}
+          />
+        )}
         <div className="flex items-center text-[#c9a959] pb-2.5">
           <svg
             width="20"
@@ -127,12 +174,21 @@ export default function RangePicker({ value, onChange }: RangePickerProps) {
             <path d="m12 5 7 7-7 7" />
           </svg>
         </div>
-        <NumberField
-          label="Fin"
-          value={value.end}
-          max={max}
-          onChange={(v) => onChange({ ...value, end: v })}
-        />
+        {isSurah ? (
+          <SurahField
+            label="Fin"
+            value={value.end}
+            chapters={chapters}
+            onChange={(v) => onChange({ ...value, end: v })}
+          />
+        ) : (
+          <NumberField
+            label="Fin"
+            value={value.end}
+            max={max}
+            onChange={(v) => onChange({ ...value, end: v })}
+          />
+        )}
       </div>
     </div>
   );

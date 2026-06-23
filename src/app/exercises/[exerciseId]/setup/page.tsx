@@ -111,7 +111,7 @@ export default function SetupPage() {
           <p className="text-gray-500 text-sm mb-5">{exercise.description}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <RangePicker value={range} onChange={setRange} />
+            <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
 
             {/* Récap de la plage en pages */}
             <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
