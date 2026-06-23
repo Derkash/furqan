@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
+import { useTranslation } from '@/hooks/exercises/useTranslation';
+import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import type { Orientation } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
@@ -55,6 +57,48 @@ export default function PracticePage() {
   const [readingMode, setReadingMode] = useState(false);
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
+
+  // Traduction Hamidullah (Hifz) : affichée seulement au tap sur un verset, en popover.
+  const { translations, loading: translationLoading, load: loadTranslations } = useTranslation();
+  const { data: quranUnits } = useQuranUnits();
+  // popover = verset sélectionné + coordonnées du tap (clientX/clientY).
+  const [popover, setPopover] = useState<{ verseKey: string; x: number; y: number } | null>(null);
+  // Position finale (clampée à l'écran), calculée après mesure du popover.
+  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Tap sur un verset (délégation via data-verse) → popover au point cliqué ; tap hors verset → ferme.
+  const handleMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isHifz) return;
+    const el = (e.target as HTMLElement).closest('[data-verse]');
+    const verseKey = el?.getAttribute('data-verse');
+    if (verseKey) {
+      loadTranslations();
+      setPopoverPos(null);
+      setPopover({ verseKey, x: e.clientX, y: e.clientY });
+    } else {
+      setPopover(null);
+    }
+  };
+
+  // Place le popover près du point cliqué, en le gardant dans l'écran (clamp + flip vertical).
+  useEffect(() => {
+    if (!popover || !popoverRef.current) return;
+    const rect = popoverRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 8;
+    const offset = 14;
+    let left = popover.x - rect.width / 2;
+    left = Math.max(margin, Math.min(left, vw - rect.width - margin));
+    let top = popover.y + offset;
+    if (top + rect.height > vh - margin) {
+      // Déborde en bas → place au-dessus du point cliqué.
+      top = popover.y - offset - rect.height;
+    }
+    top = Math.max(margin, Math.min(top, vh - rect.height - margin));
+    setPopoverPos({ left, top });
+  }, [popover, translations]);
 
   // Initialize exercise
   useEffect(() => {
@@ -264,7 +308,7 @@ export default function PracticePage() {
       )}
 
       {/* Zone Mushaf */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative" onClick={handleMushafClick}>
         {/* Bouton discret pour quitter le plein écran (Hifz) */}
         {fullscreen && (
           <button
@@ -311,6 +355,7 @@ export default function PracticePage() {
               disabled={!canFlipPrev}
               onClick={(e) => {
                 e.stopPropagation();
+                setPopover(null);
                 flipPair('prev');
               }}
               className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
@@ -331,6 +376,7 @@ export default function PracticePage() {
               disabled={!canFlipNext}
               onClick={(e) => {
                 e.stopPropagation();
+                setPopover(null);
                 flipPair('next');
               }}
               className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
@@ -346,6 +392,69 @@ export default function PracticePage() {
           </>
         )}
       </div>
+
+      {/* Popover de traduction Hamidullah, positionné au point cliqué (Hifz uniquement) */}
+      {isHifz && popover && (() => {
+        const [s, a] = popover.verseKey.split(':').map(Number);
+        const chapter = quranUnits?.chapters.find((c) => c.id === s);
+        const text = translations?.[popover.verseKey];
+        return (
+          <div
+            ref={popoverRef}
+            dir="ltr"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              left: popoverPos ? popoverPos.left : popover.x,
+              top: popoverPos ? popoverPos.top : popover.y,
+              visibility: popoverPos ? 'visible' : 'hidden',
+            }}
+            className="fixed z-40 w-[min(88vw,340px)] max-h-[60vh] overflow-y-auto bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
+          >
+            <div className="px-3.5 pt-2.5 pb-3">
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="min-w-0">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-[#c9a959]">
+                    Traduction — Hamidullah
+                  </div>
+                  <div className="text-sm font-bold text-[#2d5016] mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span>
+                      {s}:{a}
+                      {chapter ? ` · ${chapter.name_simple}` : ''}
+                    </span>
+                    {chapter && (
+                      <span
+                        className="text-[#7a8b3e]"
+                        dir="rtl"
+                        style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
+                      >
+                        {chapter.name_arabic}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Fermer la traduction"
+                  onClick={() => setPopover(null)}
+                  className="flex-none w-7 h-7 rounded-full flex items-center justify-center bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 active:scale-95 transition"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-[14px] leading-relaxed text-[#1a1a1a]">
+                {text
+                  ? text
+                  : translationLoading
+                    ? 'Chargement de la traduction…'
+                    : 'Traduction indisponible pour ce verset.'}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
