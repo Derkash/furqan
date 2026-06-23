@@ -1,36 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import RangePicker, { type RangeMode } from '@/components/exercises/RangePicker';
+import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
+import { unitToPageRange } from '@/utils/exercises/rangeToPages';
+import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
+import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
 import Link from 'next/link';
-
-interface RangeValue {
-  mode: RangeMode;
-  start: number;
-  end: number;
-  startPage: number;
-  endPage: number;
-}
 
 export default function SetupPage() {
   const router = useRouter();
   const params = useParams();
   const exerciseId = params.exerciseId as string;
 
-  const [range, setRange] = useState<RangeValue>({
-    mode: 'page',
-    start: 3,
-    end: 10,
-    startPage: 3,
-    endPage: 10,
-  });
-  const [singlePageValue, setSinglePageValue] = useState(3);
+  const { data: units } = useQuranUnits();
+
+  // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
+  const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
+  const [singlePageValue, setSinglePageValue] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isSinglePageExercise = exerciseId === 'hifz';
+
+  // Restauration des dernières valeurs saisies pour cet exercice (proposées par défaut).
+  // On lit le localStorage après le montage : le 1er rendu (serveur + client) reste vide,
+  // ce qui évite tout décalage d'hydratation, puis on applique les valeurs mémorisées.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const saved = loadSetup(exerciseId);
+    if (!saved) return;
+    if (saved.singlePage != null) {
+      setSinglePageValue(saved.singlePage);
+    }
+    if (saved.mode != null || saved.start != null || saved.end != null) {
+      setRange({
+        mode: saved.mode ?? 'page',
+        start: saved.start ?? null,
+        end: saved.end ?? null,
+      });
+    }
+  }, [exerciseId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const { startPage, endPage } = useMemo(
+    () => unitToPageRange(range.mode, range.start, range.end, units),
+    [range, units]
+  );
 
   if (!isValidExerciseId(exerciseId)) {
     return (
@@ -55,26 +72,37 @@ export default function SetupPage() {
     setError(null);
 
     if (isSinglePageExercise) {
-      if (singlePageValue < 1 || singlePageValue > 604) {
+      if (singlePageValue == null || singlePageValue < 1 || singlePageValue > 604) {
         setError('La page doit être entre 1 et 604');
         return;
       }
+      saveSetup(exerciseId, { singlePage: singlePageValue });
       router.push(
         `/exercises/${exerciseId}/practice?start=${singlePageValue}&end=${singlePageValue}`
       );
       return;
     }
 
-    const lo = Math.min(range.startPage, range.endPage);
-    const hi = Math.max(range.startPage, range.endPage);
+    if (range.start == null || range.end == null) {
+      setError('Veuillez saisir un début et une fin');
+      return;
+    }
+    if (startPage == null || endPage == null) {
+      setError('Plage invalide');
+      return;
+    }
+    const lo = Math.min(startPage, endPage);
+    const hi = Math.max(startPage, endPage);
     if (lo < 1 || hi > 604) {
       setError('La plage doit être entre 1 et 604');
       return;
     }
+    saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end });
     router.push(`/exercises/${exerciseId}/practice?start=${lo}&end=${hi}`);
   };
 
-  const pageCount = Math.abs(range.endPage - range.startPage) + 1;
+  const hasPageRange = startPage != null && endPage != null;
+  const pageCount = hasPageRange ? Math.abs(endPage! - startPage!) + 1 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] p-4 pb-12" dir="ltr">
@@ -107,15 +135,22 @@ export default function SetupPage() {
                   <input
                     type="number"
                     id="singlePage"
+                    inputMode="numeric"
                     min={1}
                     max={604}
-                    value={singlePageValue}
-                    onChange={(e) => setSinglePageValue(Number(e.target.value))}
+                    placeholder="1–604"
+                    value={singlePageValue === null ? '' : singlePageValue}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setSinglePageValue(raw === '' ? null : Number(raw));
+                    }}
                     className="w-full px-4 py-2.5 border-2 border-[#c9a959] rounded-lg focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] text-base"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg pointer-events-none">
-                    {toArabicNumbers(singlePageValue)}
-                  </span>
+                  {singlePageValue !== null && (
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a7c23] font-arabic text-lg pointer-events-none">
+                      {toArabicNumbers(singlePageValue)}
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -128,10 +163,14 @@ export default function SetupPage() {
                     Plage de pages
                   </div>
                   <div className="text-lg font-bold text-[#2d5016] mt-1">
-                    {Math.min(range.startPage, range.endPage)} → {Math.max(range.startPage, range.endPage)}
+                    {hasPageRange
+                      ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
+                      : '—'}
                   </div>
                   <div className="text-xs text-[#7a8b3e] mt-0.5">
-                    {toArabicNumbers(pageCount)} page{pageCount > 1 ? 's' : ''}
+                    {hasPageRange
+                      ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
+                      : 'Saisissez un début et une fin'}
                   </div>
                 </div>
               </>

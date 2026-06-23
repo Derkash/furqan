@@ -1,0 +1,44 @@
+// Mémorisation (localStorage) des dernières valeurs saisies pour chaque exercice,
+// afin de les reproposer à la prochaine ouverture de l'écran de configuration.
+
+import type { RangeMode } from './rangeToPages';
+
+export interface StoredSetup {
+  /** Mode de plage (page / hizb / juz / sourate) — pour les exercices à plage. */
+  mode?: RangeMode;
+  /** Borne de début saisie (dans l'unité du mode). */
+  start?: number | null;
+  /** Borne de fin saisie (dans l'unité du mode). */
+  end?: number | null;
+  /** Page unique (exercices type Hifz). */
+  singlePage?: number | null;
+}
+
+const PREFIX = 'almuraja3a:setup:';
+
+function isBrowser(): boolean {
+  return typeof window !== 'undefined' && !!window.localStorage;
+}
+
+/** Lit les dernières valeurs saisies pour un exercice donné, ou null si aucune. */
+export function loadSetup(exerciseId: string): StoredSetup | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = window.localStorage.getItem(PREFIX + exerciseId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSetup;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Enregistre les dernières valeurs saisies pour un exercice donné. */
+export function saveSetup(exerciseId: string, data: StoredSetup): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(PREFIX + exerciseId, JSON.stringify(data));
+  } catch {
+    // Quota plein ou stockage indisponible : on ignore silencieusement.
+  }
+}
