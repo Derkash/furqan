@@ -64,6 +64,61 @@ function wordHash(pageNumber: number, verseKey: string, position: number): numbe
   return ((h >>> 0) % 10000) / 10000;
 }
 
+/**
+ * Répartit `total` unités sur `slots` cases, en étalant les "+1" de façon régulière
+ * (pas en bloc) à partir d'un décalage `offset` déterministe.
+ */
+function distributeSpread(total: number, slots: number, offset: number): number[] {
+  const base = Math.floor(total / slots);
+  const r = total - base * slots;
+  const arr = new Array(slots).fill(base);
+  for (let k = 0; k < r; k++) {
+    const idx = Math.floor(((k + 0.5) * slots) / r);
+    arr[(idx + offset) % slots] += 1;
+  }
+  return arr;
+}
+
+/**
+ * Choisit `count` indices parmi [0, length-1] en espaçant les mots masqués :
+ *   - tant que count ≤ ⌈length/2⌉ : AUCUN mot masqué n'est adjacent (≥ 1 mot visible
+ *     entre deux mots masqués), les masques étant répartis régulièrement ;
+ *   - au-delà (≈ > moitié) : la contrainte se relâche progressivement, les rares mots
+ *     visibles restant servant de séparateurs régulièrement espacés ;
+ *   - count = length : tout est masqué (niveau max).
+ * Déterministe (via `offset`) → stable sur une page, pas de scintillement.
+ */
+function chooseSpacedIndices(length: number, count: number, offset: number): number[] {
+  if (count <= 0) return [];
+  if (count >= length) return Array.from({ length }, (_, i) => i);
+
+  const visible = length - count;
+  const gaps = new Array(count + 1).fill(0); // espaces visibles avant/entre/après les masques
+
+  if (visible >= count - 1) {
+    // Non-adjacence possible : 1 visible entre chaque paire, le reste réparti régulièrement.
+    for (let k = 1; k <= count - 1; k++) gaps[k] = 1;
+    const extra = visible - (count - 1);
+    const spread = distributeSpread(extra, count + 1, offset);
+    for (let k = 0; k <= count; k++) gaps[k] += spread[k];
+  } else {
+    // Non-adjacence impossible : on étale les `visible` séparateurs uniques entre les masques.
+    for (let j = 0; j < visible; j++) {
+      const idx = Math.floor(((j + 0.5) * (count - 1)) / visible);
+      gaps[1 + idx] = 1;
+    }
+  }
+
+  const indices: number[] = [];
+  let pos = 0;
+  for (let i = 0; i < count; i++) {
+    pos += gaps[i];
+    indices.push(pos);
+    pos += 1;
+  }
+  return indices;
+}
+
 interface WordData {
   verseKey: string;
   code: string;
@@ -246,10 +301,12 @@ export default function MushafPage({
         result.set(verseKey, new Set());
         continue;
       }
-      const ranked = positions
-        .map((p) => ({ p, h: wordHash(pageNumber, verseKey, p) }))
-        .sort((a, b) => a.h - b.h);
-      result.set(verseKey, new Set(ranked.slice(0, count).map((r) => r.p)));
+      // Mots du verset dans l'ordre de lecture ; on masque des indices ESPACÉS
+      // pour éviter les blocs de mots adjacents (cf. chooseSpacedIndices).
+      const ordered = positions.slice().sort((a, b) => a - b);
+      const offset = Math.floor(wordHash(pageNumber, verseKey, 0) * 1000);
+      const indices = chooseSpacedIndices(ordered.length, count, offset);
+      result.set(verseKey, new Set(indices.map((i) => ordered[i])));
     }
     return result;
   }, [data, hifzLevel, pageNumber]);
