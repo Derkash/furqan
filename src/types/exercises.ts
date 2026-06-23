@@ -5,16 +5,8 @@ import type { VersePosition, PageVerses, QuizConfig } from './index';
 // ============================================
 
 export type ExerciseId =
-  | 'find-recited-verse'
-  | 'random-verse'
-  | 'sequential-start-middle-end'
-  | 'random-start-middle-end'
-  | 'start-verse-forward'
-  | 'start-verse-backward'
-  | 'middle-verse-forward'
-  | 'middle-verse-backward'
-  | 'end-verse-forward'
-  | 'end-verse-backward'
+  | 'audio-quiz'
+  | 'sequential'
   | 'hifz';
 
 // ============================================
@@ -126,6 +118,14 @@ export interface ExerciseState {
 
 export interface ExerciseConfig extends QuizConfig {
   exerciseId: ExerciseId;
+  /** Quiz audio : position du verset joué à l'audio à identifier. */
+  identifyPosition?: VersePositionType;
+  /** Quiz audio : positions à révéler ensuite (sans audio), ordre premier→milieu→dernier. */
+  revealAfter?: VersePositionType[];
+  /** Séquentiel : positions de versets à afficher, ordre premier→milieu→dernier. */
+  showPositions?: VersePositionType[];
+  /** Séquentiel : sens de progression dans la plage. */
+  direction?: 'forward' | 'backward';
 }
 
 // ============================================

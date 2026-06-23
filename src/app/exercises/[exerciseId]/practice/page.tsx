@@ -7,7 +7,7 @@ import { useAudio } from '@/hooks/useAudio';
 import type { Orientation } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
-import type { ExerciseId } from '@/types/exercises';
+import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import Link from 'next/link';
 
@@ -19,6 +19,10 @@ export default function PracticePage() {
 
   const startPage = Number(searchParams.get('start')) || 3;
   const endPage = Number(searchParams.get('end')) || 10;
+  const identifyParam = searchParams.get('identify');
+  const revealParam = searchParams.get('reveal');
+  const showParam = searchParams.get('show');
+  const dirParam = searchParams.get('dir');
 
   const {
     state,
@@ -52,14 +56,21 @@ export default function PracticePage() {
   useEffect(() => {
     if (!isValidExerciseId(exerciseId) || initialized) return;
 
+    const parsePositions = (s: string | null): VersePositionType[] =>
+      (s ? s.split(',').filter(Boolean) : []) as VersePositionType[];
+
     initialize({
       exerciseId: exerciseId as ExerciseId,
       startPage,
       endPage,
+      identifyPosition: (identifyParam ?? undefined) as VersePositionType | undefined,
+      revealAfter: parsePositions(revealParam),
+      showPositions: parsePositions(showParam),
+      direction: (dirParam ?? undefined) as 'forward' | 'backward' | undefined,
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, identifyParam, revealParam, showParam, dirParam, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {

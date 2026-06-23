@@ -8,7 +8,94 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
+import type { VersePositionType } from '@/types/exercises';
 import Link from 'next/link';
+
+const POSITION_OPTIONS: { value: VersePositionType; label: string }[] = [
+  { value: 'first', label: 'Premier' },
+  { value: 'middle', label: 'Milieu' },
+  { value: 'last', label: 'Dernier' },
+];
+
+const IDENTIFY_OPTIONS: { value: VersePositionType; label: string }[] = [
+  ...POSITION_OPTIONS,
+  { value: 'random', label: 'Aléatoire' },
+];
+
+function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SingleSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: VersePositionType; label: string }[];
+  value: VersePositionType;
+  onChange: (v: VersePositionType) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+              active
+                ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MultiSelect({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { value: VersePositionType; label: string }[];
+  selected: VersePositionType[];
+  onToggle: (v: VersePositionType) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map((o) => {
+        const active = selected.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onToggle(o.value)}
+            className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+              active
+                ? 'bg-[#4a7c23] text-white border-[#4a7c23] shadow-md'
+                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function SetupPage() {
   const router = useRouter();
@@ -17,13 +104,20 @@ export default function SetupPage() {
 
   const { data: units } = useQuranUnits();
 
+  const isAudioQuiz = exerciseId === 'audio-quiz';
+  const isSequential = exerciseId === 'sequential';
+
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
+  // Choix spécifiques (avec des défauts sensés ; la mémoire les remplace au montage si présents).
+  const [identifyPosition, setIdentifyPosition] = useState<VersePositionType>('random');
+  const [revealAfter, setRevealAfter] = useState<VersePositionType[]>([]);
+  const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [error, setError] = useState<string | null>(null);
 
-  // Restauration des dernières valeurs saisies pour cet exercice (proposées par défaut).
-  // On lit le localStorage après le montage : le 1er rendu (serveur + client) reste vide,
-  // ce qui évite tout décalage d'hydratation, puis on applique les valeurs mémorisées.
+  // Restauration des derniers réglages pour cet exercice (proposés par défaut).
+  // Lecture localStorage après montage → 1er rendu vide (pas de décalage d'hydratation).
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = loadSetup(exerciseId);
@@ -38,6 +132,10 @@ export default function SetupPage() {
       // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
       setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
+    if (saved.identifyPosition) setIdentifyPosition(saved.identifyPosition);
+    if (saved.revealAfter) setRevealAfter(saved.revealAfter);
+    if (saved.showPositions) setShowPositions(saved.showPositions);
+    if (saved.direction) setDirection(saved.direction);
   }, [exerciseId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -64,6 +162,11 @@ export default function SetupPage() {
     return null;
   }
 
+  const toggleReveal = (p: VersePositionType) =>
+    setRevealAfter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  const toggleShow = (p: VersePositionType) =>
+    setShowPositions((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -82,8 +185,26 @@ export default function SetupPage() {
       setError('La plage doit être entre 1 et 604');
       return;
     }
-    saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end });
-    router.push(`/exercises/${exerciseId}/practice?start=${lo}&end=${hi}`);
+
+    if (isSequential && showPositions.length === 0) {
+      setError('Choisissez au moins un verset à afficher');
+      return;
+    }
+
+    const query = new URLSearchParams({ start: String(lo), end: String(hi) });
+    if (isAudioQuiz) {
+      query.set('identify', identifyPosition);
+      if (revealAfter.length > 0) query.set('reveal', revealAfter.join(','));
+      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, identifyPosition, revealAfter });
+    } else if (isSequential) {
+      query.set('show', showPositions.join(','));
+      query.set('dir', direction);
+      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, showPositions, direction });
+    } else {
+      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end });
+    }
+
+    router.push(`/exercises/${exerciseId}/practice?${query.toString()}`);
   };
 
   const hasPageRange = startPage != null && endPage != null;
@@ -129,6 +250,56 @@ export default function SetupPage() {
                   : 'Saisissez un début et une fin'}
               </div>
             </div>
+
+            {/* Choix spécifiques : Quiz audio */}
+            {isAudioQuiz && (
+              <>
+                <OptionGroup label="Verset à identifier (audio)">
+                  <SingleSelect
+                    options={IDENTIFY_OPTIONS}
+                    value={identifyPosition}
+                    onChange={setIdentifyPosition}
+                  />
+                </OptionGroup>
+                <OptionGroup label="À découvrir ensuite (sans audio)">
+                  <MultiSelect options={POSITION_OPTIONS} selected={revealAfter} onToggle={toggleReveal} />
+                  <p className="text-[11px] text-gray-400 mt-1">Optionnel — laissez vide pour juste localiser le verset.</p>
+                </OptionGroup>
+              </>
+            )}
+
+            {/* Choix spécifiques : Séquentiel */}
+            {isSequential && (
+              <>
+                <OptionGroup label="Versets à afficher">
+                  <MultiSelect options={POSITION_OPTIONS} selected={showPositions} onToggle={toggleShow} />
+                </OptionGroup>
+                <OptionGroup label="Sens">
+                  <div className="flex gap-1.5">
+                    {([
+                      { value: 'forward', label: 'Avancer →' },
+                      { value: 'backward', label: '← Reculer' },
+                    ] as const).map((o) => {
+                      const active = direction === o.value;
+                      return (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => setDirection(o.value)}
+                          className={`flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                            active
+                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </OptionGroup>
+              </>
+            )}
 
             {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 

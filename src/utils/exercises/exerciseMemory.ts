@@ -2,6 +2,7 @@
 // afin de les reproposer à la prochaine ouverture de l'écran de configuration.
 
 import type { RangeMode } from './rangeToPages';
+import type { VersePositionType } from '@/types/exercises';
 
 export interface StoredSetup {
   /** Mode de plage (page / hizb / juz / sourate) — pour les exercices à plage. */
@@ -10,8 +11,16 @@ export interface StoredSetup {
   start?: number | null;
   /** Borne de fin saisie (dans l'unité du mode). */
   end?: number | null;
-  /** Page unique (exercices type Hifz). */
+  /** Page unique (ancien Hifz — conservé pour rétro-compat). */
   singlePage?: number | null;
+  /** Quiz audio : verset à identifier à l'audio. */
+  identifyPosition?: VersePositionType;
+  /** Quiz audio : positions à découvrir ensuite. */
+  revealAfter?: VersePositionType[];
+  /** Séquentiel : positions de versets à afficher. */
+  showPositions?: VersePositionType[];
+  /** Séquentiel : sens de progression. */
+  direction?: 'forward' | 'backward';
 }
 
 const PREFIX = 'almuraja3a:setup:';

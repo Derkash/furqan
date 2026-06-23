@@ -7,6 +7,7 @@ import type {
   ExerciseStep,
   ExerciseRound,
   ExerciseId,
+  ProgressionDirection,
 } from '@/types/exercises';
 import type { PageVerses, PagePair } from '@/types';
 import { getExerciseDefinition } from '@/utils/exercises/exerciseRegistry';
@@ -53,8 +54,8 @@ interface UseExerciseReturn {
 }
 
 const initialState: ExerciseState = {
-  exerciseId: 'random-verse',
-  config: { startPage: 3, endPage: 10, exerciseId: 'random-verse' },
+  exerciseId: 'audio-quiz',
+  config: { startPage: 3, endPage: 10, exerciseId: 'audio-quiz' },
   currentRound: null,
   progress: {
     currentPage: 3,
@@ -76,11 +77,20 @@ function getPagePair(page: number): PagePair {
 
 // Exercices qui interrogent sur une seule page aléatoire de la double page
 // et sautent des doubles pages aléatoirement
-const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = [
-  'random-start-middle-end',
-  'random-verse',
-  'find-recited-verse',
-];
+const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = ['audio-quiz'];
+
+/**
+ * Sens de progression effectif : pour le Séquentiel il vient de la config
+ * (choix de l'utilisateur), sinon de la définition statique de l'exercice.
+ */
+function isBackward(
+  exerciseId: ExerciseId,
+  config: ExerciseConfig,
+  progression: ProgressionDirection
+): boolean {
+  if (exerciseId === 'sequential') return config.direction === 'backward';
+  return progression === 'backward';
+}
 
 // Exercices affichés en single page (une seule page à la fois, pas de double page)
 // (Hifz est désormais affiché en double page, comme les autres exercices.)
@@ -231,7 +241,7 @@ export function useExercise(): UseExerciseReturn {
     let startPage: number;
     if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(config.exerciseId)) {
       startPage = pickRandomPage(config.startPage, config.endPage, []);
-    } else if (definition.progression === 'backward') {
+    } else if (isBackward(config.exerciseId, config, definition.progression)) {
       startPage = config.endPage;
     } else {
       startPage = config.startPage;
@@ -300,11 +310,10 @@ export function useExercise(): UseExerciseReturn {
         // Page aléatoire dans la plage en évitant les pages récemment vues
         nextPage = pickRandomPage(startPage, endPage, recentPagesRef.current);
       } else {
-        // Progression normale page par page
-        nextPage =
-          definition.progression === 'backward'
-            ? currentPage - 1
-            : currentPage + 1;
+        // Progression normale page par page, sens selon la config (Séquentiel)
+        nextPage = isBackward(state.exerciseId, state.config, definition.progression)
+          ? currentPage - 1
+          : currentPage + 1;
       }
 
       recentPagesRef.current.push(nextPage);
@@ -322,7 +331,7 @@ export function useExercise(): UseExerciseReturn {
         },
       }));
     }
-  }, [state.currentRound, state.exerciseId, state.progress, generateCurrentRound]);
+  }, [state.currentRound, state.exerciseId, state.config, state.progress, generateCurrentRound]);
 
   // Generate round when status becomes running and no current round
   useEffect(() => {
