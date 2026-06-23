@@ -51,6 +51,10 @@ export default function PracticePage() {
   const orientation: Orientation = 'landscape';
   const audio = useAudio();
   const [initialized, setInitialized] = useState(false);
+  // Mode lecture plein écran (Hifz) : masque les barres du haut pour maximiser la lecture.
+  const [readingMode, setReadingMode] = useState(false);
+  const isHifz = exerciseId === 'hifz';
+  const fullscreen = isHifz && readingMode;
 
   // Initialize exercise
   useEffect(() => {
@@ -166,31 +170,50 @@ export default function PracticePage() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
       {/* Header avec progression */}
-      <div className="flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
-        <Link
-          href={`/exercises/${exerciseId}/setup`}
-          className="text-sm hover:underline"
-        >
-          ← Retour
-        </Link>
-        <span className="text-sm font-medium">
-          {exerciseId === 'hifz' ? (
-            <>
-              Pages {toArabicNumbers(pagePair.rightPage)}–{toArabicNumbers(pagePair.leftPage)}
-            </>
+      {!fullscreen && (
+        <div className="flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
+          <Link
+            href={`/exercises/${exerciseId}/setup`}
+            className="text-sm hover:underline"
+          >
+            ← Retour
+          </Link>
+          <span className="text-sm font-medium">
+            {exerciseId === 'hifz' ? (
+              <>
+                Pages {toArabicNumbers(pagePair.rightPage)}–{toArabicNumbers(pagePair.leftPage)}
+              </>
+            ) : (
+              <>
+                Page {toArabicNumbers(state.progress.currentPage)} •{' '}
+                {toArabicNumbers(state.progress.pagesCompleted + 1)}/
+                {toArabicNumbers(state.progress.totalPages)}
+              </>
+            )}
+          </span>
+          {isHifz ? (
+            <button
+              type="button"
+              onClick={() => setReadingMode(true)}
+              aria-label="Mode lecture plein écran"
+              className="flex items-center gap-1 text-xs font-semibold text-[#c9a959] hover:text-[#fdfaf3] transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
+              Plein écran
+            </button>
           ) : (
-            <>
-              Page {toArabicNumbers(state.progress.currentPage)} •{' '}
-              {toArabicNumbers(state.progress.pagesCompleted + 1)}/
-              {toArabicNumbers(state.progress.totalPages)}
-            </>
+            <span className="text-xs opacity-75">{exercise?.name}</span>
           )}
-        </span>
-        <span className="text-xs opacity-75">{exercise?.name}</span>
-      </div>
+        </div>
+      )}
 
       {/* Overlay avec message - sous la barre verte */}
-      {currentStep && (
+      {currentStep && !fullscreen && (
         <div className="flex-none bg-[#2d5016]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
           {audio.isPlaying && (
             <div className="flex gap-0.5">
@@ -217,8 +240,8 @@ export default function PracticePage() {
         </div>
       )}
 
-      {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz) */}
-      {exerciseId === 'hifz' && (
+      {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz, masqués en plein écran) */}
+      {isHifz && !fullscreen && (
         <div className="flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
           <span className="text-xs uppercase tracking-wide text-[#c9a959] mr-2">Niveau</span>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
@@ -242,6 +265,25 @@ export default function PracticePage() {
 
       {/* Zone Mushaf */}
       <div className="flex-1 min-h-0 relative">
+        {/* Bouton discret pour quitter le plein écran (Hifz) */}
+        {fullscreen && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setReadingMode(false);
+            }}
+            aria-label="Quitter le plein écran"
+            className="absolute right-2 top-2 z-30 w-10 h-10 rounded-full flex items-center justify-center bg-[#2d5016]/70 text-[#fdfaf3] hover:bg-[#2d5016] shadow-lg border border-[#c9a959]/40 active:scale-95 transition-all"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+              <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+              <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+              <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+            </svg>
+          </button>
+        )}
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
