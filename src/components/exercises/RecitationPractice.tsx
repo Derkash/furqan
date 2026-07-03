@@ -11,7 +11,7 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 import type { PagePair, PageVerses, VersePosition } from '@/types';
 
 /** Durée de l'extrait audio joué au début de chaque tour. */
-const SNIPPET_SECONDS = 5;
+const SNIPPET_SECONDS = 9;
 
 type Phase = 'listening' | 'reciting' | 'result';
 
@@ -25,10 +25,11 @@ function getPagePair(page: number): PagePair {
 
 /**
  * Exercice « Récitation » :
- * 1. Un verset ALÉATOIRE de la plage est tiré ; 5 s de son début sont jouées,
+ * 1. Un verset ALÉATOIRE de la plage est tiré ; 9 s de son début sont jouées,
  *    double page floutée (même rendu que les autres exercices).
- * 2. Tap → enregistrement du micro pendant que vous récitez, tout est masqué.
- * 3. Tap → résultat : double page entièrement révélée, verset cible surligné,
+ * 2. Gros bouton rouge → enregistrement du micro, pages toujours floutées,
+ *    gros bouton stop + compteur.
+ * 3. Stop → double page entièrement révélée, verset cible surligné,
  *    réécoute de votre enregistrement, bouton Suivant (nouveau verset aléatoire).
  */
 export default function RecitationPractice() {
@@ -141,10 +142,10 @@ export default function RecitationPractice() {
     newRound();
   };
 
+  // Tap sur la page : rejouer l'extrait pendant l'écoute ; sinon rien
+  // (enregistrement et résultat se pilotent avec les gros boutons).
   const handleTap = () => {
-    if (phase === 'listening') startReciting();
-    else if (phase === 'reciting') finishReciting();
-    // result : actions via les boutons (pas de tap pour éviter un passage accidentel)
+    if (phase === 'listening') playSnippet();
   };
 
   // ---------- Rendu ----------
@@ -205,7 +206,9 @@ export default function RecitationPractice() {
               </span>
             )}
             <span className="text-base font-medium">Écoutez l&apos;extrait</span>
-            <span className="text-[#c9a959] text-sm">Tapez l&apos;écran pour réciter</span>
+            <span className="text-[#c9a959] text-sm">
+              Puis appuyez sur le bouton rouge pour réciter
+            </span>
             <button
               type="button"
               onClick={(e) => {
@@ -225,11 +228,8 @@ export default function RecitationPractice() {
         {phase === 'reciting' && (
           <>
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-            <span className="text-base font-medium">
-              Enregistrement… {toArabicNumbers(Math.floor(elapsed / 60))}:
-              {String(elapsed % 60).padStart(2, '0')}
-            </span>
-            <span className="text-[#c9a959] text-sm">Tapez l&apos;écran pour terminer</span>
+            <span className="text-base font-medium">Enregistrement en cours</span>
+            <span className="text-[#c9a959] text-sm">Appuyez sur stop quand vous avez terminé</span>
           </>
         )}
         {phase === 'result' && (
@@ -256,11 +256,60 @@ export default function RecitationPractice() {
           revealedVerses={new Set([target.verseKey])}
           visibleVerses={new Set([target.verseKey])}
           highlightedVerseKey={phase === 'result' ? target.verseKey : undefined}
-          isBlurred={phase === 'listening'}
-          maskAll={phase === 'reciting'}
+          isBlurred={phase !== 'result'}
+          maskAll={false}
           loading={false}
           onTap={handleTap}
         />
+
+        {/* Gros bouton rouge : démarrer l'enregistrement (pages floutées) */}
+        {phase === 'listening' && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                startReciting();
+              }}
+              aria-label="Commencer l'enregistrement"
+              className="w-24 h-24 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white shadow-[0_8px_28px_rgba(220,38,38,0.45)] border-4 border-white active:scale-95 transition-all"
+            >
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            </button>
+            <span className="text-sm font-bold text-[#2d5016] bg-[#fdfaf3]/90 px-3 py-1 rounded-full shadow">
+              Réciter
+            </span>
+          </div>
+        )}
+
+        {/* Gros bouton stop + compteur (pages toujours floutées) */}
+        {phase === 'reciting' && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3">
+            <span className="text-4xl font-bold tabular-nums text-[#2d5016] bg-[#fdfaf3]/95 px-5 py-1.5 rounded-2xl shadow-lg border border-[#c9a959]/40">
+              {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                finishReciting();
+              }}
+              aria-label="Arrêter l'enregistrement"
+              className="w-24 h-24 rounded-full flex items-center justify-center bg-red-600 text-white shadow-[0_8px_28px_rgba(220,38,38,0.45)] border-4 border-white active:scale-95 transition-all animate-pulse"
+            >
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+            <span className="text-sm font-bold text-[#2d5016] bg-[#fdfaf3]/90 px-3 py-1 rounded-full shadow">
+              Stop
+            </span>
+          </div>
+        )}
 
         {/* Panneau de résultat flottant (n'empiète pas sur la mise en page) */}
         {phase === 'result' && (
