@@ -1,15 +1,17 @@
-// Moteur de suivi de récitation (type Tarteel) : aligne en direct les mots
-// reconnus par le micro sur la séquence de mots attendue, avec tolérance
-// (mots sautés, mots fusionnés par la reconnaissance, répétitions, reprises).
+// Analyse globale d'une récitation : alignement semi-global (programmation
+// dynamique) entre les mots reconnus par le micro et la séquence de mots
+// attendue. L'analyse se fait UNE FOIS la récitation terminée — beaucoup plus
+// fiable qu'un suivi mot à mot en direct, car l'alignement optimal considère
+// l'ensemble de la récitation (mots sautés, fusions/coupures de l'ASR,
+// répétitions, hésitations).
 
 import { wordsSimilar } from '@/utils/exercises/arabicNormalization';
 
 export type RecitationWordStatus =
-  | 'pending' // pas encore récité
-  | 'correct' // récité juste du premier coup
-  | 'corrected' // faute puis repris correctement
-  | 'missed' // sauté (détecté quand la suite a été récitée)
-  | 'error' // mot faux à la position courante
+  | 'pending' // pas atteint par la récitation
+  | 'correct' // récité juste
+  | 'error' // mot faux à cette position
+  | 'missed' // sauté
   | 'skipped'; // mot optionnel (basmala) non récité — pas une faute
 
 export interface RecitationWord {
@@ -23,118 +25,148 @@ export interface RecitationWord {
   optional?: boolean;
 }
 
-export interface MatcherState {
-  statuses: RecitationWordStatus[];
-  /** Index du prochain mot attendu. */
-  pointer: number;
-}
-
-/** Fenêtre de recherche en avant : permet de détecter les mots sautés
- *  (5 couvre une basmala entière non récitée + le mot suivant). */
-const LOOKAHEAD = 5;
-
-/** Fenêtre en arrière : un mot déjà validé répété (reprise de souffle,
- *  répétition du récitant) est ignoré au lieu d'être compté faux. */
-const LOOKBEHIND = 3;
-
-export function createMatcherState(wordCount: number): MatcherState {
-  return { statuses: new Array<RecitationWordStatus>(wordCount).fill('pending'), pointer: 0 };
-}
-
-export function cloneMatcherState(state: MatcherState): MatcherState {
-  return { statuses: [...state.statuses], pointer: state.pointer };
-}
-
-function markAdvance(state: MatcherState, index: number) {
-  state.statuses[index] = state.statuses[index] === 'error' ? 'corrected' : 'correct';
-  state.pointer = index + 1;
-}
-
-/** Applique une liste de mots récités (normalisés) à l'état. Mutation en place. */
-export function applySpokenWords(
-  state: MatcherState,
-  words: RecitationWord[],
-  spoken: string[]
-): void {
-  for (const heard of spoken) {
-    const p = state.pointer;
-    if (p >= words.length) return;
-
-    // Mot reconnu = fusion de deux mots attendus consécutifs (fréquent avec l'ASR).
-    if (p + 1 < words.length && heard === words[p].norm + words[p + 1].norm) {
-      markAdvance(state, p);
-      markAdvance(state, p + 1);
-      continue;
-    }
-
-    // Cas nominal : le mot attendu.
-    if (wordsSimilar(heard, words[p].norm)) {
-      markAdvance(state, p);
-      continue;
-    }
-
-    // Mot(s) sauté(s) : le mot entendu correspond à un mot un peu plus loin.
-    let jumped = false;
-    for (let j = 1; j <= LOOKAHEAD && p + j < words.length; j++) {
-      if (wordsSimilar(heard, words[p + j].norm)) {
-        for (let k = p; k < p + j; k++) {
-          if (state.statuses[k] === 'pending' || state.statuses[k] === 'error') {
-            state.statuses[k] = words[k].optional ? 'skipped' : 'missed';
-          }
-        }
-        markAdvance(state, p + j);
-        jumped = true;
-        break;
-      }
-    }
-    if (jumped) continue;
-
-    // Répétition d'un mot déjà validé (reprise) : on ignore.
-    let isRepetition = false;
-    for (let j = 1; j <= LOOKBEHIND && p - j >= 0; j++) {
-      if (wordsSimilar(heard, words[p - j].norm)) {
-        isRepetition = true;
-        break;
-      }
-    }
-    if (isRepetition) continue;
-
-    // Mot faux à la position courante : on signale mais on n'avance pas,
-    // pour laisser la possibilité de se corriger (→ 'corrected').
-    state.statuses[p] = 'error';
-  }
-}
-
-/** Saute manuellement le mot courant (bouton « Passer »). */
-export function skipCurrentWord(state: MatcherState, words: RecitationWord[]): void {
-  const p = state.pointer;
-  if (p >= words.length) return;
-  state.statuses[p] = words[p].optional ? 'skipped' : 'missed';
-  state.pointer = p + 1;
-}
-
 export interface RecitationScore {
   correct: number;
-  corrected: number;
-  faults: number; // missed + error
-  total: number; // mots non optionnels
+  faults: number; // error + missed
+  attempted: number; // correct + faults (mots optionnels sautés exclus)
   accuracy: number; // 0..100
 }
 
-export function computeScore(state: MatcherState, words: RecitationWord[]): RecitationScore {
-  let correct = 0;
-  let corrected = 0;
-  let faults = 0;
-  let total = 0;
-  for (let i = 0; i < words.length; i++) {
-    if (words[i].optional) continue;
-    total++;
-    const s = state.statuses[i];
-    if (s === 'correct') correct++;
-    else if (s === 'corrected') corrected++;
-    else if (s === 'missed' || s === 'error') faults++;
+export interface RecitationAnalysis {
+  /** Statut de chaque mot attendu (même longueur que `expected`). */
+  statuses: RecitationWordStatus[];
+  /** Nombre de mots attendus couverts par la récitation (préfixe). */
+  attemptedWordCount: number;
+  score: RecitationScore;
+}
+
+// Coûts de l'alignement : une faute (substitution ou omission) coûte 1 ;
+// un mot en trop (répétition, hésitation, ta'awwudh) coûte moins qu'une faute
+// pour ne jamais être compté comme telle ; fusion/coupure ASR quasi gratuites.
+const FAULT_COST = 1;
+const INSERT_COST = 0.75;
+const MERGE_COST = 0.25;
+
+// Opérations de la remontée.
+const OP_DIAG = 1; // spoken[i-1] aligné sur expected[j-1]
+const OP_INSERT = 2; // mot récité en trop
+const OP_DELETE = 3; // mot attendu manquant
+const OP_MERGE = 4; // 1 mot reconnu = 2 mots attendus collés
+const OP_SPLIT = 5; // 2 mots reconnus = 1 mot attendu coupé
+
+/**
+ * Aligne la récitation complète sur les mots attendus.
+ * La fin est libre côté attendu : les mots après l'arrêt de la récitation
+ * restent 'pending' (non tentés), sans pénalité.
+ */
+export function analyzeRecitation(
+  expected: RecitationWord[],
+  spoken: string[]
+): RecitationAnalysis {
+  const m = spoken.length;
+  const n = expected.length;
+  const statuses = new Array<RecitationWordStatus>(n).fill('pending');
+  if (m === 0 || n === 0) {
+    return {
+      statuses,
+      attemptedWordCount: 0,
+      score: { correct: 0, faults: 0, attempted: 0, accuracy: 0 },
+    };
   }
-  const done = correct + corrected + faults;
-  const accuracy = done === 0 ? 100 : Math.round(((correct + corrected) / done) * 100);
-  return { correct, corrected, faults, total, accuracy };
+
+  const W = n + 1;
+  const cost = new Float64Array((m + 1) * W);
+  const op = new Uint8Array((m + 1) * W);
+  for (let j = 1; j <= n; j++) {
+    cost[j] = cost[j - 1] + (expected[j - 1].optional ? 0 : FAULT_COST);
+    op[j] = OP_DELETE;
+  }
+  for (let i = 1; i <= m; i++) {
+    cost[i * W] = i * INSERT_COST;
+    op[i * W] = OP_INSERT;
+  }
+
+  for (let i = 1; i <= m; i++) {
+    const s = spoken[i - 1];
+    for (let j = 1; j <= n; j++) {
+      const e = expected[j - 1];
+      let best = cost[(i - 1) * W + (j - 1)] + (wordsSimilar(s, e.norm) ? 0 : FAULT_COST);
+      let bestOp = OP_DIAG;
+      const insert = cost[(i - 1) * W + j] + INSERT_COST;
+      if (insert < best) {
+        best = insert;
+        bestOp = OP_INSERT;
+      }
+      const del = cost[i * W + (j - 1)] + (e.optional ? 0 : FAULT_COST);
+      if (del < best) {
+        best = del;
+        bestOp = OP_DELETE;
+      }
+      if (j >= 2 && s === expected[j - 2].norm + e.norm) {
+        const merge = cost[(i - 1) * W + (j - 2)] + MERGE_COST;
+        if (merge < best) {
+          best = merge;
+          bestOp = OP_MERGE;
+        }
+      }
+      if (i >= 2 && spoken[i - 2] + s === e.norm) {
+        const split = cost[(i - 2) * W + (j - 1)] + MERGE_COST;
+        if (split < best) {
+          best = split;
+          bestOp = OP_SPLIT;
+        }
+      }
+      cost[i * W + j] = best;
+      op[i * W + j] = bestOp;
+    }
+  }
+
+  // Fin libre : la récitation peut s'arrêter avant la fin des mots attendus.
+  let jBest = 0;
+  let bestCost = cost[m * W];
+  for (let j = 1; j <= n; j++) {
+    if (cost[m * W + j] <= bestCost) {
+      bestCost = cost[m * W + j];
+      jBest = j;
+    }
+  }
+
+  // Remontée → statut de chaque mot attendu couvert.
+  let i = m;
+  let j = jBest;
+  while (i > 0 || j > 0) {
+    const o = op[i * W + j];
+    if (o === OP_DIAG) {
+      statuses[j - 1] = wordsSimilar(spoken[i - 1], expected[j - 1].norm) ? 'correct' : 'error';
+      i--;
+      j--;
+    } else if (o === OP_INSERT) {
+      i--;
+    } else if (o === OP_DELETE) {
+      statuses[j - 1] = expected[j - 1].optional ? 'skipped' : 'missed';
+      j--;
+    } else if (o === OP_MERGE) {
+      statuses[j - 2] = 'correct';
+      statuses[j - 1] = 'correct';
+      i--;
+      j -= 2;
+    } else if (o === OP_SPLIT) {
+      statuses[j - 1] = 'correct';
+      i -= 2;
+      j--;
+    } else {
+      break;
+    }
+  }
+
+  let correct = 0;
+  let faults = 0;
+  for (let k = 0; k < jBest; k++) {
+    if (statuses[k] === 'correct') correct++;
+    else if (statuses[k] === 'error' || statuses[k] === 'missed') faults++;
+  }
+  const attempted = correct + faults;
+  const accuracy = attempted === 0 ? 0 : Math.round((correct / attempted) * 100);
+
+  return { statuses, attemptedWordCount: jBest, score: { correct, faults, attempted, accuracy } };
 }

@@ -45,9 +45,9 @@ export const EXERCISES: ExerciseDefinition[] = [
     name: 'Récitation',
     nameArabic: 'تلاوة',
     description:
-      'Récitez au micro : chaque mot est vérifié en direct et les fautes sont signalées (type Tarteel)',
+      'Écoutez 2 s du début d’un verset (page masquée), récitez de mémoire au micro autant de versets que vous voulez, puis recevez une analyse globale de votre récitation',
     category: 'recitation',
-    hasAudio: false,
+    hasAudio: true,
     progression: 'forward',
     versePositions: ['first'],
     questions: ['recite_verse'],

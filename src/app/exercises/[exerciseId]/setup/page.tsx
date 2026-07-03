@@ -106,6 +106,7 @@ export default function SetupPage() {
 
   const isAudioQuiz = exerciseId === 'audio-quiz';
   const isSequential = exerciseId === 'sequential';
+  const isRecitation = exerciseId === 'recitation';
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
@@ -114,6 +115,7 @@ export default function SetupPage() {
   const [revealAfter, setRevealAfter] = useState<VersePositionType[]>([]);
   const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+  const [startPosition, setStartPosition] = useState<VersePositionType>('first');
   const [error, setError] = useState<string | null>(null);
 
   // Restauration des derniers réglages pour cet exercice (proposés par défaut).
@@ -136,6 +138,7 @@ export default function SetupPage() {
     if (saved.revealAfter) setRevealAfter(saved.revealAfter);
     if (saved.showPositions) setShowPositions(saved.showPositions);
     if (saved.direction) setDirection(saved.direction);
+    if (saved.startPosition) setStartPosition(saved.startPosition);
   }, [exerciseId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -200,6 +203,9 @@ export default function SetupPage() {
       query.set('show', showPositions.join(','));
       query.set('dir', direction);
       saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, showPositions, direction });
+    } else if (isRecitation) {
+      query.set('pos', startPosition);
+      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, startPosition });
     } else {
       saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end });
     }
@@ -299,6 +305,20 @@ export default function SetupPage() {
                   </div>
                 </OptionGroup>
               </>
+            )}
+
+            {/* Choix spécifiques : Récitation */}
+            {isRecitation && (
+              <OptionGroup label="Verset de départ (extrait audio de 2 s)">
+                <SingleSelect
+                  options={IDENTIFY_OPTIONS}
+                  value={startPosition}
+                  onChange={setStartPosition}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Position sur la première page — ensuite, la progression suit vos récitations.
+                </p>
+              </OptionGroup>
             )}
 
             {error && <p className="text-red-600 text-sm text-center">{error}</p>}
