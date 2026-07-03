@@ -21,8 +21,6 @@ export interface StoredSetup {
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression. */
   direction?: 'forward' | 'backward';
-  /** Récitation : position du verset de départ sur la première page. */
-  startPosition?: VersePositionType;
 }
 
 const PREFIX = 'almuraja3a:setup:';
