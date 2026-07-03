@@ -221,4 +221,7 @@ export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   'audio-quiz': audioQuizSteps,
   sequential: sequentialSteps,
   hifz: hifzSteps,
+  // La récitation n'utilise pas la machine à états Mushaf : interface dédiée
+  // (RecitationPractice) ; ce générateur ne sert jamais.
+  recitation: () => [],
 };

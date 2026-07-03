@@ -9,11 +9,24 @@ import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import type { Orientation } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
+import RecitationPractice from '@/components/exercises/RecitationPractice';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import Link from 'next/link';
 
 export default function PracticePage() {
+  const params = useParams();
+  const exerciseId = params.exerciseId as string;
+
+  // La récitation (micro + détection de fautes) a sa propre interface,
+  // sans les pages Mushaf ni la machine à états des autres exercices.
+  if (exerciseId === 'recitation') {
+    return <RecitationPractice />;
+  }
+  return <MushafPractice />;
+}
+
+function MushafPractice() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();

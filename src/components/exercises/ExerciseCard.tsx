@@ -72,6 +72,14 @@ function Icon({ name, className }: { name: string; className?: string }) {
           <path d="M19 12H5" />
         </svg>
       );
+    case 'mic':
+      return (
+        <svg {...common}>
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" x2="12" y1="19" y2="22" />
+        </svg>
+      );
     case 'brain':
       return (
         <svg {...common}>
@@ -111,6 +119,12 @@ const CATEGORY_STYLE: Record<string, { ring: string; iconBg: string; iconText: s
     iconBg: 'bg-[#4a7c23]',
     iconText: 'text-[#fdfaf3]',
     chip: 'bg-[#4a7c23]/10 text-[#4a7c23] border-[#4a7c23]/20',
+  },
+  recitation: {
+    ring: 'before:bg-[#7a3030]',
+    iconBg: 'bg-[#7a3030]',
+    iconText: 'text-[#fdfaf3]',
+    chip: 'bg-[#7a3030]/10 text-[#7a3030] border-[#7a3030]/20',
   },
 };
 

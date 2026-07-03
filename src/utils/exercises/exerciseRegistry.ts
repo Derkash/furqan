@@ -41,6 +41,20 @@ export const EXERCISES: ExerciseDefinition[] = [
     difficulty: 2,
   },
   {
+    id: 'recitation',
+    name: 'Récitation',
+    nameArabic: 'تلاوة',
+    description:
+      'Récitez au micro : chaque mot est vérifié en direct et les fautes sont signalées (type Tarteel)',
+    category: 'recitation',
+    hasAudio: false,
+    progression: 'forward',
+    versePositions: ['first'],
+    questions: ['recite_verse'],
+    icon: 'mic',
+    difficulty: 5,
+  },
+  {
     id: 'hifz',
     name: 'Hifz',
     nameArabic: 'حفظ',

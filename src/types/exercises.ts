@@ -7,7 +7,8 @@ import type { VersePosition, PageVerses, QuizConfig } from './index';
 export type ExerciseId =
   | 'audio-quiz'
   | 'sequential'
-  | 'hifz';
+  | 'hifz'
+  | 'recitation';
 
 // ============================================
 // EXERCISE ENUMS
@@ -20,7 +21,7 @@ export type VersePositionType = 'first' | 'middle' | 'last' | 'random';
 export type ProgressionDirection = 'forward' | 'backward' | 'random';
 
 /** Catégorie d'exercice */
-export type ExerciseCategory = 'random' | 'sequential' | 'positional';
+export type ExerciseCategory = 'random' | 'sequential' | 'positional' | 'recitation';
 
 /** Types de questions */
 export type QuestionType =
