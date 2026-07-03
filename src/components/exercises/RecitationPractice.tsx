@@ -230,6 +230,20 @@ export default function RecitationPractice() {
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
             <span className="text-base font-medium">Enregistrement en cours</span>
             <span className="text-[#c9a959] text-sm">Appuyez sur stop quand vous avez terminé</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playSnippet();
+              }}
+              aria-label="Faire répéter l'extrait"
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all flex-shrink-0"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
           </>
         )}
         {phase === 'result' && (

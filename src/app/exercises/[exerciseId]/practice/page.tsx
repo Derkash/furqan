@@ -6,7 +6,7 @@ import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
 import { useTranslation } from '@/hooks/exercises/useTranslation';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
-import type { Orientation } from '@/types';
+import type { Orientation, VersePosition } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
@@ -66,6 +66,9 @@ function MushafPractice() {
   const orientation: Orientation = 'landscape';
   const audio = useAudio();
   const [initialized, setInitialized] = useState(false);
+  // Dernier verset joué à l'audio dans le tour courant : permet de le faire
+  // répéter à tout moment (bouton dans le bandeau), à toutes les étapes.
+  const [lastAudioVerse, setLastAudioVerse] = useState<VersePosition | null>(null);
   // Mode lecture plein écran (Hifz) : masque les barres du haut pour maximiser la lecture.
   const [readingMode, setReadingMode] = useState(false);
   const isHifz = exerciseId === 'hifz';
@@ -143,13 +146,18 @@ function MushafPractice() {
   // Play audio when step is listening
   // Note: on utilise audio.play dans une ref pour éviter les boucles infinies
   const audioPlayRef = useRef(audio.play);
-  audioPlayRef.current = audio.play;
+  useEffect(() => {
+    audioPlayRef.current = audio.play;
+  }, [audio.play]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (currentStep?.type === 'listening' && currentStep.targetVerse) {
       audioPlayRef.current(currentStep.targetVerse);
+      setLastAudioVerse(currentStep.targetVerse);
     }
   }, [currentStep]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle tap
   const handleTap = () => {
@@ -294,6 +302,22 @@ function MushafPractice() {
           <span className="text-[#c9a959] text-sm">
             {currentStep.message.subtitle}
           </span>
+          {lastAudioVerse && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                audio.play(lastAudioVerse);
+              }}
+              aria-label="Faire répéter le verset"
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all flex-shrink-0"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
 
