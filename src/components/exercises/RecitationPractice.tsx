@@ -52,6 +52,39 @@ export default function RecitationPractice() {
   const lastVerseKeyRef = useRef<string | null>(null);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Panneau résultat déplaçable (pour ne pas cacher un verset en bas de page).
+  // null = position par défaut (bas centré) ; sinon position choisie par glissement.
+  const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const dragOffset = useRef<{ dx: number; dy: number } | null>(null);
+
+  const onPanelDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragOffset.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPanelDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragOffset.current || !panelRef.current) return;
+    const w = panelRef.current.offsetWidth;
+    const h = panelRef.current.offsetHeight;
+    const margin = 8;
+    const left = Math.max(
+      margin,
+      Math.min(e.clientX - dragOffset.current.dx, window.innerWidth - w - margin)
+    );
+    const top = Math.max(
+      margin,
+      Math.min(e.clientY - dragOffset.current.dy, window.innerHeight - h - margin)
+    );
+    setPanelPos({ left, top });
+  };
+
+  const onPanelDragEnd = () => {
+    dragOffset.current = null;
+  };
+
   // ---------- Tirage d'un nouveau tour (page aléatoire → verset aléatoire) ----------
   const newRound = useCallback(async () => {
     setLoadError(null);
@@ -325,15 +358,49 @@ export default function RecitationPractice() {
           </div>
         )}
 
-        {/* Panneau de résultat flottant (n'empiète pas sur la mise en page) */}
+        {/* Panneau de résultat flottant et DÉPLAÇABLE (poignée en haut),
+            pour ne jamais cacher le verset surligné */}
         {phase === 'result' && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[min(92vw,420px)]">
+          <div
+            ref={panelRef}
+            className="fixed z-20 w-[min(92vw,420px)]"
+            style={
+              panelPos
+                ? { left: panelPos.left, top: panelPos.top }
+                : { bottom: 12, left: '50%', transform: 'translateX(-50%)' }
+            }
+          >
             <div
-              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl shadow-[0_8px_28px_rgba(45,80,22,0.28)] px-4 py-3"
+              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl shadow-[0_8px_28px_rgba(45,80,22,0.28)] px-4 pb-3"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">
-                Votre récitation
+              {/* Poignée de déplacement */}
+              <div
+                onPointerDown={onPanelDragStart}
+                onPointerMove={onPanelDragMove}
+                onPointerUp={onPanelDragEnd}
+                onPointerCancel={onPanelDragEnd}
+                className="flex items-center justify-between gap-2 pt-2 pb-1.5 cursor-grab active:cursor-grabbing select-none"
+                style={{ touchAction: 'none' }}
+              >
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
+                  Votre récitation
+                </span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="text-[#c9a959]"
+                  aria-hidden
+                >
+                  <circle cx="9" cy="6" r="1.5" />
+                  <circle cx="15" cy="6" r="1.5" />
+                  <circle cx="9" cy="12" r="1.5" />
+                  <circle cx="15" cy="12" r="1.5" />
+                  <circle cx="9" cy="18" r="1.5" />
+                  <circle cx="15" cy="18" r="1.5" />
+                </svg>
               </div>
               {recorder.audioUrl ? (
                 <audio controls src={recorder.audioUrl} className="w-full h-9" />
