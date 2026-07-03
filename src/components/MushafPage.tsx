@@ -433,9 +433,11 @@ export default function MushafPage({
           color: #2d5016;
         }
         .verse-word.highlighted {
+          /* Halo peint en box-shadow : ne modifie PAS la largeur des mots,
+             sinon les lignes justifiées débordent du cadre de la page. */
           background-color: rgba(255, 215, 0, 0.35);
+          box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
           border-radius: 6px;
-          padding: 0 2px;
         }
         .mushaf-loader {
           position: absolute;
