@@ -22,6 +22,7 @@ import {
 } from '@/utils/exercises/userStats';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { useTafsir } from '@/hooks/exercises/useTafsir';
+import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { useSpeech } from '@/hooks/exercises/useSpeech';
 import Link from 'next/link';
 
@@ -155,12 +156,13 @@ function MushafPractice() {
   // popover = verset sélectionné + coordonnées du tap (clientX/clientY).
   const [popover, setPopover] = useState<{ verseKey: string; x: number; y: number } | null>(null);
 
-  // Tafsir français (Al-Mukhtasar) du verset ouvert + synthèse vocale française
-  // pour écouter la traduction ou le tafsir.
+  // Tafsir français (Al-Mukhtasar) + sabab an-nuzûl du verset ouvert,
+  // avec synthèse vocale française pour chaque section.
   const tafsir = useTafsir(isHifz && popover ? popover.verseKey : null);
+  const { asbab, loading: asbabLoading, load: loadAsbab } = useAsbab();
   const speech = useSpeech();
   // Quelle section est en cours de lecture vocale (pour l'état des boutons).
-  const [speakingSection, setSpeakingSection] = useState<'translation' | 'tafsir' | null>(null);
+  const [speakingSection, setSpeakingSection] = useState<'translation' | 'tafsir' | 'asbab' | null>(null);
   const speechStopRef = useRef(speech.stop);
   useEffect(() => {
     speechStopRef.current = speech.stop;
@@ -170,7 +172,23 @@ function MushafPractice() {
     speechStopRef.current();
   }, [popover?.verseKey]);
 
-  const toggleSpeak = (section: 'translation' | 'tafsir', text: string | null | undefined) => {
+  // Sections « développées » du popover : par défaut chaque section montre un
+  // aperçu (3 lignes) + « Voir plus » — un clic affiche tout. L'audio se lance
+  // depuis le titre sans avoir à développer.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  // Texte arabe original du sabab : affiché uniquement à la demande (bouton),
+  // jamais lu par la synthèse vocale.
+  const [showAsbabArabic, setShowAsbabArabic] = useState(false);
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
+
+  const toggleSpeak = (section: 'translation' | 'tafsir' | 'asbab', text: string | null | undefined) => {
     if (!text) return;
     if ((speech.speaking || speech.loading) && speakingSection === section) {
       speech.stop();
@@ -209,7 +227,10 @@ function MushafPractice() {
 
     if (verseKey) {
       loadTranslations();
+      loadAsbab();
       setPopoverPos(null);
+      setOpenSections(new Set());
+      setShowAsbabArabic(false);
       setPopover({ verseKey, x: e.clientX, y: e.clientY });
     } else {
       setPopover(null);
@@ -794,9 +815,71 @@ function MushafPractice() {
 
       {/* Popover de traduction Hamidullah, positionné au point cliqué (Hifz uniquement) */}
       {isHifz && popover && (() => {
-        const [s, a] = popover.verseKey.split(':').map(Number);
-        const chapter = quranUnits?.chapters.find((c) => c.id === s);
+        const [sNum, aNum] = popover.verseKey.split(':').map(Number);
+        const chapter = quranUnits?.chapters.find((c) => c.id === sNum);
         const text = translations?.[popover.verseKey];
+        const asbabTexts = asbab?.[popover.verseKey];
+        // Audio : uniquement la traduction française (l'arabe est là pour info).
+        const asbabFull = asbabTexts?.map((o) => o.fr).join('\n\n') ?? null;
+
+        const speakerButton = (
+          section: 'translation' | 'tafsir' | 'asbab',
+          speakText: string | null | undefined
+        ) =>
+          speakText ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSpeak(section, speakText);
+              }}
+              aria-label="Écouter cette section"
+              className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
+                (speech.speaking || speech.loading) && speakingSection === section
+                  ? 'bg-[#2d5016] text-[#fdfaf3]'
+                  : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+              }`}
+            >
+              {speech.loading && speakingSection === section ? (
+                <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
+              ) : speech.speaking && speakingSection === section ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                  <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+          ) : null;
+
+        const sectionHeader = (
+          section: 'translation' | 'tafsir' | 'asbab',
+          title: string,
+          speakText: string | null | undefined
+        ) => (
+          <div className="flex items-center justify-between gap-1 py-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
+              {title}
+            </span>
+            {speakerButton(section, speakText)}
+          </div>
+        );
+
+        // Lien « Voir plus / Réduire » sous les textes longs.
+        const seeMore = (section: string, contentLength: number) =>
+          contentLength > 140 ? (
+            <button
+              type="button"
+              onClick={() => toggleSection(section)}
+              className="text-[11px] font-semibold text-[#4a7c23] underline mb-1"
+            >
+              {openSections.has(section) ? 'Réduire' : 'Voir plus'}
+            </button>
+          ) : null;
+
         return (
           <div
             ref={popoverRef}
@@ -807,33 +890,29 @@ function MushafPractice() {
               top: popoverPos ? popoverPos.top : popover.y,
               visibility: popoverPos ? 'visible' : 'hidden',
             }}
-            className="fixed z-40 w-[min(90vw,380px)] max-h-[70vh] overflow-y-auto bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
+            className="fixed z-40 w-[min(90vw,380px)] max-h-[65vh] overflow-y-auto overscroll-contain bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
           >
             <div className="px-3.5 pt-2.5 pb-3">
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <div className="min-w-0">
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-[#c9a959]">
-                    Traduction — Hamidullah
-                  </div>
-                  <div className="text-sm font-bold text-[#2d5016] mt-0.5 flex items-center gap-2 flex-wrap">
-                    <span>
-                      {s}:{a}
-                      {chapter ? ` · ${chapter.name_simple}` : ''}
+              {/* Entête : référence du verset + fermeture */}
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="text-sm font-bold text-[#2d5016] flex items-center gap-2 flex-wrap min-w-0">
+                  <span>
+                    {sNum}:{aNum}
+                    {chapter ? ` · ${chapter.name_simple}` : ''}
+                  </span>
+                  {chapter && (
+                    <span
+                      className="text-[#7a8b3e]"
+                      dir="rtl"
+                      style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
+                    >
+                      {chapter.name_arabic}
                     </span>
-                    {chapter && (
-                      <span
-                        className="text-[#7a8b3e]"
-                        dir="rtl"
-                        style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
-                      >
-                        {chapter.name_arabic}
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
                 <button
                   type="button"
-                  aria-label="Fermer la traduction"
+                  aria-label="Fermer"
                   onClick={() => setPopover(null)}
                   className="flex-none w-7 h-7 rounded-full flex items-center justify-center bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 active:scale-95 transition"
                 >
@@ -843,81 +922,98 @@ function MushafPractice() {
                   </svg>
                 </button>
               </div>
-              <div className="flex items-start gap-2">
-                <p className="flex-1 text-[14px] leading-relaxed text-[#1a1a1a]">
-                  {text
-                    ? text
-                    : translationLoading
-                      ? 'Chargement de la traduction…'
-                      : 'Traduction indisponible pour ce verset.'}
-                </p>
-                {text && speech.supported && (
-                  <button
-                    type="button"
-                    onClick={() => toggleSpeak('translation', text)}
-                    aria-label="Écouter la traduction"
-                    className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
-                      (speech.speaking || speech.loading) && speakingSection === 'translation'
-                        ? 'bg-[#2d5016] text-[#fdfaf3]'
-                        : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+
+              {/* Section 1 : traduction Hamidullah */}
+              {sectionHeader('translation', 'Traduction — Hamidullah', text)}
+              <p
+                onClick={() => !openSections.has('translation') && toggleSection('translation')}
+                className={`text-[14px] leading-relaxed text-[#1a1a1a] pb-0.5 ${
+                  openSections.has('translation') ? '' : 'line-clamp-3 cursor-pointer'
+                }`}
+              >
+                {text
+                  ? text
+                  : translationLoading
+                    ? 'Chargement de la traduction…'
+                    : 'Traduction indisponible pour ce verset.'}
+              </p>
+              {seeMore('translation', text?.length ?? 0)}
+
+              {/* Section 2 : tafsir Al-Mukhtasar */}
+              <div className="border-t border-[#c9a959]/30 mt-1" />
+              {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
+              <p
+                onClick={() => !openSections.has('tafsir') && toggleSection('tafsir')}
+                className={`text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line pb-0.5 ${
+                  openSections.has('tafsir') ? '' : 'line-clamp-3 cursor-pointer'
+                }`}
+              >
+                {tafsir.text
+                  ? tafsir.text
+                  : tafsir.loading
+                    ? 'Chargement du tafsir…'
+                    : 'Tafsir indisponible pour ce verset.'}
+              </p>
+              {seeMore('tafsir', tafsir.text?.length ?? 0)}
+
+              {/* Section 3 : sabab an-nuzûl (occasions authentifiées) */}
+              <div className="border-t border-[#c9a959]/30 mt-1" />
+              {sectionHeader('asbab', 'Sabab an-Nuzûl — authentifié', asbabFull)}
+              {asbabTexts && asbabTexts.length > 0 ? (
+                <>
+                  <p className="text-[10px] font-semibold text-red-600 mb-1">
+                    Traduit de l&apos;arabe au français par l&apos;IA — en cas de doute,
+                    référez-vous au texte original ci-dessous.
+                  </p>
+                  <div
+                    onClick={() => !openSections.has('asbab') && toggleSection('asbab')}
+                    className={`space-y-2 pb-0.5 ${
+                      openSections.has('asbab') ? '' : 'line-clamp-3 cursor-pointer'
                     }`}
                   >
-                    {speech.loading && speakingSection === 'translation' ? (
-                      <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
-                    ) : speech.speaking && speakingSection === 'translation' ? (
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="6" width="12" height="12" rx="2" />
-                      </svg>
-                    ) : (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3 9v6h4l5 5V4L7 9H3z" />
-                        <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Tafsir français (Al-Mukhtasar) */}
-              <div className="mt-3 pt-2.5 border-t border-[#c9a959]/30">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-[#c9a959]">
-                    Tafsir — Al-Mukhtasar
+                    {asbabTexts.map((occasion, i) => (
+                      <p key={i} className="text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line">
+                        {asbabTexts.length > 1 && (
+                          <span className="font-bold text-[#7a5d2c]">
+                            Récit {toArabicNumbers(i + 1)} —{' '}
+                          </span>
+                        )}
+                        {occasion.fr}
+                      </p>
+                    ))}
                   </div>
-                  {tafsir.text && speech.supported && (
-                    <button
-                      type="button"
-                      onClick={() => toggleSpeak('tafsir', tafsir.text)}
-                      aria-label="Écouter le tafsir"
-                      className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
-                        (speech.speaking || speech.loading) && speakingSection === 'tafsir'
-                          ? 'bg-[#2d5016] text-[#fdfaf3]'
-                          : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
-                      }`}
-                    >
-                      {speech.loading && speakingSection === 'tafsir' ? (
-                        <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
-                      ) : speech.speaking && speakingSection === 'tafsir' ? (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="6" width="12" height="12" rx="2" />
-                        </svg>
-                      ) : (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M3 9v6h4l5 5V4L7 9H3z" />
-                          <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                      )}
-                    </button>
+                  {seeMore('asbab', asbabFull?.length ?? 0)}
+
+                  {/* Texte arabe original : pour info, à la demande, hors audio */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAsbabArabic((v) => !v)}
+                    className="mt-1 mb-1 text-[11px] font-semibold text-[#7a5d2c] bg-[#c9a959]/15 border border-[#c9a959]/30 rounded-full px-2.5 py-1 active:scale-95 transition"
+                  >
+                    {showAsbabArabic ? 'Masquer le texte original (arabe)' : 'Texte original (arabe)'}
+                  </button>
+                  {showAsbabArabic && (
+                    <div className="space-y-2 pb-1 border-t border-[#c9a959]/20 pt-2">
+                      {asbabTexts.map((occasion, i) => (
+                        <p
+                          key={i}
+                          dir="rtl"
+                          className="text-[15px] leading-loose text-[#1a1a1a] whitespace-pre-line"
+                          style={{ fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif" }}
+                        >
+                          {occasion.ar}
+                        </p>
+                      ))}
+                    </div>
                   )}
-                </div>
-                <p className="text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line">
-                  {tafsir.text
-                    ? tafsir.text
-                    : tafsir.loading
-                      ? 'Chargement du tafsir…'
-                      : 'Tafsir indisponible pour ce verset.'}
+                </>
+              ) : (
+                <p className="text-[13px] leading-relaxed text-gray-400 pb-1">
+                  {asbabLoading
+                    ? 'Chargement…'
+                    : 'Aucun sabab an-nuzûl authentifié rapporté pour ce verset.'}
                 </p>
-              </div>
+              )}
             </div>
           </div>
         );
