@@ -21,6 +21,8 @@ export interface StoredSetup {
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression. */
   direction?: 'forward' | 'backward';
+  /** Nombre de questions souhaité (tous exercices sauf Hifz). */
+  questionCount?: number;
 }
 
 const PREFIX = 'almuraja3a:setup:';

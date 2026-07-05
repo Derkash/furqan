@@ -114,7 +114,10 @@ export default function SetupPage() {
   const [revealAfter, setRevealAfter] = useState<VersePositionType[]>([]);
   const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+  const [questionCount, setQuestionCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
+
+  const isHifz = exerciseId === 'hifz';
 
   // Restauration des derniers réglages pour cet exercice (proposés par défaut).
   // Lecture localStorage après montage → 1er rendu vide (pas de décalage d'hydratation).
@@ -136,6 +139,7 @@ export default function SetupPage() {
     if (saved.revealAfter) setRevealAfter(saved.revealAfter);
     if (saved.showPositions) setShowPositions(saved.showPositions);
     if (saved.direction) setDirection(saved.direction);
+    if (saved.questionCount) setQuestionCount(saved.questionCount);
   }, [exerciseId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -192,16 +196,27 @@ export default function SetupPage() {
     }
 
     const query = new URLSearchParams({ start: String(lo), end: String(hi) });
+
+    // Nombre de questions (tous les exercices sauf Hifz, qui est une lecture libre)
+    const count = Math.max(1, Math.min(200, Math.round(questionCount) || 1));
+    if (!isHifz) query.set('n', String(count));
+    const base = {
+      mode: range.mode,
+      start: range.start,
+      end: range.end,
+      ...(isHifz ? {} : { questionCount: count }),
+    };
+
     if (isAudioQuiz) {
       query.set('identify', identifyPosition);
       if (revealAfter.length > 0) query.set('reveal', revealAfter.join(','));
-      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, identifyPosition, revealAfter });
+      saveSetup(exerciseId, { ...base, identifyPosition, revealAfter });
     } else if (isSequential) {
       query.set('show', showPositions.join(','));
       query.set('dir', direction);
-      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end, showPositions, direction });
+      saveSetup(exerciseId, { ...base, showPositions, direction });
     } else {
-      saveSetup(exerciseId, { mode: range.mode, start: range.start, end: range.end });
+      saveSetup(exerciseId, base);
     }
 
     router.push(`/exercises/${exerciseId}/practice?${query.toString()}`);
@@ -299,6 +314,36 @@ export default function SetupPage() {
                   </div>
                 </OptionGroup>
               </>
+            )}
+
+            {/* Nombre de questions (tous les exercices sauf Hifz) */}
+            {!isHifz && (
+              <OptionGroup label="Nombre de questions">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount((c) => Math.max(1, c - 5))}
+                    className="w-10 h-10 rounded-lg border-2 border-[#c9a959]/30 text-[#2d5016] font-bold hover:border-[#c9a959]"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={questionCount}
+                    onChange={(e) => setQuestionCount(Number(e.target.value))}
+                    className="flex-1 text-center px-3 py-2 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount((c) => Math.min(200, c + 5))}
+                    className="w-10 h-10 rounded-lg border-2 border-[#c9a959]/30 text-[#2d5016] font-bold hover:border-[#c9a959]"
+                  >
+                    +
+                  </button>
+                </div>
+              </OptionGroup>
             )}
 
             {error && <p className="text-red-600 text-sm text-center">{error}</p>}

@@ -14,6 +14,8 @@ interface MushafDoublePageProps {
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
+  /** Mots sélectionnés/déclarés en faute, clés "verseKey#position". */
+  selectedWords?: Set<string>;
   singlePage?: boolean; // Afficher une seule page (la page courante)
   currentPage?: number; // Numéro de la page courante (pour mode singlePage)
   hifzLevel?: number; // Niveau de Hifz (0-8)
@@ -37,6 +39,7 @@ export default function MushafDoublePage({
   isBlurred = false,
   maskAll = false,
   loading = false,
+  selectedWords,
   singlePage = false,
   currentPage,
   hifzLevel,
@@ -70,6 +73,7 @@ export default function MushafDoublePage({
             highlightedVerseKey={highlightedVerseKey}
             isBlurred={isBlurred}
             maskAll={maskAll}
+              selectedWords={selectedWords}
             hifzLevel={hifzLevel}
             loading={loading && !pageVerses}
           />
@@ -109,6 +113,7 @@ export default function MushafDoublePage({
               highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              selectedWords={selectedWords}
               hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />
@@ -124,6 +129,7 @@ export default function MushafDoublePage({
               highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              selectedWords={selectedWords}
               hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
@@ -141,6 +147,7 @@ export default function MushafDoublePage({
               highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              selectedWords={selectedWords}
               hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
@@ -156,6 +163,7 @@ export default function MushafDoublePage({
               highlightedVerseKey={highlightedVerseKey}
               isBlurred={isBlurred}
               maskAll={maskAll}
+              selectedWords={selectedWords}
               hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />

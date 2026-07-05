@@ -42,6 +42,8 @@ interface MushafPageProps {
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
+  /** Mots sélectionnés/déclarés en faute, clés "verseKey#position" (marqués en rouge). */
+  selectedWords?: Set<string>;
   frameConfig?: Partial<FrameConfig>;
   /**
    * Niveau de Hifz (0-8). 0 = tout visible, 8 = quasi rien.
@@ -256,6 +258,7 @@ export default function MushafPage({
   isBlurred = false,
   maskAll = false,
   loading = false,
+  selectedWords,
   frameConfig,
   hifzLevel,
 }: MushafPageProps) {
@@ -439,6 +442,12 @@ export default function MushafPage({
           box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
           border-radius: 6px;
         }
+        .verse-word.selected {
+          /* Mot déclaré en faute — même technique box-shadow, pas de padding. */
+          background-color: rgba(220, 38, 38, 0.22);
+          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.28);
+          border-radius: 6px;
+        }
         .mushaf-loader {
           position: absolute;
           inset: 0;
@@ -532,15 +541,20 @@ export default function MushafPage({
                       const shouldHide = verseMaskHide || hifzHide;
                       const isHighlighted =
                         highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
+                      const isSelected =
+                        !w.isAyahMarker && selectedWords?.has(`${w.verseKey}#${w.position}`);
                       const classes = ['verse-word'];
                       if (shouldHide) classes.push('hidden');
-                      if (isHighlighted) classes.push('highlighted');
+                      if (isHighlighted && !isSelected) classes.push('highlighted');
+                      if (isSelected) classes.push('selected');
                       if (w.isAyahMarker) classes.push('ayah-marker');
                       return (
                         <span
                           key={`${line.line}-${i}`}
                           className={classes.join(' ')}
                           data-verse={w.verseKey}
+                          data-pos={w.position}
+                          data-page={pageNumber}
                         >
                           {w.code}
                         </span>

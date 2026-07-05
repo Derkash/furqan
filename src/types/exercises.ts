@@ -119,6 +119,8 @@ export interface ExerciseState {
 
 export interface ExerciseConfig extends QuizConfig {
   exerciseId: ExerciseId;
+  /** Nombre de questions (tours) souhaité. Absent = toute la plage. */
+  maxRounds?: number;
   /** Quiz audio : position du verset joué à l'audio à identifier. */
   identifyPosition?: VersePositionType;
   /** Quiz audio : positions à révéler ensuite (sans audio), ordre premier→milieu→dernier. */

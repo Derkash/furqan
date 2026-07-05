@@ -14,6 +14,7 @@ import { getExerciseDefinition } from '@/utils/exercises/exerciseRegistry';
 import { STEP_GENERATORS } from '@/lib/exercises/stepGenerators';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import { useVerseMap } from '@/hooks/useVerseMap';
+import { getCurrentUser, getPriorityPages } from '@/utils/exercises/userStats';
 
 interface UseExerciseReturn {
   // State
@@ -105,6 +106,10 @@ function pairRightPage(page: number): number {
  * Tire une page aléatoire dans [startPage, endPage] en évitant les `avoidRecent`
  * dernières pages visitées. Réinitialise correctement si toute la fenêtre
  * récente couvre la plage.
+ *
+ * Adaptation aux fautes : ~50 % du temps, la page est tirée parmi celles
+ * contenant des mots/versets en erreur (mémoire utilisateur), en mixant
+ * avec le tirage uniforme pour ne pas tourner qu'autour des erreurs.
  */
 function pickRandomPage(
   startPage: number,
@@ -124,6 +129,14 @@ function pickRandomPage(
   }
 
   const pool = available.length > 0 ? available : Array.from({ length: rangeSize }, (_, i) => startPage + i);
+
+  const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
+  if (priority.size > 0 && Math.random() < 0.5) {
+    const priorityPool = pool.filter((p) => priority.has(p));
+    if (priorityPool.length > 0) {
+      return priorityPool[Math.floor(Math.random() * priorityPool.length)];
+    }
+  }
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -233,6 +246,14 @@ export function useExercise(): UseExerciseReturn {
     }
 
     const totalPages = config.endPage - config.startPage + 1;
+    // Nombre de questions demandé : libre pour les exercices à tirage aléatoire
+    // (les pages peuvent revenir), borné au nombre de pages pour les séquentiels.
+    const isRandomExercise = DOUBLE_PAGE_RANDOM_EXERCISES.includes(config.exerciseId);
+    const totalRounds = config.maxRounds
+      ? isRandomExercise
+        ? config.maxRounds
+        : Math.min(config.maxRounds, totalPages)
+      : totalPages;
 
     // Reset historique pour le nouvel exercice
     recentPagesRef.current = [];
@@ -258,7 +279,7 @@ export function useExercise(): UseExerciseReturn {
         pagesCompleted: 0,
         totalPages,
         roundsCompleted: 0,
-        totalRounds: totalPages,
+        totalRounds,
       },
       status: 'idle',
     });
@@ -292,14 +313,14 @@ export function useExercise(): UseExerciseReturn {
       const definition = getExerciseDefinition(state.exerciseId);
       if (!definition) return;
 
-      const { currentPage, pagesCompleted, totalPages } = state.progress;
+      const { currentPage, pagesCompleted, totalRounds } = state.progress;
       const { startPage, endPage } = state.config;
 
       // Pour les exercices double-page aléatoire, sauter à une double page aléatoire
       const isDoublePageExercise = DOUBLE_PAGE_RANDOM_EXERCISES.includes(state.exerciseId);
 
-      if (pagesCompleted + 1 >= totalPages) {
-        // Exercise complete
+      if (pagesCompleted + 1 >= totalRounds) {
+        // Exercise complete (nombre de questions atteint)
         setState((prev) => ({ ...prev, status: 'completed' }));
         return;
       }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
@@ -12,6 +12,7 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { getCurrentUser, recordVerseResult } from '@/utils/exercises/userStats';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -38,6 +39,7 @@ function MushafPractice() {
   const revealParam = searchParams.get('reveal');
   const showParam = searchParams.get('show');
   const dirParam = searchParams.get('dir');
+  const nParam = searchParams.get('n');
 
   const {
     state,
@@ -127,6 +129,7 @@ function MushafPractice() {
       exerciseId: exerciseId as ExerciseId,
       startPage,
       endPage,
+      maxRounds: nParam ? Number(nParam) || undefined : undefined,
       identifyPosition: (identifyParam ?? undefined) as VersePositionType | undefined,
       revealAfter: parsePositions(revealParam),
       showPositions: parsePositions(showParam),
@@ -134,7 +137,7 @@ function MushafPractice() {
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, identifyParam, revealParam, showParam, dirParam, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {
@@ -159,6 +162,28 @@ function MushafPractice() {
   }, [currentStep]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // « Avez-vous trouvé ? » : demandé en fin de tour pour les exercices de quiz,
+  // et mémorisé pour orienter les prochaines interrogations vers les échecs.
+  const [askFound, setAskFound] = useState(false);
+  const asksFeedback = exerciseId === 'audio-quiz' || exerciseId === 'sequential';
+  const roundTargets = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const step of state.currentRound?.steps ?? []) {
+      if (step.targetVerse) seen.set(step.targetVerse.verseKey, step.targetVerse.page);
+    }
+    return Array.from(seen, ([verseKey, page]) => ({ verseKey, page }));
+  }, [state.currentRound]);
+
+  const answerFound = (found: boolean) => {
+    const user = getCurrentUser();
+    const at = new Date().toISOString();
+    for (const t of roundTargets) {
+      recordVerseResult(user, { verseKey: t.verseKey, page: t.page, found, exercise: exerciseId, at });
+    }
+    setAskFound(false);
+    nextStep();
+  };
+
   // Handle tap
   const handleTap = () => {
     // Arrêter l'audio en cours si il y en a
@@ -170,6 +195,18 @@ function MushafPractice() {
     }
     // En Hifz, on reste sur la page : pas d'avancement au tap
     if (exerciseId === 'hifz') return;
+    if (askFound) return;
+
+    // Dernière étape du tour d'un quiz → demander d'abord « trouvé ou pas ? »
+    if (
+      asksFeedback &&
+      state.currentRound &&
+      state.currentRound.currentStepIndex === state.currentRound.steps.length - 1 &&
+      roundTargets.length > 0
+    ) {
+      setAskFound(true);
+      return;
+    }
     nextStep();
   };
 
@@ -208,7 +245,8 @@ function MushafPractice() {
         <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[#2d5016] text-center">
           <h2 className="text-2xl font-bold text-[#2d5016] mb-2">Terminé !</h2>
           <p className="text-[#4a7c23] mb-4">
-            Vous avez terminé {toArabicNumbers(state.progress.totalPages)} pages
+            Vous avez terminé {toArabicNumbers(state.progress.totalRounds)} question
+            {state.progress.totalRounds > 1 ? 's' : ''}
           </p>
           <div className="flex gap-3 justify-center">
             <button
@@ -250,9 +288,9 @@ function MushafPractice() {
               </>
             ) : (
               <>
-                Page {toArabicNumbers(state.progress.currentPage)} •{' '}
+                Page {toArabicNumbers(state.progress.currentPage)} • Question{' '}
                 {toArabicNumbers(state.progress.pagesCompleted + 1)}/
-                {toArabicNumbers(state.progress.totalPages)}
+                {toArabicNumbers(state.progress.totalRounds)}
               </>
             )}
           </span>
@@ -429,6 +467,34 @@ function MushafPractice() {
           </>
         )}
       </div>
+
+      {/* Question de fin de tour : « Avez-vous trouvé ? » (exercices de quiz) */}
+      {askFound && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-[#fdfaf3] border-2 border-[#c9a959] rounded-2xl shadow-xl p-5 w-[min(90vw,340px)] text-center">
+            <p className="text-lg font-bold text-[#2d5016] mb-1">Avez-vous trouvé ?</p>
+            <p className="text-xs text-gray-500 mb-4">
+              Votre réponse oriente les prochaines questions vers ce que vous ratez.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                type="button"
+                onClick={() => answerFound(true)}
+                className="flex-1 py-3 rounded-xl bg-[#2d5016] hover:bg-[#4a7c23] text-white font-bold active:scale-95 transition-all"
+              >
+                ✓ Oui
+              </button>
+              <button
+                type="button"
+                onClick={() => answerFound(false)}
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold active:scale-95 transition-all"
+              >
+                ✗ Non
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Popover de traduction Hamidullah, positionné au point cliqué (Hifz uniquement) */}
       {isHifz && popover && (() => {

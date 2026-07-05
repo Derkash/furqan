@@ -45,7 +45,7 @@ export const EXERCISES: ExerciseDefinition[] = [
     name: 'Récitation',
     nameArabic: 'تلاوة',
     description:
-      'Écoutez 9 s d’un verset aléatoire (page floutée), enregistrez votre récitation, puis comparez : page révélée, verset surligné et réécoute de votre enregistrement',
+      'Écoutez 9 s d’un verset aléatoire, enregistrez votre récitation, puis comparez (page révélée, verset surligné). Déclarez vos fautes mot par mot : elles orientent les prochaines questions',
     category: 'recitation',
     hasAudio: true,
     progression: 'random',
