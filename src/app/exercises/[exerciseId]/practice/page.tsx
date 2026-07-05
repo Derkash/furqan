@@ -21,6 +21,8 @@ import {
   type MistakeType,
 } from '@/utils/exercises/userStats';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
+import { useTafsir } from '@/hooks/exercises/useTafsir';
+import { useSpeech } from '@/hooks/exercises/useSpeech';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -152,6 +154,32 @@ function MushafPractice() {
   const { data: quranUnits } = useQuranUnits();
   // popover = verset sélectionné + coordonnées du tap (clientX/clientY).
   const [popover, setPopover] = useState<{ verseKey: string; x: number; y: number } | null>(null);
+
+  // Tafsir français (Al-Mukhtasar) du verset ouvert + synthèse vocale française
+  // pour écouter la traduction ou le tafsir.
+  const tafsir = useTafsir(isHifz && popover ? popover.verseKey : null);
+  const speech = useSpeech();
+  // Quelle section est en cours de lecture vocale (pour l'état des boutons).
+  const [speakingSection, setSpeakingSection] = useState<'translation' | 'tafsir' | null>(null);
+  const speechStopRef = useRef(speech.stop);
+  useEffect(() => {
+    speechStopRef.current = speech.stop;
+  }, [speech.stop]);
+  // Changement/fermeture du popover → couper la lecture vocale.
+  useEffect(() => {
+    speechStopRef.current();
+  }, [popover?.verseKey]);
+
+  const toggleSpeak = (section: 'translation' | 'tafsir', text: string | null | undefined) => {
+    if (!text) return;
+    if (speech.speaking && speakingSection === section) {
+      speech.stop();
+      setSpeakingSection(null);
+    } else {
+      speech.speak(text);
+      setSpeakingSection(section);
+    }
+  };
   // Position finale (clampée à l'écran), calculée après mesure du popover.
   const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -779,7 +807,7 @@ function MushafPractice() {
               top: popoverPos ? popoverPos.top : popover.y,
               visibility: popoverPos ? 'visible' : 'hidden',
             }}
-            className="fixed z-40 w-[min(88vw,340px)] max-h-[60vh] overflow-y-auto bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
+            className="fixed z-40 w-[min(90vw,380px)] max-h-[70vh] overflow-y-auto bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
           >
             <div className="px-3.5 pt-2.5 pb-3">
               <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -815,13 +843,77 @@ function MushafPractice() {
                   </svg>
                 </button>
               </div>
-              <p className="text-[14px] leading-relaxed text-[#1a1a1a]">
-                {text
-                  ? text
-                  : translationLoading
-                    ? 'Chargement de la traduction…'
-                    : 'Traduction indisponible pour ce verset.'}
-              </p>
+              <div className="flex items-start gap-2">
+                <p className="flex-1 text-[14px] leading-relaxed text-[#1a1a1a]">
+                  {text
+                    ? text
+                    : translationLoading
+                      ? 'Chargement de la traduction…'
+                      : 'Traduction indisponible pour ce verset.'}
+                </p>
+                {text && speech.supported && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSpeak('translation', text)}
+                    aria-label="Écouter la traduction"
+                    className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
+                      speech.speaking && speakingSection === 'translation'
+                        ? 'bg-[#2d5016] text-[#fdfaf3]'
+                        : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+                    }`}
+                  >
+                    {speech.speaking && speakingSection === 'translation' ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                        <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Tafsir français (Al-Mukhtasar) */}
+              <div className="mt-3 pt-2.5 border-t border-[#c9a959]/30">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-[#c9a959]">
+                    Tafsir — Al-Mukhtasar
+                  </div>
+                  {tafsir.text && speech.supported && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSpeak('tafsir', tafsir.text)}
+                      aria-label="Écouter le tafsir"
+                      className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
+                        speech.speaking && speakingSection === 'tafsir'
+                          ? 'bg-[#2d5016] text-[#fdfaf3]'
+                          : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+                      }`}
+                    >
+                      {speech.speaking && speakingSection === 'tafsir' ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                      ) : (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                          <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line">
+                  {tafsir.text
+                    ? tafsir.text
+                    : tafsir.loading
+                      ? 'Chargement du tafsir…'
+                      : 'Tafsir indisponible pour ce verset.'}
+                </p>
+              </div>
             </div>
           </div>
         );
