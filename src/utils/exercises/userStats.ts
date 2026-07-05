@@ -5,6 +5,14 @@
 
 export type MistakeType = 'oubli' | 'inversion' | 'harakat' | 'mot';
 
+/** Types de faute avec libellé et couleur (mêmes teintes que les marques sur la page). */
+export const MISTAKE_TYPE_META: { value: MistakeType; label: string; color: string }[] = [
+  { value: 'oubli', label: 'Oubli', color: '#d97706' },
+  { value: 'inversion', label: 'Inversion', color: '#7c3aed' },
+  { value: 'harakat', label: 'Harakat', color: '#2563eb' },
+  { value: 'mot', label: 'Mot erroné', color: '#dc2626' },
+];
+
 export interface WordMistake {
   verseKey: string; // "4:124"
   position: number; // index du mot dans le verset (données QCF)

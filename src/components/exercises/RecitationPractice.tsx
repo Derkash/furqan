@@ -12,6 +12,7 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getCurrentUser,
   getMistakeWordMarks,
+  MISTAKE_TYPE_META,
   getPriorityVerses,
   logout,
   pickPriorityVerse,
@@ -26,14 +27,6 @@ import type { PagePair, PageVerses, VersePosition } from '@/types';
 const SNIPPET_SECONDS = 9;
 
 type Phase = 'listening' | 'reciting' | 'result';
-
-/** Types de faute : chacun sa couleur (mêmes teintes que les marques sur la page). */
-const MISTAKE_TYPES: { value: MistakeType; label: string; color: string }[] = [
-  { value: 'oubli', label: 'Oubli', color: '#d97706' },
-  { value: 'inversion', label: 'Inversion', color: '#7c3aed' },
-  { value: 'harakat', label: 'Harakat', color: '#2563eb' },
-  { value: 'mot', label: 'Mot erroné', color: '#dc2626' },
-];
 
 function getPagePair(page: number): PagePair {
   const rightPage = page % 2 === 1 ? page : page - 1;
@@ -483,7 +476,7 @@ export default function RecitationPractice() {
               Touchez les mots ratés • feuilletez tout le Mushaf
             </span>
             <span className="hidden sm:flex items-center gap-2 ml-2">
-              {MISTAKE_TYPES.map((t) => (
+              {MISTAKE_TYPE_META.map((t) => (
                 <span key={t.value} className="flex items-center gap-1 text-[10px] text-white/80">
                   <span
                     className="w-2 h-2 rounded-full"
@@ -632,7 +625,7 @@ export default function RecitationPractice() {
                 </button>
               </div>
               <div className="flex gap-1.5 flex-wrap">
-                {MISTAKE_TYPES.map((t) => (
+                {MISTAKE_TYPE_META.map((t) => (
                   <button
                     key={t.value}
                     type="button"

@@ -15,9 +15,12 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getCurrentUser,
   getMistakeWordMarks,
+  MISTAKE_TYPE_META,
   recordVerseResult,
+  recordWordMistakes,
   type MistakeType,
 } from '@/utils/exercises/userStats';
+import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -90,6 +93,60 @@ function MushafPractice() {
   }, [isHifz]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Hifz : s'enregistrer pendant la lecture (texte visible) et se réécouter.
+  const recorder = useAudioRecorder();
+  const [recElapsed, setRecElapsed] = useState(0);
+  const recTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(2);
+  const playerRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (playerRef.current) playerRef.current.playbackRate = playbackRate;
+  }, [playbackRate, recorder.audioUrl]);
+  useEffect(() => {
+    return () => {
+      if (recTimer.current) clearInterval(recTimer.current);
+    };
+  }, []);
+
+  const startRecording = async () => {
+    const ok = await recorder.start();
+    if (!ok) return;
+    setRecElapsed(0);
+    if (recTimer.current) clearInterval(recTimer.current);
+    recTimer.current = setInterval(() => setRecElapsed((s) => s + 1), 1000);
+  };
+
+  const stopRecording = () => {
+    if (recTimer.current) clearInterval(recTimer.current);
+    recorder.stop();
+  };
+
+  // Hifz : mode « marquer mes fautes » — taper les mots ratés, puis choisir le type.
+  const [markingMode, setMarkingMode] = useState(false);
+  const [selWords, setSelWords] = useState<
+    Map<string, { verseKey: string; position: number; page: number }>
+  >(new Map());
+
+  const declareHifzMistakes = (type: MistakeType) => {
+    const user = getCurrentUser();
+    const at = new Date().toISOString();
+    recordWordMistakes(
+      user,
+      Array.from(selWords.values()).map((w) => ({ ...w, type, at }))
+    );
+    setMistakeWords(getMistakeWordMarks(user));
+    setSelWords(new Map());
+  };
+
+  // Marques affichées en Hifz : fautes persistées (si visibles) + sélection en cours.
+  const hifzWordMarks = useMemo(() => {
+    if (!isHifz) return undefined;
+    const marks = new Map<string, string>();
+    if (showMistakes) for (const [k, v] of mistakeWords) marks.set(k, v);
+    for (const k of selWords.keys()) marks.set(k, 'selected');
+    return marks;
+  }, [isHifz, showMistakes, mistakeWords, selWords]);
+
   // Traduction Hamidullah (Hifz) : affichée seulement au tap sur un verset, en popover.
   const { translations, loading: translationLoading, load: loadTranslations } = useTranslation();
   const { data: quranUnits } = useQuranUnits();
@@ -99,11 +156,29 @@ function MushafPractice() {
   const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Tap sur un verset (délégation via data-verse) → popover au point cliqué ; tap hors verset → ferme.
+  // Tap sur un verset (délégation via data-verse) :
+  // - mode marquage : sélectionne/désélectionne le MOT touché (faute à déclarer)
+  // - sinon : popover de traduction au point cliqué ; tap hors verset → ferme.
   const handleMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isHifz) return;
     const el = (e.target as HTMLElement).closest('[data-verse]');
     const verseKey = el?.getAttribute('data-verse');
+
+    if (markingMode) {
+      if (!el || !verseKey || el.classList.contains('ayah-marker')) return;
+      const pos = Number(el.getAttribute('data-pos'));
+      const page = Number(el.getAttribute('data-page'));
+      if (!Number.isFinite(pos)) return;
+      const key = `${verseKey}#${pos}`;
+      setSelWords((prev) => {
+        const next = new Map(prev);
+        if (next.has(key)) next.delete(key);
+        else next.set(key, { verseKey, position: pos, page });
+        return next;
+      });
+      return;
+    }
+
     if (verseKey) {
       loadTranslations();
       setPopoverPos(null);
@@ -379,9 +454,27 @@ function MushafPractice() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              setMarkingMode((m) => {
+                if (!m) setPopover(null);
+                else setSelWords(new Map());
+                return !m;
+              });
+            }}
+            title="Marquer mes fautes : touchez les mots ratés, puis choisissez le type"
+            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
+              markingMode
+                ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959] shadow-md'
+                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+            }`}
+          >
+            ✍ Marquer
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               setShowMistakes((s) => !s);
             }}
-            title="Afficher/masquer les fautes déclarées en Récitation"
+            title="Afficher/masquer les fautes déclarées"
             className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
               showMistakes && mistakeWords.size > 0
                 ? 'bg-red-600 text-white border-red-600'
@@ -440,13 +533,159 @@ function MushafPractice() {
           visibleVerses={visibleVerses}
           isBlurred={isBlurred}
           maskAll={maskAll}
-          wordMarks={isHifz && showMistakes ? mistakeWords : undefined}
+          wordMarks={hifzWordMarks}
           loading={loading}
           singlePage={singlePage}
           currentPage={singlePage ? displayedPage : undefined}
           hifzLevel={exerciseId === 'hifz' ? hifzLevel : undefined}
           onTap={handleTap}
         />
+
+        {/* Barre de déclaration de fautes (Hifz, mode marquage) */}
+        {isHifz && markingMode && selWords.size > 0 && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]">
+            <div
+              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
+                  {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} — type de faute ?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelWords(new Map())}
+                  className="text-[11px] text-gray-400 hover:text-gray-600 underline"
+                >
+                  Annuler
+                </button>
+              </div>
+              {getCurrentUser() ? (
+                <div className="flex gap-1.5 flex-wrap">
+                  {MISTAKE_TYPE_META.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => declareHifzMistakes(t.value)}
+                      className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95 transition-all"
+                      style={{ borderColor: t.color, color: t.color }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = t.color;
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fff';
+                        e.currentTarget.style.color = t.color;
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  Connectez-vous (exercice Récitation ou tableau de bord) pour mémoriser vos fautes.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Enregistreur (Hifz) : s'enregistrer en lisant, puis se réécouter */}
+        {isHifz && (
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {recorder.recording ? (
+              <div className="flex items-center gap-2.5 bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-full pl-4 pr-1.5 py-1.5 shadow-lg">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-bold tabular-nums text-[#2d5016] text-lg">
+                  {Math.floor(recElapsed / 60)}:{String(recElapsed % 60).padStart(2, '0')}
+                </span>
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  aria-label="Arrêter l'enregistrement"
+                  className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow active:scale-95 transition-all"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              </div>
+            ) : recorder.audioUrl ? (
+              <div className="flex items-center gap-2 bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl px-3 py-2 shadow-lg flex-wrap justify-center">
+                <audio
+                  ref={playerRef}
+                  controls
+                  src={recorder.audioUrl}
+                  className="h-8 w-52"
+                  onLoadedMetadata={(e) => {
+                    e.currentTarget.playbackRate = playbackRate;
+                  }}
+                />
+                <span className="flex items-center gap-1">
+                  {[1, 1.5, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      onClick={() => setPlaybackRate(rate)}
+                      className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold transition-all ${
+                        playbackRate === rate
+                          ? 'bg-[#2d5016] text-[#fdfaf3]'
+                          : 'bg-white border border-[#c9a959]/40 text-[#4a7c23]'
+                      }`}
+                    >
+                      ×{rate === 1.5 ? '1,5' : rate}
+                    </button>
+                  ))}
+                </span>
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  aria-label="Nouvel enregistrement"
+                  className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center active:scale-95 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={recorder.clear}
+                  aria-label="Fermer le lecteur"
+                  className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 flex items-center justify-center active:scale-95 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white rounded-full px-4 py-2.5 shadow-lg font-bold text-sm active:scale-95 transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+                S&apos;enregistrer
+              </button>
+            )}
+            {recorder.error && (
+              <p className="mt-1 text-center text-[11px] text-red-600 bg-white/90 rounded-full px-3 py-0.5 shadow">
+                {recorder.error}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Boutons de feuilletage (Hifz) : extrémités gauche/droite, centrés verticalement.
             Lecture RTL : avancer (pages suivantes) = aller vers la GAUCHE. */}
