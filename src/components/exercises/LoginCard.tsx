@@ -2,35 +2,67 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { login } from '@/utils/exercises/userStats';
+import { login, register } from '@/utils/exercises/userStats';
 
 interface LoginCardProps {
   onLoggedIn: (username: string) => void;
 }
 
+type Mode = 'login' | 'register';
+
 /**
- * Connexion simple (identifiant + mot de passe, compte créé automatiquement)
- * pour la mémoire des fautes de récitation.
+ * Connexion / Inscription pour la mémoire des fautes.
+ * - Connexion : erreur si l'identifiant n'existe pas ou si le mot de passe est faux.
+ * - Inscription : erreur si l'identifiant existe déjà.
  */
 export default function LoginCard({ onLoggedIn }: LoginCardProps) {
+  const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = login(username, password);
+    const result = mode === 'login' ? login(username, password) : register(username, password);
     if (result.ok) onLoggedIn(username.trim());
-    else setError(result.error ?? 'Connexion impossible');
+    else setError(result.error ?? 'Opération impossible');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm w-full border border-[#c9a959]/20">
-        <h1 className="text-xl font-bold text-[#2d5016] mb-1">Connexion</h1>
+        {/* Onglets Connexion / Inscription */}
+        <div className="flex gap-1.5 mb-5">
+          {(
+            [
+              { value: 'login', label: 'Connexion' },
+              { value: 'register', label: 'Inscription' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => switchMode(t.value)}
+              className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                mode === t.value
+                  ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                  : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <p className="text-gray-500 text-sm mb-5">
-          Pour mémoriser vos fautes et adapter les exercices. Le compte est créé
-          automatiquement à la première connexion.
+          {mode === 'login'
+            ? 'Retrouvez vos fautes mémorisées et vos exercices adaptés.'
+            : 'Créez votre compte pour mémoriser vos fautes et suivre votre progression.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -54,7 +86,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               className="w-full px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none text-[#1a1a1a]"
             />
           </div>
@@ -65,7 +97,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
             type="submit"
             className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] hover:from-[#4a7c23] hover:to-[#2d5016] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98]"
           >
-            Se connecter
+            {mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
           </button>
         </form>
 

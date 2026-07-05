@@ -64,28 +64,53 @@ function setUserCookie(username: string | null) {
 
 // ---------- Comptes ----------
 
-/**
- * Connexion : crée le compte automatiquement s'il n'existe pas.
- * Retourne une erreur uniquement si le mot de passe ne correspond pas.
- */
+function validateCredentials(
+  username: string,
+  password: string
+): { name: string; key: string; hash: string } | { error: string } {
+  if (!isBrowser()) return { error: 'Stockage indisponible' };
+  const name = username.trim();
+  if (!name) return { error: 'Identifiant requis' };
+  if (!password) return { error: 'Mot de passe requis' };
+  return {
+    name,
+    key: ACCOUNT_PREFIX + name.toLowerCase(),
+    hash: hashPassword(password),
+  };
+}
+
+/** Connexion : l'identifiant doit exister et le mot de passe correspondre. */
 export function login(
   username: string,
   password: string
 ): { ok: boolean; error?: string } {
-  if (!isBrowser()) return { ok: false, error: 'Stockage indisponible' };
-  const name = username.trim();
-  if (!name) return { ok: false, error: 'Identifiant requis' };
-  if (!password) return { ok: false, error: 'Mot de passe requis' };
+  const creds = validateCredentials(username, password);
+  if ('error' in creds) return { ok: false, error: creds.error };
 
-  const key = ACCOUNT_PREFIX + name.toLowerCase();
-  const hash = hashPassword(password);
-  const existing = window.localStorage.getItem(key);
+  const existing = window.localStorage.getItem(creds.key);
   if (existing === null) {
-    window.localStorage.setItem(key, hash);
-  } else if (existing !== hash) {
+    return { ok: false, error: 'Cet identifiant n’existe pas. Créez un compte.' };
+  }
+  if (existing !== creds.hash) {
     return { ok: false, error: 'Mot de passe incorrect' };
   }
-  setUserCookie(name);
+  setUserCookie(creds.name);
+  return { ok: true };
+}
+
+/** Inscription : l'identifiant ne doit pas déjà exister. */
+export function register(
+  username: string,
+  password: string
+): { ok: boolean; error?: string } {
+  const creds = validateCredentials(username, password);
+  if ('error' in creds) return { ok: false, error: creds.error };
+
+  if (window.localStorage.getItem(creds.key) !== null) {
+    return { ok: false, error: 'Cet identifiant existe déjà. Connectez-vous.' };
+  }
+  window.localStorage.setItem(creds.key, creds.hash);
+  setUserCookie(creds.name);
   return { ok: true };
 }
 
@@ -185,6 +210,47 @@ export function getPriorityPages(
     pages.add(page);
   }
   return pages;
+}
+
+/** Clés "verseKey#position" de tous les mots déclarés en faute (pour Hifz). */
+export function getMistakeWordKeys(username: string | null): Set<string> {
+  const keys = new Set<string>();
+  if (!username) return keys;
+  for (const m of loadStats(username).wordMistakes) {
+    keys.add(`${m.verseKey}#${m.position}`);
+  }
+  return keys;
+}
+
+export interface AggregatedMistake {
+  verseKey: string;
+  position: number;
+  page: number;
+  count: number;
+  types: Partial<Record<MistakeType, number>>;
+  lastAt: string;
+}
+
+/** Fautes agrégées par mot (pour le tableau de bord), triées par fréquence. */
+export function aggregateMistakesByWord(username: string | null): AggregatedMistake[] {
+  const map = new Map<string, AggregatedMistake>();
+  if (!username) return [];
+  for (const m of loadStats(username).wordMistakes) {
+    const key = `${m.verseKey}#${m.position}`;
+    const entry = map.get(key) ?? {
+      verseKey: m.verseKey,
+      position: m.position,
+      page: m.page,
+      count: 0,
+      types: {},
+      lastAt: m.at,
+    };
+    entry.count++;
+    entry.types[m.type] = (entry.types[m.type] ?? 0) + 1;
+    if (m.at > entry.lastAt) entry.lastAt = m.at;
+    map.set(key, entry);
+  }
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
 /** Tire un verset prioritaire au hasard, pondéré par le poids. */

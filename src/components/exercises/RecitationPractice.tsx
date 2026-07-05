@@ -89,6 +89,13 @@ export default function RecitationPractice() {
   const audio = useAudio();
   const recorder = useAudioRecorder();
 
+  // Vitesse de réécoute de l'enregistrement (×2 par défaut).
+  const [playbackRate, setPlaybackRate] = useState(2);
+  const playerRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (playerRef.current) playerRef.current.playbackRate = playbackRate;
+  }, [playbackRate, recorder.audioUrl]);
+
   const lastVerseKeyRef = useRef<string | null>(null);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -366,6 +373,12 @@ export default function RecitationPractice() {
             >
               Recommencer
             </button>
+            <Link
+              href="/dashboard"
+              className="px-4 py-2 bg-white border-2 border-[#2d5016] text-[#2d5016] hover:bg-[#f0f7ea] rounded-lg font-semibold"
+            >
+              Tableau de bord
+            </Link>
             <Link
               href="/exercises"
               className="px-4 py-2 bg-[#2d5016] hover:bg-[#4a7c23] text-white rounded-lg font-semibold"
@@ -676,7 +689,36 @@ export default function RecitationPractice() {
                 </svg>
               </div>
               {recorder.audioUrl ? (
-                <audio controls src={recorder.audioUrl} className="w-full h-9" />
+                <>
+                  <audio
+                    ref={playerRef}
+                    controls
+                    src={recorder.audioUrl}
+                    className="w-full h-9"
+                    onLoadedMetadata={(e) => {
+                      e.currentTarget.playbackRate = playbackRate;
+                    }}
+                  />
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <span className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold mr-1">
+                      Vitesse
+                    </span>
+                    {[1, 1.5, 2].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setPlaybackRate(rate)}
+                        className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all ${
+                          playbackRate === rate
+                            ? 'bg-[#2d5016] text-[#fdfaf3]'
+                            : 'bg-white border border-[#c9a959]/40 text-[#4a7c23] hover:border-[#c9a959]'
+                        }`}
+                      >
+                        ×{rate === 1.5 ? '1,5' : rate}
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-gray-400 py-2">Préparation de l&apos;audio…</p>
               )}

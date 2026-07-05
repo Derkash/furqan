@@ -12,7 +12,7 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { getCurrentUser, recordVerseResult } from '@/utils/exercises/userStats';
+import { getCurrentUser, getMistakeWordKeys, recordVerseResult } from '@/utils/exercises/userStats';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -75,6 +75,15 @@ function MushafPractice() {
   const [readingMode, setReadingMode] = useState(false);
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
+
+  // Hifz : fautes déclarées en Récitation, transférées ici (mots marqués en rouge).
+  const [showMistakes, setShowMistakes] = useState(true);
+  const [mistakeWords, setMistakeWords] = useState<Set<string>>(new Set());
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (isHifz) setMistakeWords(getMistakeWordKeys(getCurrentUser()));
+  }, [isHifz]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Traduction Hamidullah (Hifz) : affichée seulement au tap sur un verset, en popover.
   const { translations, loading: translationLoading, load: loadTranslations } = useTranslation();
@@ -362,6 +371,20 @@ function MushafPractice() {
       {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz, masqués en plein écran) */}
       {isHifz && !fullscreen && (
         <div className="flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMistakes((s) => !s);
+            }}
+            title="Afficher/masquer les fautes déclarées en Récitation"
+            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
+              showMistakes && mistakeWords.size > 0
+                ? 'bg-red-600 text-white border-red-600'
+                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+            }`}
+          >
+            Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
+          </button>
           <span className="text-xs uppercase tracking-wide text-[#c9a959] mr-2">Niveau</span>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
             <button
@@ -412,6 +435,7 @@ function MushafPractice() {
           visibleVerses={visibleVerses}
           isBlurred={isBlurred}
           maskAll={maskAll}
+          selectedWords={isHifz && showMistakes ? mistakeWords : undefined}
           loading={loading}
           singlePage={singlePage}
           currentPage={singlePage ? displayedPage : undefined}
