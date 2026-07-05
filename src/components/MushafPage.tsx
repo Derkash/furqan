@@ -42,8 +42,11 @@ interface MushafPageProps {
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
-  /** Mots sélectionnés/déclarés en faute, clés "verseKey#position" (marqués en rouge). */
-  selectedWords?: Set<string>;
+  /**
+   * Marques par mot, clés "verseKey#position" → 'selected' (sélection en cours)
+   * ou type de faute ('oubli' | 'inversion' | 'harakat' | 'mot'), chacun sa couleur.
+   */
+  wordMarks?: Map<string, string>;
   frameConfig?: Partial<FrameConfig>;
   /**
    * Niveau de Hifz (0-8). 0 = tout visible, 8 = quasi rien.
@@ -258,7 +261,7 @@ export default function MushafPage({
   isBlurred = false,
   maskAll = false,
   loading = false,
-  selectedWords,
+  wordMarks,
   frameConfig,
   hifzLevel,
 }: MushafPageProps) {
@@ -442,10 +445,31 @@ export default function MushafPage({
           box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
           border-radius: 6px;
         }
-        .verse-word.selected {
-          /* Mot déclaré en faute — même technique box-shadow, pas de padding. */
+        /* Marques de fautes — même technique box-shadow (pas de padding),
+           une couleur par type. */
+        .verse-word.mark-selected {
+          background-color: rgba(100, 116, 139, 0.22);
+          box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.35);
+          border-radius: 6px;
+        }
+        .verse-word.mark-oubli {
+          background-color: rgba(217, 119, 6, 0.22);
+          box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.32);
+          border-radius: 6px;
+        }
+        .verse-word.mark-inversion {
+          background-color: rgba(124, 58, 237, 0.20);
+          box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.30);
+          border-radius: 6px;
+        }
+        .verse-word.mark-harakat {
+          background-color: rgba(37, 99, 235, 0.18);
+          box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.30);
+          border-radius: 6px;
+        }
+        .verse-word.mark-mot {
           background-color: rgba(220, 38, 38, 0.22);
-          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.28);
+          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.30);
           border-radius: 6px;
         }
         .mushaf-loader {
@@ -541,12 +565,13 @@ export default function MushafPage({
                       const shouldHide = verseMaskHide || hifzHide;
                       const isHighlighted =
                         highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
-                      const isSelected =
-                        !w.isAyahMarker && selectedWords?.has(`${w.verseKey}#${w.position}`);
+                      const mark = w.isAyahMarker
+                        ? undefined
+                        : wordMarks?.get(`${w.verseKey}#${w.position}`);
                       const classes = ['verse-word'];
                       if (shouldHide) classes.push('hidden');
-                      if (isHighlighted && !isSelected) classes.push('highlighted');
-                      if (isSelected) classes.push('selected');
+                      if (isHighlighted && !mark) classes.push('highlighted');
+                      if (mark) classes.push(`mark-${mark}`);
                       if (w.isAyahMarker) classes.push('ayah-marker');
                       return (
                         <span

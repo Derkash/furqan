@@ -212,14 +212,18 @@ export function getPriorityPages(
   return pages;
 }
 
-/** Clés "verseKey#position" de tous les mots déclarés en faute (pour Hifz). */
-export function getMistakeWordKeys(username: string | null): Set<string> {
-  const keys = new Set<string>();
-  if (!username) return keys;
+/**
+ * Marques "verseKey#position" → type de faute, pour l'affichage coloré
+ * (Récitation et Hifz). En cas de types multiples : le plus récent gagne.
+ */
+export function getMistakeWordMarks(username: string | null): Map<string, MistakeType> {
+  const marks = new Map<string, MistakeType>();
+  if (!username) return marks;
+  // wordMistakes est chronologique : la dernière écriture l'emporte.
   for (const m of loadStats(username).wordMistakes) {
-    keys.add(`${m.verseKey}#${m.position}`);
+    marks.set(`${m.verseKey}#${m.position}`, m.type);
   }
-  return keys;
+  return marks;
 }
 
 export interface AggregatedMistake {

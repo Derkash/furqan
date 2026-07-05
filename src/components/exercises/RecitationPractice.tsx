@@ -11,6 +11,7 @@ import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getCurrentUser,
+  getMistakeWordMarks,
   getPriorityVerses,
   logout,
   pickPriorityVerse,
@@ -24,16 +25,14 @@ import type { PagePair, PageVerses, VersePosition } from '@/types';
 /** Durée de l'extrait audio joué au début de chaque tour. */
 const SNIPPET_SECONDS = 9;
 
-/** Nombre de doubles pages accessibles avant/après en phase résultat (±5 pages). */
-const RESULT_FLIP_RANGE = 5;
-
 type Phase = 'listening' | 'reciting' | 'result';
 
-const MISTAKE_TYPES: { value: MistakeType; label: string }[] = [
-  { value: 'oubli', label: 'Oubli' },
-  { value: 'inversion', label: 'Inversion' },
-  { value: 'harakat', label: 'Harakat' },
-  { value: 'mot', label: 'Mot erroné' },
+/** Types de faute : chacun sa couleur (mêmes teintes que les marques sur la page). */
+const MISTAKE_TYPES: { value: MistakeType; label: string; color: string }[] = [
+  { value: 'oubli', label: 'Oubli', color: '#d97706' },
+  { value: 'inversion', label: 'Inversion', color: '#7c3aed' },
+  { value: 'harakat', label: 'Harakat', color: '#2563eb' },
+  { value: 'mot', label: 'Mot erroné', color: '#dc2626' },
 ];
 
 function getPagePair(page: number): PagePair {
@@ -79,12 +78,13 @@ export default function RecitationPractice() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
-  // Phase résultat : double page affichée (feuilletable ±5 pages autour de la cible)
+  // Phase résultat : double page affichée (feuilletable sur tout le Mushaf)
   const [resultPair, setResultPair] = useState<PagePair | null>(null);
   // Sélection de mots en faute : "verseKey#position" → en attente de type
   const [selectedWords, setSelectedWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
-  // Mots déjà déclarés ce tour (restent marqués en rouge)
-  const [savedWords, setSavedWords] = useState<Set<string>>(new Set());
+  // Toutes les fautes déjà déclarées (persistées) : affichées à CHAQUE résultat,
+  // colorées par type, même sans nouvelle faute.
+  const [storedMarks, setStoredMarks] = useState<Map<string, MistakeType>>(new Map());
 
   const audio = useAudio();
   const recorder = useAudioRecorder();
@@ -172,7 +172,8 @@ export default function RecitationPractice() {
       setLeftPageVerses(left);
       setRightPageVerses(right);
       setSelectedWords(new Map());
-      setSavedWords(new Set());
+      // Recharge les fautes persistées : toujours visibles au prochain résultat.
+      setStoredMarks(getMistakeWordMarks(getCurrentUser()));
       setRound((r) => r + 1);
       setPhase('listening');
     } catch {
@@ -257,21 +258,14 @@ export default function RecitationPractice() {
     newRound();
   };
 
-  // ---------- Feuilletage ±5 pages en phase résultat (comme Hifz) ----------
-  const flipBounds = useMemo(() => {
-    if (!pagePair) return null;
-    const lo = Math.max(1, getPagePair(Math.max(1, pagePair.rightPage - RESULT_FLIP_RANGE)).rightPage);
-    const hi = Math.min(603, getPagePair(Math.min(604, pagePair.rightPage + RESULT_FLIP_RANGE)).rightPage);
-    return { lo, hi };
-  }, [pagePair]);
-
-  const canFlipPrev = !!(resultPair && flipBounds && resultPair.rightPage > flipBounds.lo);
-  const canFlipNext = !!(resultPair && flipBounds && resultPair.rightPage < flipBounds.hi);
+  // ---------- Feuilletage en phase résultat : TOUT le Mushaf (1 → 604) ----------
+  const canFlipPrev = !!(resultPair && resultPair.rightPage > 1);
+  const canFlipNext = !!(resultPair && resultPair.rightPage < 603);
 
   const flipResult = (direction: 'prev' | 'next') => {
-    if (!resultPair || !flipBounds) return;
+    if (!resultPair) return;
     let target2 = resultPair.rightPage + (direction === 'next' ? 2 : -2);
-    target2 = Math.max(flipBounds.lo, Math.min(flipBounds.hi, target2));
+    target2 = Math.max(1, Math.min(603, target2));
     if (target2 !== resultPair.rightPage) setResultPair(getPagePair(target2));
   };
 
@@ -304,20 +298,17 @@ export default function RecitationPractice() {
       at,
     }));
     recordWordMistakes(user, mistakes);
-    setSavedWords((prev) => {
-      const next = new Set(prev);
-      for (const key of selectedWords.keys()) next.add(key);
-      return next;
-    });
+    // Recharge depuis le stockage : les nouveaux mots prennent leur couleur de type.
+    setStoredMarks(getMistakeWordMarks(user));
     setSelectedWords(new Map());
   };
 
-  // Mots marqués en rouge sur la page : sélection en cours + déjà déclarés.
-  const markedWords = useMemo(() => {
-    const set = new Set(savedWords);
-    for (const key of selectedWords.keys()) set.add(key);
-    return set;
-  }, [savedWords, selectedWords]);
+  // Marques affichées : fautes persistées (couleur par type) + sélection en cours.
+  const wordMarks = useMemo(() => {
+    const marks = new Map<string, string>(storedMarks);
+    for (const key of selectedWords.keys()) marks.set(key, 'selected');
+    return marks;
+  }, [storedMarks, selectedWords]);
 
   const handleTap = () => {
     if (phase === 'listening') playSnippet();
@@ -489,7 +480,18 @@ export default function RecitationPractice() {
           <>
             <span className="text-base font-medium">Verset surligné</span>
             <span className="text-[#c9a959] text-sm">
-              Touchez les mots ratés pour les déclarer • feuilletez avec les flèches
+              Touchez les mots ratés • feuilletez tout le Mushaf
+            </span>
+            <span className="hidden sm:flex items-center gap-2 ml-2">
+              {MISTAKE_TYPES.map((t) => (
+                <span key={t.value} className="flex items-center gap-1 text-[10px] text-white/80">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: t.color }}
+                  />
+                  {t.label}
+                </span>
+              ))}
             </span>
           </>
         )}
@@ -513,7 +515,7 @@ export default function RecitationPractice() {
           highlightedVerseKey={phase === 'result' ? target.verseKey : undefined}
           isBlurred={phase !== 'result'}
           maskAll={false}
-          selectedWords={phase === 'result' ? markedWords : undefined}
+          wordMarks={phase === 'result' ? wordMarks : undefined}
           loading={false}
           onTap={handleTap}
         />
@@ -635,7 +637,16 @@ export default function RecitationPractice() {
                     key={t.value}
                     type="button"
                     onClick={() => declareMistakes(t.value)}
-                    className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 border-red-200 text-red-700 hover:bg-red-600 hover:text-white hover:border-red-600 active:scale-95 transition-all"
+                    className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95 transition-all hover:text-white"
+                    style={{ borderColor: t.color, color: t.color }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = t.color;
+                      e.currentTarget.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fff';
+                      e.currentTarget.style.color = t.color;
+                    }}
                   >
                     {t.label}
                   </button>

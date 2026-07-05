@@ -12,7 +12,12 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { getCurrentUser, getMistakeWordKeys, recordVerseResult } from '@/utils/exercises/userStats';
+import {
+  getCurrentUser,
+  getMistakeWordMarks,
+  recordVerseResult,
+  type MistakeType,
+} from '@/utils/exercises/userStats';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -76,12 +81,12 @@ function MushafPractice() {
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
 
-  // Hifz : fautes déclarées en Récitation, transférées ici (mots marqués en rouge).
+  // Hifz : fautes déclarées en Récitation, transférées ici (une couleur par type).
   const [showMistakes, setShowMistakes] = useState(true);
-  const [mistakeWords, setMistakeWords] = useState<Set<string>>(new Set());
+  const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (isHifz) setMistakeWords(getMistakeWordKeys(getCurrentUser()));
+    if (isHifz) setMistakeWords(getMistakeWordMarks(getCurrentUser()));
   }, [isHifz]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -435,7 +440,7 @@ function MushafPractice() {
           visibleVerses={visibleVerses}
           isBlurred={isBlurred}
           maskAll={maskAll}
-          selectedWords={isHifz && showMistakes ? mistakeWords : undefined}
+          wordMarks={isHifz && showMistakes ? mistakeWords : undefined}
           loading={loading}
           singlePage={singlePage}
           currentPage={singlePage ? displayedPage : undefined}
