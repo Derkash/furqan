@@ -172,7 +172,7 @@ function MushafPractice() {
 
   const toggleSpeak = (section: 'translation' | 'tafsir', text: string | null | undefined) => {
     if (!text) return;
-    if (speech.speaking && speakingSection === section) {
+    if ((speech.speaking || speech.loading) && speakingSection === section) {
       speech.stop();
       setSpeakingSection(null);
     } else {
@@ -857,12 +857,14 @@ function MushafPractice() {
                     onClick={() => toggleSpeak('translation', text)}
                     aria-label="Écouter la traduction"
                     className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
-                      speech.speaking && speakingSection === 'translation'
+                      (speech.speaking || speech.loading) && speakingSection === 'translation'
                         ? 'bg-[#2d5016] text-[#fdfaf3]'
                         : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
                     }`}
                   >
-                    {speech.speaking && speakingSection === 'translation' ? (
+                    {speech.loading && speakingSection === 'translation' ? (
+                      <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
+                    ) : speech.speaking && speakingSection === 'translation' ? (
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                         <rect x="6" y="6" width="12" height="12" rx="2" />
                       </svg>
@@ -888,12 +890,14 @@ function MushafPractice() {
                       onClick={() => toggleSpeak('tafsir', tafsir.text)}
                       aria-label="Écouter le tafsir"
                       className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
-                        speech.speaking && speakingSection === 'tafsir'
+                        (speech.speaking || speech.loading) && speakingSection === 'tafsir'
                           ? 'bg-[#2d5016] text-[#fdfaf3]'
                           : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
                       }`}
                     >
-                      {speech.speaking && speakingSection === 'tafsir' ? (
+                      {speech.loading && speakingSection === 'tafsir' ? (
+                        <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
+                      ) : speech.speaking && speakingSection === 'tafsir' ? (
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                           <rect x="6" y="6" width="12" height="12" rx="2" />
                         </svg>
