@@ -22,6 +22,7 @@ import {
 } from '@/utils/exercises/userStats';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { useTafsir } from '@/hooks/exercises/useTafsir';
+import { useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { useSpeech } from '@/hooks/exercises/useSpeech';
 import Link from 'next/link';
@@ -37,6 +38,10 @@ export default function PracticePage() {
   }
   return <MushafPractice />;
 }
+
+// Tafsir Al-Mukhtasar : masqué à la demande de l'utilisateur au profit
+// d'Ibn Kathir (complet). Passer à true pour le réafficher.
+const SHOW_MUKHTASAR = false;
 
 function MushafPractice() {
   const params = useParams();
@@ -158,11 +163,12 @@ function MushafPractice() {
 
   // Tafsir français (Al-Mukhtasar) + sabab an-nuzûl du verset ouvert,
   // avec synthèse vocale française pour chaque section.
-  const tafsir = useTafsir(isHifz && popover ? popover.verseKey : null);
+  const tafsir = useTafsir(isHifz && SHOW_MUKHTASAR && popover ? popover.verseKey : null);
+  const ibnKathir = useIbnKathir(isHifz && popover ? popover.verseKey : null);
   const { asbab, loading: asbabLoading, load: loadAsbab } = useAsbab();
   const speech = useSpeech();
   // Quelle section est en cours de lecture vocale (pour l'état des boutons).
-  const [speakingSection, setSpeakingSection] = useState<'translation' | 'tafsir' | 'asbab' | null>(null);
+  const [speakingSection, setSpeakingSection] = useState<'translation' | 'tafsir' | 'ibnkathir' | 'asbab' | null>(null);
   const speechStopRef = useRef(speech.stop);
   useEffect(() => {
     speechStopRef.current = speech.stop;
@@ -188,7 +194,7 @@ function MushafPractice() {
     });
   };
 
-  const toggleSpeak = (section: 'translation' | 'tafsir' | 'asbab', text: string | null | undefined) => {
+  const toggleSpeak = (section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab', text: string | null | undefined) => {
     if (!text) return;
     if ((speech.speaking || speech.loading) && speakingSection === section) {
       speech.stop();
@@ -823,7 +829,7 @@ function MushafPractice() {
         const asbabFull = asbabTexts?.map((o) => o.fr).join('\n\n') ?? null;
 
         const speakerButton = (
-          section: 'translation' | 'tafsir' | 'asbab',
+          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
           speakText: string | null | undefined
         ) =>
           speakText ? (
@@ -856,7 +862,7 @@ function MushafPractice() {
           ) : null;
 
         const sectionHeader = (
-          section: 'translation' | 'tafsir' | 'asbab',
+          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
           title: string,
           speakText: string | null | undefined
         ) => (
@@ -939,22 +945,48 @@ function MushafPractice() {
               </p>
               {seeMore('translation', text?.length ?? 0)}
 
-              {/* Section 2 : tafsir Al-Mukhtasar */}
+              {/* Section 2 : tafsir Ibn Kathir (complet, EN→FR par IA) */}
               <div className="border-t border-[#c9a959]/30 mt-1" />
-              {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
+              {sectionHeader('ibnkathir', 'Tafsir — Ibn Kathir', ibnKathir.text)}
+              {ibnKathir.text && (
+                <p className="text-[10px] font-semibold text-red-600 mb-1">
+                  Traduit de l&apos;anglais (abrégé) au français par l&apos;IA.
+                </p>
+              )}
               <p
-                onClick={() => !openSections.has('tafsir') && toggleSection('tafsir')}
+                onClick={() => !openSections.has('ibnkathir') && toggleSection('ibnkathir')}
                 className={`text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line pb-0.5 ${
-                  openSections.has('tafsir') ? '' : 'line-clamp-3 cursor-pointer'
+                  openSections.has('ibnkathir') ? '' : 'line-clamp-3 cursor-pointer'
                 }`}
               >
-                {tafsir.text
-                  ? tafsir.text
-                  : tafsir.loading
-                    ? 'Chargement du tafsir…'
+                {ibnKathir.text
+                  ? ibnKathir.text
+                  : ibnKathir.loading
+                    ? 'Chargement du tafsir… (la première consultation d’un verset peut prendre ~10 s)'
                     : 'Tafsir indisponible pour ce verset.'}
               </p>
-              {seeMore('tafsir', tafsir.text?.length ?? 0)}
+              {seeMore('ibnkathir', ibnKathir.text?.length ?? 0)}
+
+              {/* Section Al-Mukhtasar (masquée — SHOW_MUKHTASAR pour réactiver) */}
+              {SHOW_MUKHTASAR && (
+                <>
+                  <div className="border-t border-[#c9a959]/30 mt-1" />
+                  {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
+                  <p
+                    onClick={() => !openSections.has('tafsir') && toggleSection('tafsir')}
+                    className={`text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line pb-0.5 ${
+                      openSections.has('tafsir') ? '' : 'line-clamp-3 cursor-pointer'
+                    }`}
+                  >
+                    {tafsir.text
+                      ? tafsir.text
+                      : tafsir.loading
+                        ? 'Chargement du tafsir…'
+                        : 'Tafsir indisponible pour ce verset.'}
+                  </p>
+                  {seeMore('tafsir', tafsir.text?.length ?? 0)}
+                </>
+              )}
 
               {/* Section 3 : sabab an-nuzûl (occasions authentifiées) */}
               <div className="border-t border-[#c9a959]/30 mt-1" />
