@@ -10,7 +10,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { translate as bingTranslate } from 'bing-translate-api';
 
-const SURAHS = [1, 2, 3, 4, 5, 6, 7, ...Array.from({ length: 37 }, (_, i) => 78 + i)];
+// Sourates cibles : par défaut 1-7 + Juz 'Amma ; surchargable via SURAHS=2,3 ou SURAHS=4-5
+function parseSurahs(spec) {
+  return spec.split(',').flatMap((part) => {
+    const [a, b] = part.split('-').map(Number);
+    return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a];
+  });
+}
+const SURAHS = process.env.SURAHS
+  ? parseSurahs(process.env.SURAHS)
+  : [1, 2, 3, 4, 5, 6, 7, ...Array.from({ length: 37 }, (_, i) => 78 + i)];
 
 const SOURCE_URL = (ayah) =>
   `https://api.qurancdn.com/api/qdc/tafsirs/en-tafisr-ibn-kathir/by_ayah/${ayah}`;
