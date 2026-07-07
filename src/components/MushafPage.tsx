@@ -452,14 +452,21 @@ export default function MushafPage({
           box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
           border-radius: 6px;
         }
-        /* Thèmes de tafsir : versets d'un même groupe = même teinte (20 %),
-           alternée entre groupes voisins. Déclarés AVANT les marques de fautes
-           pour que celles-ci l'emportent sur le fond. */
-        .verse-word.theme-a {
-          background-color: rgba(201, 169, 89, 0.2);
+        /* Thèmes de tafsir : versets d'un même groupe = même teinte, palette
+           pastel bien différenciée (façon Mushaf thématique imprimé : saumon,
+           bleu ciel, vert d'eau, sable) en rotation entre groupes voisins.
+           Déclarés AVANT les marques de fautes pour que celles-ci l'emportent. */
+        .verse-word.theme-0 {
+          background-color: rgba(233, 140, 110, 0.32);
         }
-        .verse-word.theme-b {
-          background-color: rgba(122, 139, 62, 0.2);
+        .verse-word.theme-1 {
+          background-color: rgba(110, 165, 220, 0.32);
+        }
+        .verse-word.theme-2 {
+          background-color: rgba(125, 195, 125, 0.34);
+        }
+        .verse-word.theme-3 {
+          background-color: rgba(228, 195, 100, 0.36);
         }
 
         /* Marques de fautes — même technique box-shadow (pas de padding),
@@ -588,7 +595,7 @@ export default function MushafPage({
                       const themeGroup = verseThemes?.[w.verseKey];
                       const classes = ['verse-word'];
                       if (themeGroup !== undefined) {
-                        classes.push(themeGroup % 2 === 0 ? 'theme-a' : 'theme-b');
+                        classes.push(`theme-${themeGroup % 4}`);
                       }
                       if (shouldHide) classes.push('hidden');
                       if (isHighlighted && !mark) classes.push('highlighted');
