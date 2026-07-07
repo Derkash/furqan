@@ -50,10 +50,63 @@ function splitSentences(text: string): string[] {
   return parts.length > 0 ? parts : [text];
 }
 
+// Suites de texte arabe (citations du verset dans le tafsir) : affichées en
+// bloc séparé (retour à la ligne) et en grande police, façon tafsir imprimé.
+const ARABIC_RUN =
+  /((?:[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF﴿﴾][\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF\s.,،؛؟:!()«»\d-]*)?[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF﴿﴾])/;
+
+function isArabicRun(part: string): boolean {
+  return /[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF﴿﴾]/.test(part);
+}
+
+/** Longueur « parlée » d'un texte : l'arabe n'est pas lu par la voix. */
+function spokenLength(text: string): number {
+  return text.replace(new RegExp(ARABIC_RUN.source, 'g'), '').length + 1;
+}
+
+/** Rend un texte en séparant les citations arabes : bloc centré, police ~2x. */
+function renderRich(text: string, keyPrefix: string) {
+  return text.split(new RegExp(ARABIC_RUN.source, 'g')).map((part, i) => {
+    if (!part) return null;
+    if (isArabicRun(part)) {
+      const isLong = part.trim().includes(' ') || part.trim().length > 8;
+      if (isLong) {
+        return (
+          <span
+            key={`${keyPrefix}-${i}`}
+            dir="rtl"
+            className="block text-center my-2 text-[#2d5016]"
+            style={{
+              fontFamily: "'UthmanicHafs', 'Amiri', 'Scheherazade New', serif",
+              fontSize: '2.1em',
+              lineHeight: 1.9,
+            }}
+          >
+            {part.trim()}
+          </span>
+        );
+      }
+      return (
+        <span
+          key={`${keyPrefix}-${i}`}
+          dir="rtl"
+          style={{
+            fontFamily: "'UthmanicHafs', 'Amiri', 'Scheherazade New', serif",
+            fontSize: '1.25em',
+          }}
+        >
+          {part}
+        </span>
+      );
+    }
+    return <span key={`${keyPrefix}-${i}`}>{part}</span>;
+  });
+}
+
 /**
  * Texte dont la phrase en cours de lecture est surlignée et suivie
- * (position estimée proportionnellement aux caractères — la voix vient d'un
- * MP3 serveur sans repères mot à mot).
+ * (position estimée au prorata des caractères FRANÇAIS — l'arabe n'est pas
+ * lu par la voix). Les citations arabes sont rendues en bloc, grande police.
  */
 function KaraokeText({
   text,
@@ -68,7 +121,7 @@ function KaraokeText({
 }) {
   const sentences = useMemo(() => splitSentences(text), [text]);
   const totalLen = useMemo(
-    () => sentences.reduce((sum, x) => sum + x.length + 1, 0),
+    () => sentences.reduce((sum, x) => sum + spokenLength(x), 0),
     [sentences]
   );
 
@@ -77,7 +130,7 @@ function KaraokeText({
     let acc = 0;
     activeIdx = sentences.length - 1;
     for (let i = 0; i < sentences.length; i++) {
-      acc += sentences[i].length + 1;
+      acc += spokenLength(sentences[i]);
       if (progress < acc / totalLen) {
         activeIdx = i;
         break;
@@ -93,7 +146,9 @@ function KaraokeText({
   }, [activeIdx]);
 
   if (!playing) {
-    return <p className={`${className} whitespace-pre-line`}>{text}</p>;
+    return (
+      <p className={`${className} whitespace-pre-line`}>{renderRich(text, 'r')}</p>
+    );
   }
   return (
     <p className={className}>
@@ -107,7 +162,7 @@ function KaraokeText({
               : 'transition-colors'
           }
         >
-          {sentence}{' '}
+          {renderRich(sentence, `k${i}`)}{' '}
         </span>
       ))}
     </p>
