@@ -22,6 +22,7 @@ import {
 } from '@/utils/exercises/userStats';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { useTafsir } from '@/hooks/exercises/useTafsir';
+import { useTafsirGroups } from '@/hooks/exercises/useTafsirGroups';
 import { useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { useSpeech } from '@/hooks/exercises/useSpeech';
@@ -128,6 +129,11 @@ function MushafPractice() {
     if (recTimer.current) clearInterval(recTimer.current);
     recorder.stop();
   };
+
+  // Hifz : surlignage par thème — les versets partageant le même tafsir
+  // Ibn Kathir portent la même teinte (alternée entre groupes voisins).
+  const [showThemes, setShowThemes] = useState(true);
+  const tafsirGroups = useTafsirGroups(isHifz && showThemes);
 
   // Hifz : mode « marquer mes fautes » — taper les mots ratés, puis choisir le type.
   const [markingMode, setMarkingMode] = useState(false);
@@ -509,6 +515,20 @@ function MushafPractice() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              setShowThemes((t) => !t);
+            }}
+            title="Surligner les versets partageant le même tafsir (thèmes)"
+            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
+              showThemes
+                ? 'bg-[#7a8b3e] text-white border-[#7a8b3e] shadow-md'
+                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+            }`}
+          >
+            Thèmes
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               setMarkingMode((m) => {
                 if (!m) setPopover(null);
                 else setSelWords(new Map());
@@ -589,6 +609,7 @@ function MushafPractice() {
           isBlurred={isBlurred}
           maskAll={maskAll}
           wordMarks={hifzWordMarks}
+          verseThemes={isHifz && showThemes ? tafsirGroups : null}
           loading={loading}
           singlePage={singlePage}
           currentPage={singlePage ? displayedPage : undefined}

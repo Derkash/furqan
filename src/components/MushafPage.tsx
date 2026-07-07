@@ -47,6 +47,12 @@ interface MushafPageProps {
    * ou type de faute ('oubli' | 'inversion' | 'harakat' | 'mot'), chacun sa couleur.
    */
   wordMarks?: Map<string, string>;
+  /**
+   * Thèmes de tafsir : verseKey → numéro de groupe. Les versets d'un même
+   * groupe (même tafsir Ibn Kathir) partagent la même teinte (opacité 20 %),
+   * alternée entre groupes voisins.
+   */
+  verseThemes?: Record<string, number> | null;
   frameConfig?: Partial<FrameConfig>;
   /**
    * Niveau de Hifz (0-8). 0 = tout visible, 8 = quasi rien.
@@ -262,6 +268,7 @@ export default function MushafPage({
   maskAll = false,
   loading = false,
   wordMarks,
+  verseThemes,
   frameConfig,
   hifzLevel,
 }: MushafPageProps) {
@@ -445,6 +452,16 @@ export default function MushafPage({
           box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
           border-radius: 6px;
         }
+        /* Thèmes de tafsir : versets d'un même groupe = même teinte (20 %),
+           alternée entre groupes voisins. Déclarés AVANT les marques de fautes
+           pour que celles-ci l'emportent sur le fond. */
+        .verse-word.theme-a {
+          background-color: rgba(201, 169, 89, 0.2);
+        }
+        .verse-word.theme-b {
+          background-color: rgba(122, 139, 62, 0.2);
+        }
+
         /* Marques de fautes — même technique box-shadow (pas de padding),
            une couleur par type. */
         .verse-word.mark-selected {
@@ -568,7 +585,11 @@ export default function MushafPage({
                       const mark = w.isAyahMarker
                         ? undefined
                         : wordMarks?.get(`${w.verseKey}#${w.position}`);
+                      const themeGroup = verseThemes?.[w.verseKey];
                       const classes = ['verse-word'];
+                      if (themeGroup !== undefined) {
+                        classes.push(themeGroup % 2 === 0 ? 'theme-a' : 'theme-b');
+                      }
                       if (shouldHide) classes.push('hidden');
                       if (isHighlighted && !mark) classes.push('highlighted');
                       if (mark) classes.push(`mark-${mark}`);

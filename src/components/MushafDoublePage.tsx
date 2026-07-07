@@ -16,6 +16,8 @@ interface MushafDoublePageProps {
   loading?: boolean;
   /** Marques par mot, clés "verseKey#position" → 'selected' ou type de faute. */
   wordMarks?: Map<string, string>;
+  /** Thèmes de tafsir : verseKey → n° de groupe (teinte partagée par groupe). */
+  verseThemes?: Record<string, number> | null;
   singlePage?: boolean; // Afficher une seule page (la page courante)
   currentPage?: number; // Numéro de la page courante (pour mode singlePage)
   hifzLevel?: number; // Niveau de Hifz (0-8)
@@ -40,6 +42,7 @@ export default function MushafDoublePage({
   maskAll = false,
   loading = false,
   wordMarks,
+  verseThemes,
   singlePage = false,
   currentPage,
   hifzLevel,
@@ -74,6 +77,7 @@ export default function MushafDoublePage({
             isBlurred={isBlurred}
             maskAll={maskAll}
               wordMarks={wordMarks}
+              verseThemes={verseThemes}
             hifzLevel={hifzLevel}
             loading={loading && !pageVerses}
           />
@@ -114,6 +118,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />
@@ -130,6 +135,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
@@ -148,6 +154,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               loading={loading && !rightPageVerses}
             />
@@ -164,6 +171,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               loading={loading && !leftPageVerses}
             />
