@@ -44,6 +44,76 @@ export default function PracticePage() {
 // d'Ibn Kathir (complet). Passer à true pour le réafficher.
 const SHOW_MUKHTASAR = false;
 
+/** Découpe un texte en phrases (pour le suivi de lecture). */
+function splitSentences(text: string): string[] {
+  const parts = text.split(/(?<=[.!?؟…:])\s+|\n+/).filter((x) => x.trim().length > 0);
+  return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Texte dont la phrase en cours de lecture est surlignée et suivie
+ * (position estimée proportionnellement aux caractères — la voix vient d'un
+ * MP3 serveur sans repères mot à mot).
+ */
+function KaraokeText({
+  text,
+  playing,
+  progress,
+  className,
+}: {
+  text: string;
+  playing: boolean;
+  progress: number;
+  className: string;
+}) {
+  const sentences = useMemo(() => splitSentences(text), [text]);
+  const totalLen = useMemo(
+    () => sentences.reduce((sum, x) => sum + x.length + 1, 0),
+    [sentences]
+  );
+
+  let activeIdx = -1;
+  if (playing) {
+    let acc = 0;
+    activeIdx = sentences.length - 1;
+    for (let i = 0; i < sentences.length; i++) {
+      acc += sentences[i].length + 1;
+      if (progress < acc / totalLen) {
+        activeIdx = i;
+        break;
+      }
+    }
+  }
+
+  const activeRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (activeIdx >= 0) {
+      activeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [activeIdx]);
+
+  if (!playing) {
+    return <p className={`${className} whitespace-pre-line`}>{text}</p>;
+  }
+  return (
+    <p className={className}>
+      {sentences.map((sentence, i) => (
+        <span
+          key={i}
+          ref={i === activeIdx ? activeRef : undefined}
+          className={
+            i === activeIdx
+              ? 'bg-[#c9a959]/35 rounded px-0.5 transition-colors'
+              : 'transition-colors'
+          }
+        >
+          {sentence}{' '}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function MushafPractice() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -164,8 +234,8 @@ function MushafPractice() {
   // Traduction Hamidullah (Hifz) : affichée seulement au tap sur un verset, en popover.
   const { translations, loading: translationLoading, load: loadTranslations } = useTranslation();
   const { data: quranUnits } = useQuranUnits();
-  // popover = verset sélectionné + coordonnées du tap (clientX/clientY).
-  const [popover, setPopover] = useState<{ verseKey: string; x: number; y: number } | null>(null);
+  // popover = verset ouvert + côté du panneau (moitié OPPOSÉE à la page du verset).
+  const [popover, setPopover] = useState<{ verseKey: string; side: 'left' | 'right' } | null>(null);
 
   // Tafsir français (Al-Mukhtasar) + sabab an-nuzûl du verset ouvert,
   // avec synthèse vocale française pour chaque section.
@@ -208,12 +278,10 @@ function MushafPractice() {
     } else {
       speech.speak(text);
       setSpeakingSection(section);
+      // Déplie la section pour que le texte suive la voix.
+      setOpenSections((prev) => new Set(prev).add(section));
     }
   };
-  // Position finale (clampée à l'écran), calculée après mesure du popover.
-  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
   // Tap sur un verset (délégation via data-verse) :
   // - mode marquage : sélectionne/désélectionne le MOT touché (faute à déclarer)
   // - sinon : popover de traduction au point cliqué ; tap hors verset → ferme.
@@ -240,33 +308,15 @@ function MushafPractice() {
     if (verseKey) {
       loadTranslations();
       loadAsbab();
-      setPopoverPos(null);
       setOpenSections(new Set());
       setShowAsbabArabic(false);
-      setPopover({ verseKey, x: e.clientX, y: e.clientY });
+      // Page impaire = côté DROIT de l'écran → panneau à GAUCHE, et inversement.
+      const page = Number(el?.getAttribute('data-page'));
+      setPopover({ verseKey, side: page % 2 === 1 ? 'left' : 'right' });
     } else {
       setPopover(null);
     }
   };
-
-  // Place le popover près du point cliqué, en le gardant dans l'écran (clamp + flip vertical).
-  useEffect(() => {
-    if (!popover || !popoverRef.current) return;
-    const rect = popoverRef.current.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const margin = 8;
-    const offset = 14;
-    let left = popover.x - rect.width / 2;
-    left = Math.max(margin, Math.min(left, vw - rect.width - margin));
-    let top = popover.y + offset;
-    if (top + rect.height > vh - margin) {
-      // Déborde en bas → place au-dessus du point cliqué.
-      top = popover.y - offset - rect.height;
-    }
-    top = Math.max(margin, Math.min(top, vh - rect.height - margin));
-    setPopoverPos({ left, top });
-  }, [popover, translations]);
 
   // Initialize exercise
   useEffect(() => {
@@ -810,6 +860,264 @@ function MushafPractice() {
             </button>
           </>
         )}
+
+      {isHifz && popover && (() => {
+        const [sNum, aNum] = popover.verseKey.split(':').map(Number);
+        const chapter = quranUnits?.chapters.find((c) => c.id === sNum);
+        const text = translations?.[popover.verseKey];
+        const asbabTexts = asbab?.[popover.verseKey];
+        // Audio : uniquement la traduction française (l'arabe est là pour info).
+        const asbabFull = asbabTexts?.map((o) => o.fr).join('\n\n') ?? null;
+
+        const speakerButton = (
+          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
+          speakText: string | null | undefined
+        ) =>
+          speakText ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSpeak(section, speakText);
+              }}
+              aria-label="Écouter cette section"
+              className={`flex-none w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition ${
+                (speech.speaking || speech.loading) && speakingSection === section
+                  ? 'bg-[#2d5016] text-[#fdfaf3]'
+                  : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+              }`}
+            >
+              {speech.loading && speakingSection === section ? (
+                <span className="w-4 h-4 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
+              ) : speech.speaking && speakingSection === section ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              ) : (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                  <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+          ) : null;
+
+        const sectionHeader = (
+          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
+          title: string,
+          speakText: string | null | undefined
+        ) => (
+          <div className="flex items-center justify-between gap-1 py-1.5">
+            <span className="text-[12px] font-bold uppercase tracking-widest text-[#c9a959]">
+              {title}
+            </span>
+            {speakerButton(section, speakText)}
+          </div>
+        );
+
+        // Lien « Voir plus / Réduire » sous les textes longs.
+        const seeMore = (section: string, contentLength: number) =>
+          contentLength > 200 ? (
+            <button
+              type="button"
+              onClick={() => toggleSection(section)}
+              className="text-[13px] font-semibold text-[#4a7c23] underline mb-1.5"
+            >
+              {openSections.has(section) ? 'Réduire' : 'Voir plus'}
+            </button>
+          ) : null;
+
+        const isPlaying = (section: string) =>
+          speech.speaking && speakingSection === section;
+
+        return (
+          <div
+            dir="ltr"
+            onClick={(e) => e.stopPropagation()}
+            className={`absolute inset-y-0 z-30 w-1/2 bg-[#fdfaf3]/[0.98] backdrop-blur overflow-y-auto overscroll-contain shadow-[0_0_40px_rgba(45,80,22,0.3)] ${
+              popover.side === 'left'
+                ? 'left-0 border-r-2 border-[#c9a959]'
+                : 'right-0 border-l-2 border-[#c9a959]'
+            }`}
+          >
+            <div className="px-5 pt-3 pb-8 max-w-xl mx-auto">
+              {/* Entête : référence du verset + fermeture */}
+              <div className="sticky top-0 -mx-5 px-5 py-2 bg-[#fdfaf3]/95 backdrop-blur z-10 flex items-center justify-between gap-2 border-b border-[#c9a959]/30 mb-2">
+                <div className="text-lg font-bold text-[#2d5016] flex items-center gap-2 flex-wrap min-w-0">
+                  <span>
+                    {sNum}:{aNum}
+                    {chapter ? ` · ${chapter.name_simple}` : ''}
+                  </span>
+                  {chapter && (
+                    <span
+                      className="text-[#7a8b3e]"
+                      dir="rtl"
+                      style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
+                    >
+                      {chapter.name_arabic}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Fermer"
+                  onClick={() => setPopover(null)}
+                  className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 active:scale-95 transition"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Section 1 : traduction Hamidullah */}
+              {sectionHeader('translation', 'Traduction — Hamidullah', text)}
+              {text ? (
+                <div
+                  onClick={() => !openSections.has('translation') && toggleSection('translation')}
+                  className={
+                    openSections.has('translation') || isPlaying('translation')
+                      ? ''
+                      : 'line-clamp-3 cursor-pointer'
+                  }
+                >
+                  <KaraokeText
+                    text={text}
+                    playing={isPlaying('translation')}
+                    progress={speech.progress}
+                    className="text-[17px] leading-relaxed text-[#1a1a1a] pb-1"
+                  />
+                </div>
+              ) : (
+                <p className="text-[15px] text-gray-400 pb-1">
+                  {translationLoading ? 'Chargement de la traduction…' : 'Traduction indisponible.'}
+                </p>
+              )}
+              {seeMore('translation', text?.length ?? 0)}
+
+              {/* Section 2 : tafsir Ibn Kathir (complet, EN→FR par IA) */}
+              <div className="border-t border-[#c9a959]/30 mt-2" />
+              {sectionHeader('ibnkathir', 'Tafsir — Ibn Kathir', ibnKathir.text)}
+              {ibnKathir.text ? (
+                <>
+                  <p className="text-[11px] font-semibold text-red-600 mb-1.5">
+                    Traduit de l&apos;anglais (abrégé) au français par l&apos;IA.
+                  </p>
+                  <div
+                    onClick={() => !openSections.has('ibnkathir') && toggleSection('ibnkathir')}
+                    className={
+                      openSections.has('ibnkathir') || isPlaying('ibnkathir')
+                        ? ''
+                        : 'line-clamp-3 cursor-pointer'
+                    }
+                  >
+                    <KaraokeText
+                      text={ibnKathir.text}
+                      playing={isPlaying('ibnkathir')}
+                      progress={speech.progress}
+                      className="text-[16px] leading-relaxed text-[#1a1a1a] pb-1"
+                    />
+                  </div>
+                  {seeMore('ibnkathir', ibnKathir.text.length)}
+                </>
+              ) : (
+                <p className="text-[15px] text-gray-400 pb-1">
+                  {ibnKathir.loading
+                    ? 'Chargement du tafsir… (la première consultation d’un verset peut prendre ~10 s)'
+                    : 'Tafsir indisponible pour ce verset.'}
+                </p>
+              )}
+
+              {/* Section Al-Mukhtasar (masquée — SHOW_MUKHTASAR pour réactiver) */}
+              {SHOW_MUKHTASAR && (
+                <>
+                  <div className="border-t border-[#c9a959]/30 mt-2" />
+                  {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
+                  <KaraokeText
+                    text={tafsir.text ?? ''}
+                    playing={isPlaying('tafsir')}
+                    progress={speech.progress}
+                    className="text-[16px] leading-relaxed text-[#1a1a1a] pb-1"
+                  />
+                </>
+              )}
+
+              {/* Section 3 : sabab an-nuzûl (occasions authentifiées) */}
+              <div className="border-t border-[#c9a959]/30 mt-2" />
+              {sectionHeader('asbab', 'Sabab an-Nuzûl — authentifié', asbabFull)}
+              {asbabTexts && asbabTexts.length > 0 && asbabFull ? (
+                <>
+                  <p className="text-[11px] font-semibold text-red-600 mb-1.5">
+                    Traduit de l&apos;arabe au français par l&apos;IA — en cas de doute,
+                    référez-vous au texte original ci-dessous.
+                  </p>
+                  <div
+                    onClick={() => !openSections.has('asbab') && toggleSection('asbab')}
+                    className={
+                      openSections.has('asbab') || isPlaying('asbab')
+                        ? ''
+                        : 'line-clamp-3 cursor-pointer'
+                    }
+                  >
+                    {isPlaying('asbab') ? (
+                      <KaraokeText
+                        text={asbabFull}
+                        playing
+                        progress={speech.progress}
+                        className="text-[16px] leading-relaxed text-[#1a1a1a] pb-1"
+                      />
+                    ) : (
+                      <div className="space-y-2 pb-1">
+                        {asbabTexts.map((occasion, i) => (
+                          <p key={i} className="text-[16px] leading-relaxed text-[#1a1a1a] whitespace-pre-line">
+                            {asbabTexts.length > 1 && (
+                              <span className="font-bold text-[#7a5d2c]">
+                                Récit {toArabicNumbers(i + 1)} —{' '}
+                              </span>
+                            )}
+                            {occasion.fr}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {seeMore('asbab', asbabFull.length)}
+
+                  {/* Texte arabe original : pour info, à la demande, hors audio */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAsbabArabic((v) => !v)}
+                    className="mt-1 mb-1 text-[13px] font-semibold text-[#7a5d2c] bg-[#c9a959]/15 border border-[#c9a959]/30 rounded-full px-3 py-1.5 active:scale-95 transition"
+                  >
+                    {showAsbabArabic ? 'Masquer le texte original (arabe)' : 'Texte original (arabe)'}
+                  </button>
+                  {showAsbabArabic && (
+                    <div className="space-y-2 pb-1 border-t border-[#c9a959]/20 pt-2">
+                      {asbabTexts.map((occasion, i) => (
+                        <p
+                          key={i}
+                          dir="rtl"
+                          className="text-[18px] leading-loose text-[#1a1a1a] whitespace-pre-line"
+                          style={{ fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif" }}
+                        >
+                          {occasion.ar}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-[15px] text-gray-400 pb-1">
+                  {asbabLoading
+                    ? 'Chargement…'
+                    : 'Aucun sabab an-nuzûl authentifié rapporté pour ce verset.'}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       </div>
 
       {/* Question de fin de tour : « Avez-vous trouvé ? » (exercices de quiz) */}
@@ -841,236 +1149,6 @@ function MushafPractice() {
       )}
 
       {/* Popover de traduction Hamidullah, positionné au point cliqué (Hifz uniquement) */}
-      {isHifz && popover && (() => {
-        const [sNum, aNum] = popover.verseKey.split(':').map(Number);
-        const chapter = quranUnits?.chapters.find((c) => c.id === sNum);
-        const text = translations?.[popover.verseKey];
-        const asbabTexts = asbab?.[popover.verseKey];
-        // Audio : uniquement la traduction française (l'arabe est là pour info).
-        const asbabFull = asbabTexts?.map((o) => o.fr).join('\n\n') ?? null;
-
-        const speakerButton = (
-          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
-          speakText: string | null | undefined
-        ) =>
-          speakText ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleSpeak(section, speakText);
-              }}
-              aria-label="Écouter cette section"
-              className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition ${
-                (speech.speaking || speech.loading) && speakingSection === section
-                  ? 'bg-[#2d5016] text-[#fdfaf3]'
-                  : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
-              }`}
-            >
-              {speech.loading && speakingSection === section ? (
-                <span className="w-3.5 h-3.5 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
-              ) : speech.speaking && speakingSection === section ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M3 9v6h4l5 5V4L7 9H3z" />
-                  <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              )}
-            </button>
-          ) : null;
-
-        const sectionHeader = (
-          section: 'translation' | 'tafsir' | 'ibnkathir' | 'asbab',
-          title: string,
-          speakText: string | null | undefined
-        ) => (
-          <div className="flex items-center justify-between gap-1 py-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
-              {title}
-            </span>
-            {speakerButton(section, speakText)}
-          </div>
-        );
-
-        // Lien « Voir plus / Réduire » sous les textes longs.
-        const seeMore = (section: string, contentLength: number) =>
-          contentLength > 140 ? (
-            <button
-              type="button"
-              onClick={() => toggleSection(section)}
-              className="text-[11px] font-semibold text-[#4a7c23] underline mb-1"
-            >
-              {openSections.has(section) ? 'Réduire' : 'Voir plus'}
-            </button>
-          ) : null;
-
-        return (
-          <div
-            ref={popoverRef}
-            dir="ltr"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              left: popoverPos ? popoverPos.left : popover.x,
-              top: popoverPos ? popoverPos.top : popover.y,
-              visibility: popoverPos ? 'visible' : 'hidden',
-            }}
-            className="fixed z-40 w-[min(90vw,380px)] max-h-[65vh] overflow-y-auto overscroll-contain bg-[#fdfaf3] border-2 border-[#c9a959] shadow-[0_8px_28px_rgba(45,80,22,0.28)] rounded-xl"
-          >
-            <div className="px-3.5 pt-2.5 pb-3">
-              {/* Entête : référence du verset + fermeture */}
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <div className="text-sm font-bold text-[#2d5016] flex items-center gap-2 flex-wrap min-w-0">
-                  <span>
-                    {sNum}:{aNum}
-                    {chapter ? ` · ${chapter.name_simple}` : ''}
-                  </span>
-                  {chapter && (
-                    <span
-                      className="text-[#7a8b3e]"
-                      dir="rtl"
-                      style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
-                    >
-                      {chapter.name_arabic}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  aria-label="Fermer"
-                  onClick={() => setPopover(null)}
-                  className="flex-none w-7 h-7 rounded-full flex items-center justify-center bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 active:scale-95 transition"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Section 1 : traduction Hamidullah */}
-              {sectionHeader('translation', 'Traduction — Hamidullah', text)}
-              <p
-                onClick={() => !openSections.has('translation') && toggleSection('translation')}
-                className={`text-[14px] leading-relaxed text-[#1a1a1a] pb-0.5 ${
-                  openSections.has('translation') ? '' : 'line-clamp-3 cursor-pointer'
-                }`}
-              >
-                {text
-                  ? text
-                  : translationLoading
-                    ? 'Chargement de la traduction…'
-                    : 'Traduction indisponible pour ce verset.'}
-              </p>
-              {seeMore('translation', text?.length ?? 0)}
-
-              {/* Section 2 : tafsir Ibn Kathir (complet, EN→FR par IA) */}
-              <div className="border-t border-[#c9a959]/30 mt-1" />
-              {sectionHeader('ibnkathir', 'Tafsir — Ibn Kathir', ibnKathir.text)}
-              {ibnKathir.text && (
-                <p className="text-[10px] font-semibold text-red-600 mb-1">
-                  Traduit de l&apos;anglais (abrégé) au français par l&apos;IA.
-                </p>
-              )}
-              <p
-                onClick={() => !openSections.has('ibnkathir') && toggleSection('ibnkathir')}
-                className={`text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line pb-0.5 ${
-                  openSections.has('ibnkathir') ? '' : 'line-clamp-3 cursor-pointer'
-                }`}
-              >
-                {ibnKathir.text
-                  ? ibnKathir.text
-                  : ibnKathir.loading
-                    ? 'Chargement du tafsir… (la première consultation d’un verset peut prendre ~10 s)'
-                    : 'Tafsir indisponible pour ce verset.'}
-              </p>
-              {seeMore('ibnkathir', ibnKathir.text?.length ?? 0)}
-
-              {/* Section Al-Mukhtasar (masquée — SHOW_MUKHTASAR pour réactiver) */}
-              {SHOW_MUKHTASAR && (
-                <>
-                  <div className="border-t border-[#c9a959]/30 mt-1" />
-                  {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
-                  <p
-                    onClick={() => !openSections.has('tafsir') && toggleSection('tafsir')}
-                    className={`text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line pb-0.5 ${
-                      openSections.has('tafsir') ? '' : 'line-clamp-3 cursor-pointer'
-                    }`}
-                  >
-                    {tafsir.text
-                      ? tafsir.text
-                      : tafsir.loading
-                        ? 'Chargement du tafsir…'
-                        : 'Tafsir indisponible pour ce verset.'}
-                  </p>
-                  {seeMore('tafsir', tafsir.text?.length ?? 0)}
-                </>
-              )}
-
-              {/* Section 3 : sabab an-nuzûl (occasions authentifiées) */}
-              <div className="border-t border-[#c9a959]/30 mt-1" />
-              {sectionHeader('asbab', 'Sabab an-Nuzûl — authentifié', asbabFull)}
-              {asbabTexts && asbabTexts.length > 0 ? (
-                <>
-                  <p className="text-[10px] font-semibold text-red-600 mb-1">
-                    Traduit de l&apos;arabe au français par l&apos;IA — en cas de doute,
-                    référez-vous au texte original ci-dessous.
-                  </p>
-                  <div
-                    onClick={() => !openSections.has('asbab') && toggleSection('asbab')}
-                    className={`space-y-2 pb-0.5 ${
-                      openSections.has('asbab') ? '' : 'line-clamp-3 cursor-pointer'
-                    }`}
-                  >
-                    {asbabTexts.map((occasion, i) => (
-                      <p key={i} className="text-[13px] leading-relaxed text-[#1a1a1a] whitespace-pre-line">
-                        {asbabTexts.length > 1 && (
-                          <span className="font-bold text-[#7a5d2c]">
-                            Récit {toArabicNumbers(i + 1)} —{' '}
-                          </span>
-                        )}
-                        {occasion.fr}
-                      </p>
-                    ))}
-                  </div>
-                  {seeMore('asbab', asbabFull?.length ?? 0)}
-
-                  {/* Texte arabe original : pour info, à la demande, hors audio */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAsbabArabic((v) => !v)}
-                    className="mt-1 mb-1 text-[11px] font-semibold text-[#7a5d2c] bg-[#c9a959]/15 border border-[#c9a959]/30 rounded-full px-2.5 py-1 active:scale-95 transition"
-                  >
-                    {showAsbabArabic ? 'Masquer le texte original (arabe)' : 'Texte original (arabe)'}
-                  </button>
-                  {showAsbabArabic && (
-                    <div className="space-y-2 pb-1 border-t border-[#c9a959]/20 pt-2">
-                      {asbabTexts.map((occasion, i) => (
-                        <p
-                          key={i}
-                          dir="rtl"
-                          className="text-[15px] leading-loose text-[#1a1a1a] whitespace-pre-line"
-                          style={{ fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif" }}
-                        >
-                          {occasion.ar}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-[13px] leading-relaxed text-gray-400 pb-1">
-                  {asbabLoading
-                    ? 'Chargement…'
-                    : 'Aucun sabab an-nuzûl authentifié rapporté pour ce verset.'}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

@@ -8,7 +8,9 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const VOICE = 'fr-FR-DeniseNeural';
+// Voix masculine demandée par l'utilisateur ; Rémy (multilingue) est la plus
+// naturelle, Henri en secours si indisponible.
+const VOICES = ['fr-FR-RemyMultilingualNeural', 'fr-FR-HenriNeural'];
 const MAX_CHARS = 6000;
 
 /** Nettoie le texte pour la voix française : retire l'écriture arabe,
@@ -36,16 +38,25 @@ export async function POST(req: NextRequest) {
   if (!clean) return new Response('Texte vide après nettoyage', { status: 400 });
 
   try {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata(VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(clean);
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of audioStream) {
-      chunks.push(chunk as Buffer);
+    let audio: Buffer | null = null;
+    for (const voice of VOICES) {
+      try {
+        const tts = new MsEdgeTTS();
+        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+        const { audioStream } = tts.toStream(clean);
+        const chunks: Buffer[] = [];
+        for await (const chunk of audioStream) {
+          chunks.push(chunk as Buffer);
+        }
+        if (chunks.length > 0) {
+          audio = Buffer.concat(chunks);
+          break;
+        }
+      } catch {
+        // voix indisponible → suivante
+      }
     }
-    const audio = Buffer.concat(chunks);
-    if (audio.length === 0) throw new Error('audio vide');
+    if (!audio || audio.length === 0) throw new Error('audio vide');
 
     return new Response(new Uint8Array(audio), {
       headers: {

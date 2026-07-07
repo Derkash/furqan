@@ -25,7 +25,6 @@ function loadGroups(): Promise<GroupsMap | null> {
 export function useTafsirGroups(enabled: boolean) {
   const [groups, setGroups] = useState<GroupsMap | null>(null);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -36,7 +35,6 @@ export function useTafsirGroups(enabled: boolean) {
       cancelled = true;
     };
   }, [enabled]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   return groups;
 }

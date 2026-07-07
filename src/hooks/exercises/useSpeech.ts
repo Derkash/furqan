@@ -13,6 +13,8 @@ const audioCache = new Map<string, string>();
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Progression de la lecture (0..1) — permet au texte de suivre la voix.
+  const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Jeton de requête : une demande plus récente annule l'effet des anciennes.
   const requestIdRef = useRef(0);
@@ -25,6 +27,7 @@ export function useSpeech() {
     }
     setSpeaking(false);
     setLoading(false);
+    setProgress(0);
   }, []);
 
   const speak = useCallback(async (text: string) => {
@@ -61,6 +64,9 @@ export function useSpeech() {
     audio.src = url;
     audio.onended = () => setSpeaking(false);
     audio.onerror = () => setSpeaking(false);
+    audio.ontimeupdate = () => {
+      setProgress(audio.duration ? audio.currentTime / audio.duration : 0);
+    };
     try {
       await audio.play();
       if (requestId === requestIdRef.current) setSpeaking(true);
@@ -78,5 +84,5 @@ export function useSpeech() {
     };
   }, []);
 
-  return { supported: true, speaking, loading, speak, stop };
+  return { supported: true, speaking, loading, progress, speak, stop };
 }
