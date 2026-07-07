@@ -4,6 +4,40 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Cache des audios déjà synthétisés (par texte) : la réécoute est instantanée.
 const audioCache = new Map<string, string>();
+// Requêtes en cours (dédupliquées) : un même texte n'est jamais synthétisé deux fois.
+const pending = new Map<string, Promise<string | null>>();
+
+/** Récupère (ou synthétise) l'audio d'un texte, avec cache et déduplication. */
+function fetchTTS(text: string): Promise<string | null> {
+  const cached = audioCache.get(text);
+  if (cached) return Promise.resolve(cached);
+  if (!pending.has(text)) {
+    pending.set(
+      text,
+      fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
+          const url = URL.createObjectURL(await res.blob());
+          audioCache.set(text, url);
+          return url;
+        })
+        .catch(() => null)
+        .finally(() => {
+          pending.delete(text);
+        })
+    );
+  }
+  return pending.get(text)!;
+}
+
+/** Précharge l'audio d'un texte en tâche de fond (sans le jouer). */
+export function prefetchSpeech(text: string | null | undefined) {
+  if (text) void fetchTTS(text);
+}
 
 /**
  * Lecture vocale française de qualité : le texte est synthétisé côté serveur
@@ -35,25 +69,13 @@ export function useSpeech() {
     if (audioRef.current) audioRef.current.pause();
     setSpeaking(false);
 
-    let url = audioCache.get(text);
+    let url = audioCache.get(text) ?? null;
     if (!url) {
       setLoading(true);
-      try {
-        const res = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-        });
-        if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
-        const blob = await res.blob();
-        url = URL.createObjectURL(blob);
-        audioCache.set(text, url);
-      } catch {
-        if (requestId === requestIdRef.current) setLoading(false);
-        return;
-      }
+      url = await fetchTTS(text);
       if (requestId !== requestIdRef.current) return; // annulé entre-temps
       setLoading(false);
+      if (!url) return;
     }
 
     if (!audioRef.current && typeof window !== 'undefined') {

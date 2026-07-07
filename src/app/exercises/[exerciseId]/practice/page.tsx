@@ -25,7 +25,7 @@ import { useTafsir } from '@/hooks/exercises/useTafsir';
 import { useTafsirGroups } from '@/hooks/exercises/useTafsirGroups';
 import { useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { useAsbab } from '@/hooks/exercises/useAsbab';
-import { useSpeech } from '@/hooks/exercises/useSpeech';
+import { prefetchSpeech, useSpeech } from '@/hooks/exercises/useSpeech';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -253,6 +253,36 @@ function MushafPractice() {
   useEffect(() => {
     speechStopRef.current();
   }, [popover?.verseKey]);
+
+  // Préchargement audio (Hifz) — l'utilisateur trouvait la synthèse trop
+  // longue au clic :
+  // 1. dès l'arrivée sur une double page, les audios des TRADUCTIONS de ses
+  //    versets sont synthétisés en tâche de fond (textes courts) ;
+  // 2. dès l'ouverture du panneau d'un verset, ses trois sections (traduction,
+  //    tafsir, sabab) sont préchargées — le bouton lecture devient instantané.
+  useEffect(() => {
+    if (isHifz) loadTranslations();
+  }, [isHifz, loadTranslations]);
+
+  useEffect(() => {
+    if (!isHifz || !translations) return;
+    const verses = [
+      ...(rightPageVerses?.verses ?? []),
+      ...(leftPageVerses?.verses ?? []),
+    ];
+    // Étalé dans le temps pour ne pas saturer le serveur au feuilletage.
+    const timers = verses.slice(0, 40).map((v, i) =>
+      setTimeout(() => prefetchSpeech(translations[v.verseKey]), i * 400)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [isHifz, translations, leftPageVerses, rightPageVerses]);
+
+  useEffect(() => {
+    if (!isHifz || !popover) return;
+    prefetchSpeech(translations?.[popover.verseKey]);
+    prefetchSpeech(ibnKathir.text);
+    prefetchSpeech(asbab?.[popover.verseKey]?.map((o) => o.fr).join('\n\n'));
+  }, [isHifz, popover, translations, ibnKathir.text, asbab]);
 
   // Sections « développées » du popover : par défaut chaque section montre un
   // aperçu (3 lignes) + « Voir plus » — un clic affiche tout. L'audio se lance
