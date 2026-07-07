@@ -270,9 +270,9 @@ function MushafPractice() {
       ...(rightPageVerses?.verses ?? []),
       ...(leftPageVerses?.verses ?? []),
     ];
-    // Étalé dans le temps pour ne pas saturer le serveur au feuilletage.
-    const timers = verses.slice(0, 40).map((v, i) =>
-      setTimeout(() => prefetchSpeech(translations[v.verseKey]), i * 400)
+    // Étalé dans le temps pour ne pas concurrencer une lecture demandée au clic.
+    const timers = verses.slice(0, 24).map((v, i) =>
+      setTimeout(() => prefetchSpeech(translations[v.verseKey]), 1500 + i * 800)
     );
     return () => timers.forEach(clearTimeout);
   }, [isHifz, translations, leftPageVerses, rightPageVerses]);

@@ -8,9 +8,10 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Voix masculine demandée par l'utilisateur ; Rémy (multilingue) est la plus
-// naturelle, Henri en secours si indisponible.
-const VOICES = ['fr-FR-RemyMultilingualNeural', 'fr-FR-HenriNeural'];
+// Voix masculine : Henri (neurale standard — rapide). Rémy « Multilingual »
+// était plus naturelle mais 2-4x plus lente à synthétiser (modèle lourd),
+// ce qui rendait l'attente pénible.
+const VOICES = ['fr-FR-HenriNeural', 'fr-FR-RemyMultilingualNeural'];
 const MAX_CHARS = 6000;
 
 /** Nettoie le texte pour la voix française : retire l'écriture arabe,
