@@ -78,7 +78,7 @@ function renderRich(text: string, keyPrefix: string) {
             className="block text-center my-2 text-[#2d5016]"
             style={{
               fontFamily: "'UthmanicHafs', 'Amiri', 'Scheherazade New', serif",
-              fontSize: '2.1em',
+              fontSize: '4em',
               lineHeight: 1.9,
             }}
           >
@@ -92,7 +92,7 @@ function renderRich(text: string, keyPrefix: string) {
           dir="rtl"
           style={{
             fontFamily: "'UthmanicHafs', 'Amiri', 'Scheherazade New', serif",
-            fontSize: '1.25em',
+            fontSize: '1.5em',
           }}
         >
           {part}
