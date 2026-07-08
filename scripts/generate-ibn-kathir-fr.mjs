@@ -165,6 +165,12 @@ async function main() {
           writeJson(surah, n, { ref: `${surah}/${first}` });
         }
       }
+      // Certains versets n'ont PAS d'entrée propre : l'API renvoie le groupe
+      // PRÉCÉDENT sans les inclure (ex. 20:32 → groupe 20:22-31). On les fait
+      // pointer sur ce groupe, sinon leur fichier ne serait jamais écrit.
+      if (!group.includes(ayah)) {
+        writeJson(surah, ayah, { ref: `${surah}/${first}` });
+      }
       done++;
       if (done % 10 === 0) console.log(`  … ${verseKey} ok (${done} groupes)`);
       ayah = Math.max(...group, ayah) + 1;

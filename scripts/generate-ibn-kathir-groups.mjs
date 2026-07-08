@@ -29,8 +29,10 @@ for (let surah = 1; surah <= 114; surah++) {
     if (key in result) continue; // déjà couvert par un groupe précédent
     const data = JSON.parse(fs.readFileSync(path.join(dir, `${ayah}.json`), 'utf8'));
     if (data.ref) {
-      // Fichier de renvoi rencontré avant son groupe (ne devrait pas arriver
-      // avec le tri croissant) : on le rattache au groupe du fichier référencé.
+      // Renvoi vers un groupe précédent (verset sans entrée propre) :
+      // il rejoint le groupe du verset référencé.
+      const refKey = data.ref.replace('/', ':');
+      if (result[refKey]) result[key] = result[refKey];
       continue;
     }
     groupId++;
