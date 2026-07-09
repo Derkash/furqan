@@ -21,6 +21,7 @@ interface MushafDoublePageProps {
   singlePage?: boolean; // Afficher une seule page (la page courante)
   currentPage?: number; // Numéro de la page courante (pour mode singlePage)
   hifzLevel?: number; // Niveau de Hifz (0-8)
+  revealFraction?: number; // Fraction du verset révélée en sixièmes (1-6)
   onTap: () => void;
 }
 
@@ -46,6 +47,7 @@ export default function MushafDoublePage({
   singlePage = false,
   currentPage,
   hifzLevel,
+  revealFraction,
   onTap,
 }: MushafDoublePageProps) {
   const isLandscape = orientation === 'landscape';
@@ -79,6 +81,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               verseThemes={verseThemes}
             hifzLevel={hifzLevel}
+            revealFraction={revealFraction}
             loading={loading && !pageVerses}
           />
         </div>
@@ -120,6 +123,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
+              revealFraction={revealFraction}
               loading={loading && !leftPageVerses}
             />
           </div>
@@ -137,6 +141,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
+              revealFraction={revealFraction}
               loading={loading && !rightPageVerses}
             />
           </div>
@@ -156,6 +161,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
+              revealFraction={revealFraction}
               loading={loading && !rightPageVerses}
             />
           </div>
@@ -173,6 +179,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
+              revealFraction={revealFraction}
               loading={loading && !leftPageVerses}
             />
           </div>

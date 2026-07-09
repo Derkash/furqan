@@ -14,8 +14,11 @@ export type ExerciseId =
 // EXERCISE ENUMS
 // ============================================
 
-/** Position du verset sur la page */
-export type VersePositionType = 'first' | 'middle' | 'last' | 'random';
+/** Position du verset sur la page ('previous' = le verset juste avant celui identifié) */
+export type VersePositionType = 'first' | 'middle' | 'last' | 'random' | 'previous';
+
+/** Mode de réponse aux questions du quiz : taper l'écran ou réciter au micro. */
+export type AnswerMode = 'tap' | 'recite';
 
 /** Direction de progression */
 export type ProgressionDirection = 'forward' | 'backward' | 'random';
@@ -69,6 +72,10 @@ export interface ExerciseStepUI {
   singlePage?: boolean;
   /** Niveau Hifz par défaut (0-8). */
   hifzLevel?: number;
+  /** Fraction du verset révélée en sixièmes (1-6). Absent ou 6 = verset complet. */
+  revealFraction?: number;
+  /** Si true, l'étape attend une récitation au micro avant de révéler. */
+  awaitsRecitation?: boolean;
 }
 
 export interface ExerciseStep {
@@ -123,8 +130,14 @@ export interface ExerciseConfig extends QuizConfig {
   maxRounds?: number;
   /** Quiz audio : position du verset joué à l'audio à identifier. */
   identifyPosition?: VersePositionType;
-  /** Quiz audio : positions à révéler ensuite (sans audio), ordre premier→milieu→dernier. */
+  /** Quiz audio : positions à révéler ensuite (sans audio), ordre précédent→premier→milieu→dernier. */
   revealAfter?: VersePositionType[];
+  /** Quiz audio : durée max (en secondes) de l'extrait audio de la question. Absent/0 = verset complet. */
+  audioSeconds?: number;
+  /** Quiz audio : fraction du verset révélée en sixièmes (1-6). Absent ou 6 = complet. */
+  revealFraction?: number;
+  /** Quiz audio : mode de réponse aux questions (taper l'écran ou réciter au micro). */
+  answerMode?: AnswerMode;
   /** Séquentiel : positions de versets à afficher, ordre premier→milieu→dernier. */
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression dans la plage. */

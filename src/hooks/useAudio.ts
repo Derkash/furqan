@@ -5,7 +5,8 @@ import type { AudioState, VersePosition } from '@/types';
 import { getAudioUrl } from '@/utils/ayahMapping';
 
 interface UseAudioReturn extends AudioState {
-  play: (verse: VersePosition) => Promise<void>;
+  /** Joue le verset ; `maxSeconds` coupe l'extrait après N secondes (absent/0 = complet). */
+  play: (verse: VersePosition, maxSeconds?: number) => Promise<void>;
   pause: () => void;
   stop: () => void;
 }
@@ -22,6 +23,15 @@ export function useAudio(): UseAudioReturn {
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Minuteur de coupure quand on ne joue qu'un extrait (durée de question limitée).
+  const cutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCutTimer = () => {
+    if (cutTimerRef.current) {
+      clearTimeout(cutTimerRef.current);
+      cutTimerRef.current = null;
+    }
+  };
 
   // Initialiser l'élément audio
   useEffect(() => {
@@ -46,6 +56,7 @@ export function useAudio(): UseAudioReturn {
     }
 
     return () => {
+      clearCutTimer();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -53,10 +64,11 @@ export function useAudio(): UseAudioReturn {
     };
   }, []);
 
-  const play = useCallback(async (verse: VersePosition) => {
+  const play = useCallback(async (verse: VersePosition, maxSeconds?: number) => {
     if (!audioRef.current) return;
 
     try {
+      clearCutTimer();
       setState((prev) => ({
         ...prev,
         isLoading: true,
@@ -68,6 +80,13 @@ export function useAudio(): UseAudioReturn {
       audioRef.current.src = audioUrl;
 
       await audioRef.current.play();
+
+      if (maxSeconds && maxSeconds > 0) {
+        cutTimerRef.current = setTimeout(() => {
+          audioRef.current?.pause();
+          setState((prev) => ({ ...prev, isPlaying: false }));
+        }, maxSeconds * 1000);
+      }
 
       setState((prev) => ({
         ...prev,
@@ -85,6 +104,7 @@ export function useAudio(): UseAudioReturn {
   }, []);
 
   const pause = useCallback(() => {
+    clearCutTimer();
     if (audioRef.current) {
       audioRef.current.pause();
       setState((prev) => ({
@@ -95,6 +115,7 @@ export function useAudio(): UseAudioReturn {
   }, []);
 
   const stop = useCallback(() => {
+    clearCutTimer();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;

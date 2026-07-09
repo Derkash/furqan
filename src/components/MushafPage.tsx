@@ -59,6 +59,11 @@ interface MushafPageProps {
    * Lorsque défini, override le masquage par verset (maskAll est ignoré pour les mots non-marker).
    */
   hifzLevel?: number;
+  /**
+   * Fraction du verset révélée en sixièmes (1-6) pour les versets visibles :
+   * seuls les premiers ⌈k/6 × longueur⌉ mots sont montrés. Absent ou 6 = complet.
+   */
+  revealFraction?: number;
 }
 
 /**
@@ -271,6 +276,7 @@ export default function MushafPage({
   verseThemes,
   frameConfig,
   hifzLevel,
+  revealFraction,
 }: MushafPageProps) {
   const config: FrameConfig = { ...DEFAULT_FRAME, ...(frameConfig ?? {}) };
   const [data, setData] = useState<PageData | null>(null);
@@ -323,6 +329,26 @@ export default function MushafPage({
     }
     return result;
   }, [data, hifzLevel, pageNumber]);
+
+  // Révélation partielle : position max à montrer par verset (⌈k/6 × longueur⌉).
+  // Les positions de mots sont globales au verset, donc le calcul reste correct
+  // même si le verset déborde sur la page voisine.
+  const fractionCutoff = useMemo(() => {
+    if (!data || !revealFraction || revealFraction <= 0 || revealFraction >= 6) return null;
+    const maxPos = new Map<string, number>();
+    for (const line of data.lines) {
+      if (line.type !== 'content' || !line.words) continue;
+      for (const w of line.words) {
+        if (w.isAyahMarker) continue;
+        if ((maxPos.get(w.verseKey) ?? 0) < w.position) maxPos.set(w.verseKey, w.position);
+      }
+    }
+    const cutoff = new Map<string, number>();
+    for (const [verseKey, len] of maxPos) {
+      cutoff.set(verseKey, Math.max(1, Math.ceil((revealFraction / 6) * len)));
+    }
+    return cutoff;
+  }, [data, revealFraction]);
 
   useEffect(() => {
     ensureFontLoaded(fontFamily);
@@ -582,11 +608,19 @@ export default function MushafPage({
                   >
                     {(line.words ?? []).map((w, i) => {
                       const verseMaskHide = maskAll && !visibleVerses.has(w.verseKey) && !w.isAyahMarker;
+                      // Révélation partielle : au-delà de la fraction choisie, le mot reste masqué.
+                      const fractionHide =
+                        !verseMaskHide &&
+                        maskAll &&
+                        !w.isAyahMarker &&
+                        fractionCutoff !== null &&
+                        visibleVerses.has(w.verseKey) &&
+                        w.position > (fractionCutoff.get(w.verseKey) ?? Infinity);
                       const hifzHide =
                         hifzHidden && !w.isAyahMarker
                           ? hifzHidden.get(w.verseKey)?.has(w.position) ?? false
                           : false;
-                      const shouldHide = verseMaskHide || hifzHide;
+                      const shouldHide = verseMaskHide || hifzHide || fractionHide;
                       const isHighlighted =
                         highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
                       const mark = w.isAyahMarker

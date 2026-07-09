@@ -182,6 +182,10 @@ function MushafPractice() {
   const showParam = searchParams.get('show');
   const dirParam = searchParams.get('dir');
   const nParam = searchParams.get('n');
+  // Quiz audio : durée de l'extrait (s), fraction révélée (1-6), mode de réponse.
+  const audioSeconds = Number(searchParams.get('dur')) || 0;
+  const fracParam = Number(searchParams.get('frac')) || 0;
+  const answerMode = searchParams.get('ans') === 'recite' ? 'recite' : 'tap';
 
   const {
     state,
@@ -419,10 +423,13 @@ function MushafPractice() {
       revealAfter: parsePositions(revealParam),
       showPositions: parsePositions(showParam),
       direction: (dirParam ?? undefined) as 'forward' | 'backward' | undefined,
+      audioSeconds: audioSeconds > 0 ? audioSeconds : undefined,
+      revealFraction: fracParam >= 1 && fracParam <= 6 ? fracParam : undefined,
+      answerMode,
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {
@@ -441,11 +448,46 @@ function MushafPractice() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (currentStep?.type === 'listening' && currentStep.targetVerse) {
-      audioPlayRef.current(currentStep.targetVerse);
+      audioPlayRef.current(currentStep.targetVerse, audioSeconds > 0 ? audioSeconds : undefined);
       setLastAudioVerse(currentStep.targetVerse);
     }
-  }, [currentStep]);
+  }, [currentStep, audioSeconds]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // ---- Quiz audio : question en grand sur la moitié opposée + réponse par récitation ----
+  const isQuiz = exerciseId === 'audio-quiz';
+  const awaitingRecitation = isQuiz && currentStep?.ui.awaitsRecitation === true;
+  // La question s'affiche pendant les étapes "questioning" uniquement (pas pendant
+  // l'écoute, pour ne pas trahir de quel côté se trouve le verset à localiser).
+  const showQuestionPanel = isQuiz && currentStep?.type === 'questioning';
+  // Page du tour impaire → affichée à DROITE de l'écran → question à GAUCHE, et inversement.
+  const roundPage = state.currentRound?.pageNumber ?? 0;
+  const questionSide: 'left' | 'right' = roundPage % 2 === 1 ? 'left' : 'right';
+
+  // Fin d'enregistrement pendant une question → on révèle le verset (nextStep)
+  // et le lecteur reste affiché pour se réécouter.
+  const wasRecordingRef = useRef(false);
+  useEffect(() => {
+    if (recorder.recording) {
+      wasRecordingRef.current = true;
+      return;
+    }
+    if (wasRecordingRef.current && recorder.audioUrl && awaitingRecitation) {
+      wasRecordingRef.current = false;
+      nextStep();
+    }
+  }, [recorder.recording, recorder.audioUrl, awaitingRecitation, nextStep]);
+
+  // Nouvelle question (ou nouvelle écoute) → on repart d'un enregistreur propre.
+  const recorderClearRef = useRef(recorder.clear);
+  useEffect(() => {
+    recorderClearRef.current = recorder.clear;
+  }, [recorder.clear]);
+  useEffect(() => {
+    if (isQuiz && (currentStep?.type === 'questioning' || currentStep?.type === 'listening')) {
+      recorderClearRef.current();
+    }
+  }, [isQuiz, currentStep]);
 
   // « Avez-vous trouvé ? » : demandé en fin de tour pour les exercices de quiz,
   // et mémorisé pour orienter les prochaines interrogations vers les échecs.
@@ -481,6 +523,9 @@ function MushafPractice() {
     // En Hifz, on reste sur la page : pas d'avancement au tap
     if (exerciseId === 'hifz') return;
     if (askFound) return;
+    // Question à réciter : le tap n'avance pas, c'est la fin de l'enregistrement
+    // qui révèle (bouton « Révéler sans réciter » pour passer).
+    if (awaitingRecitation) return;
 
     // Dernière étape du tour d'un quiz → demander d'abord « trouvé ou pas ? »
     if (
@@ -630,7 +675,7 @@ function MushafPractice() {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                audio.play(lastAudioVerse);
+                audio.play(lastAudioVerse, audioSeconds > 0 ? audioSeconds : undefined);
               }}
               aria-label="Faire répéter le verset"
               className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all flex-shrink-0"
@@ -749,8 +794,136 @@ function MushafPractice() {
           singlePage={singlePage}
           currentPage={singlePage ? displayedPage : undefined}
           hifzLevel={exerciseId === 'hifz' ? hifzLevel : undefined}
+          revealFraction={currentStep?.ui.revealFraction}
           onTap={handleTap}
         />
+
+        {/* Question du quiz : en GRAND sur la moitié opposée à la page interrogée */}
+        {showQuestionPanel && currentStep && (
+          <div
+            onClick={() => {
+              if (!awaitingRecitation) handleTap();
+            }}
+            className={`absolute inset-y-0 z-20 w-1/2 flex items-center justify-center p-4 ${
+              questionSide === 'left' ? 'left-0' : 'right-0'
+            }`}
+          >
+            <div className="bg-[#fdfaf3]/[0.97] backdrop-blur border-2 border-[#c9a959] rounded-3xl shadow-2xl px-6 py-8 w-full max-w-md text-center">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-3">
+                Question
+              </p>
+              <p className="text-2xl lg:text-3xl font-bold text-[#2d5016] leading-snug mb-2">
+                {currentStep.message.title}
+              </p>
+              <p className="text-sm text-[#7a8b3e] mb-6">{currentStep.message.subtitle}</p>
+
+              {lastAudioVerse && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    audio.play(lastAudioVerse, audioSeconds > 0 ? audioSeconds : undefined);
+                  }}
+                  className="mx-auto mb-5 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 font-bold text-sm active:scale-95 transition-all"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                    <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  Réécouter le verset
+                </button>
+              )}
+
+              {awaitingRecitation ? (
+                <>
+                  {recorder.recording ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                        <span className="font-bold tabular-nums text-[#2d5016] text-3xl">
+                          {Math.floor(recElapsed / 60)}:{String(recElapsed % 60).padStart(2, '0')}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          stopRecording();
+                        }}
+                        aria-label="Arrêter l'enregistrement et révéler"
+                        className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl active:scale-95 transition-all"
+                      >
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                      </button>
+                      <p className="text-xs text-gray-500">Stop = révélation du verset</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRecording();
+                        }}
+                        className="flex items-center gap-3 bg-red-600 hover:bg-red-500 text-white rounded-full px-8 py-4 shadow-xl font-bold text-lg active:scale-95 transition-all"
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          <line x1="12" x2="12" y1="19" y2="22" />
+                        </svg>
+                        Réciter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          nextStep();
+                        }}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                      >
+                        Révéler sans réciter
+                      </button>
+                      {recorder.error && (
+                        <p className="text-[11px] text-red-600">{recorder.error}</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">Tapez l&apos;écran pour révéler</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Récitation enregistrée (quiz) : lecteur pour se réécouter après la révélation */}
+        {isQuiz && recorder.audioUrl && !recorder.recording && !showQuestionPanel && (
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl px-3 py-2 shadow-lg">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959]">
+                Ma récitation
+              </span>
+              <audio controls src={recorder.audioUrl} className="h-8 w-52" />
+              <button
+                type="button"
+                onClick={recorder.clear}
+                aria-label="Fermer le lecteur"
+                className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 flex items-center justify-center active:scale-95 transition-all"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Barre de déclaration de fautes (Hifz, mode marquage) */}
         {isHifz && markingMode && selWords.size > 0 && (

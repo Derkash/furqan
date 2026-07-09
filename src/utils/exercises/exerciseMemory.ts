@@ -17,6 +17,12 @@ export interface StoredSetup {
   identifyPosition?: VersePositionType;
   /** Quiz audio : positions à découvrir ensuite. */
   revealAfter?: VersePositionType[];
+  /** Quiz audio : durée max de l'extrait audio de la question (s, 0 = complet). */
+  audioSeconds?: number;
+  /** Quiz audio : fraction du verset révélée en sixièmes (1-6, 6 = complet). */
+  revealFraction?: number;
+  /** Quiz audio : mode de réponse (taper l'écran ou réciter au micro). */
+  answerMode?: 'tap' | 'recite';
   /** Séquentiel : positions de versets à afficher. */
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression. */

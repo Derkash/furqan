@@ -22,6 +22,29 @@ const IDENTIFY_OPTIONS: { value: VersePositionType; label: string }[] = [
   { value: 'random', label: 'Aléatoire' },
 ];
 
+// À découvrir ensuite : positions de page + le verset précédant celui écouté.
+const REVEAL_OPTIONS: { value: VersePositionType; label: string }[] = [
+  { value: 'previous', label: 'Précédent' },
+  ...POSITION_OPTIONS,
+];
+
+const DURATION_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Complet' },
+  { value: 3, label: '3 s' },
+  { value: 6, label: '6 s' },
+  { value: 9, label: '9 s' },
+  { value: 12, label: '12 s' },
+];
+
+const FRACTION_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: '1/6' },
+  { value: 2, label: '2/6' },
+  { value: 3, label: '3/6' },
+  { value: 4, label: '4/6' },
+  { value: 5, label: '5/6' },
+  { value: 6, label: 'Tout' },
+];
+
 function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -52,6 +75,38 @@ function SingleSelect({
             type="button"
             onClick={() => onChange(o.value)}
             className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+              active
+                ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NumberSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: number; label: string }[];
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`flex-1 min-w-[52px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
               active
                 ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
                 : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
@@ -112,6 +167,9 @@ export default function SetupPage() {
   // Choix spécifiques (avec des défauts sensés ; la mémoire les remplace au montage si présents).
   const [identifyPosition, setIdentifyPosition] = useState<VersePositionType>('random');
   const [revealAfter, setRevealAfter] = useState<VersePositionType[]>([]);
+  const [audioSeconds, setAudioSeconds] = useState<number>(0);
+  const [revealFraction, setRevealFraction] = useState<number>(6);
+  const [answerMode, setAnswerMode] = useState<'tap' | 'recite'>('tap');
   const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [questionCount, setQuestionCount] = useState<number>(10);
@@ -137,6 +195,9 @@ export default function SetupPage() {
     }
     if (saved.identifyPosition) setIdentifyPosition(saved.identifyPosition);
     if (saved.revealAfter) setRevealAfter(saved.revealAfter);
+    if (saved.audioSeconds != null) setAudioSeconds(saved.audioSeconds);
+    if (saved.revealFraction != null) setRevealFraction(saved.revealFraction);
+    if (saved.answerMode) setAnswerMode(saved.answerMode);
     if (saved.showPositions) setShowPositions(saved.showPositions);
     if (saved.direction) setDirection(saved.direction);
     if (saved.questionCount) setQuestionCount(saved.questionCount);
@@ -210,7 +271,17 @@ export default function SetupPage() {
     if (isAudioQuiz) {
       query.set('identify', identifyPosition);
       if (revealAfter.length > 0) query.set('reveal', revealAfter.join(','));
-      saveSetup(exerciseId, { ...base, identifyPosition, revealAfter });
+      if (audioSeconds > 0) query.set('dur', String(audioSeconds));
+      if (revealFraction >= 1 && revealFraction < 6) query.set('frac', String(revealFraction));
+      if (answerMode === 'recite') query.set('ans', 'recite');
+      saveSetup(exerciseId, {
+        ...base,
+        identifyPosition,
+        revealAfter,
+        audioSeconds,
+        revealFraction,
+        answerMode,
+      });
     } else if (isSequential) {
       query.set('show', showPositions.join(','));
       query.set('dir', direction);
@@ -276,9 +347,48 @@ export default function SetupPage() {
                     onChange={setIdentifyPosition}
                   />
                 </OptionGroup>
+                <OptionGroup label="Durée de l'extrait audio (question)">
+                  <NumberSelect options={DURATION_OPTIONS} value={audioSeconds} onChange={setAudioSeconds} />
+                  <p className="text-[11px] text-gray-400 mt-1">La récitation de la question s&apos;arrête après cette durée.</p>
+                </OptionGroup>
                 <OptionGroup label="À découvrir ensuite (sans audio)">
-                  <MultiSelect options={POSITION_OPTIONS} selected={revealAfter} onToggle={toggleReveal} />
-                  <p className="text-[11px] text-gray-400 mt-1">Optionnel — laissez vide pour juste localiser le verset.</p>
+                  <MultiSelect options={REVEAL_OPTIONS} selected={revealAfter} onToggle={toggleReveal} />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Optionnel — « Précédent » = le verset juste avant celui écouté.
+                  </p>
+                </OptionGroup>
+                <OptionGroup label="Partie du verset révélée en réponse">
+                  <NumberSelect options={FRACTION_OPTIONS} value={revealFraction} onChange={setRevealFraction} />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Ex : 2/6 = seul le premier tiers du verset est montré.
+                  </p>
+                </OptionGroup>
+                <OptionGroup label="Réponse aux questions">
+                  <div className="flex gap-1.5">
+                    {([
+                      { value: 'tap', label: 'Taper l’écran' },
+                      { value: 'recite', label: '🎙 Réciter au micro' },
+                    ] as const).map((o) => {
+                      const active = answerMode === o.value;
+                      return (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => setAnswerMode(o.value)}
+                          className={`flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                            active
+                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Au micro : vous récitez, la fin de l&apos;enregistrement révèle le verset et vous pouvez vous réécouter.
+                  </p>
                 </OptionGroup>
               </>
             )}
