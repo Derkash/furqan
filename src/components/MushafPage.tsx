@@ -161,6 +161,31 @@ interface PageData {
 
 const BASMALA_TEXT = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
 
+// Chapitres (nom + plage de pages par sourate) : chargés une seule fois,
+// partagés entre toutes les pages — sert au badge « page N/M de la sourate ».
+interface ChapterInfo {
+  id: number;
+  name_simple: string;
+  name_arabic: string;
+  pages: [number, number];
+}
+let chaptersCache: ChapterInfo[] | null = null;
+let chaptersPromise: Promise<ChapterInfo[]> | null = null;
+
+function loadChapters(): Promise<ChapterInfo[]> {
+  if (chaptersCache) return Promise.resolve(chaptersCache);
+  if (!chaptersPromise) {
+    chaptersPromise = fetch('/qcf-data/chapters.json')
+      .then((r) => r.json())
+      .then((list: ChapterInfo[]) => {
+        chaptersCache = list;
+        return list;
+      })
+      .catch(() => []);
+  }
+  return chaptersPromise;
+}
+
 const loadedFonts = new Set<string>();
 
 function ensureFontLoaded(fontFamily: string) {
@@ -280,8 +305,42 @@ export default function MushafPage({
 }: MushafPageProps) {
   const config: FrameConfig = { ...DEFAULT_FRAME, ...(frameConfig ?? {}) };
   const [data, setData] = useState<PageData | null>(null);
+  const [chapters, setChapters] = useState<ChapterInfo[] | null>(chaptersCache);
   const padded = String(pageNumber).padStart(3, '0');
   const fontFamily = `QCF_P${padded}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    loadChapters().then((list) => {
+      if (!cancelled) setChapters(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Badge « numéro de page dans la sourate » : sourate du premier verset de la
+  // page, position = page − première page de la sourate + 1 (sur total).
+  const surahPageLabel = useMemo(() => {
+    if (!data || !chapters) return null;
+    let firstVerseKey: string | null = null;
+    for (const line of data.lines) {
+      if (line.type !== 'content' || !line.words) continue;
+      const word = line.words.find((w) => !w.isAyahMarker);
+      if (word) {
+        firstVerseKey = word.verseKey;
+        break;
+      }
+    }
+    if (!firstVerseKey) return null;
+    const surah = Number(firstVerseKey.split(':')[0]);
+    const chapter = chapters.find((c) => c.id === surah);
+    if (!chapter) return null;
+    const n = pageNumber - chapter.pages[0] + 1;
+    const total = chapter.pages[1] - chapter.pages[0] + 1;
+    if (n < 1 || n > total) return null;
+    return `${chapter.name_simple} · ${n}/${total}`;
+  }, [data, chapters, pageNumber]);
 
   /**
    * Calcule, pour chaque verset, les positions de mots à masquer au niveau Hifz courant.
@@ -545,6 +604,26 @@ export default function MushafPage({
       `}</style>
       <div className="mushaf-page">
         <MushafFrame config={config} />
+
+        {/* Numéro de page relatif à la sourate : en haut à DROITE pour la page
+            de droite (impaire), en haut à GAUCHE pour la page de gauche (paire) */}
+        {surahPageLabel && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '1.2%',
+              ...(isOddPage ? { right: '2.8%' } : { left: '2.8%' }),
+              fontSize: '2.1cqi',
+              fontWeight: 700,
+              color: '#7a5d2c',
+              letterSpacing: '0.03em',
+              zIndex: 2,
+              pointerEvents: 'none',
+            }}
+          >
+            {surahPageLabel}
+          </div>
+        )}
 
         <div
           className="mushaf-content"

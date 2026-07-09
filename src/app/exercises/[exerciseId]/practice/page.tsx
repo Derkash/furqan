@@ -460,9 +460,11 @@ function MushafPractice() {
   // La question s'affiche pendant les étapes "questioning" uniquement (pas pendant
   // l'écoute, pour ne pas trahir de quel côté se trouve le verset à localiser).
   const showQuestionPanel = isQuiz && currentStep?.type === 'questioning';
-  // Page du tour impaire → affichée à DROITE de l'écran → question à GAUCHE, et inversement.
+  // La question s'affiche sur la moitié OPPOSÉE à la page du verset visé
+  // (page impaire → affichée à droite → question à gauche, et inversement).
   const roundPage = state.currentRound?.pageNumber ?? 0;
-  const questionSide: 'left' | 'right' = roundPage % 2 === 1 ? 'left' : 'right';
+  const targetPage = currentStep?.targetVerse?.page ?? roundPage;
+  const questionSide: 'left' | 'right' = targetPage % 2 === 1 ? 'left' : 'right';
 
   // Fin d'enregistrement pendant une question → on révèle le verset (nextStep)
   // et le lecteur reste affiché pour se réécouter.

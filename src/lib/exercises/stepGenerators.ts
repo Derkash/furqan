@@ -9,7 +9,9 @@ import { fromGlobalAyahNumber, getVerseKey } from '@/utils/ayahMapping';
 // HELPERS
 // ============================================
 
-const POSITION_ORDER: VersePositionType[] = ['previous', 'first', 'middle', 'last'];
+// « Précédent » en DERNIER : sa révélation peut nécessiter d'afficher la double
+// page d'avant, ce qui ne doit pas perturber les questions posées sur la page courante.
+const POSITION_ORDER: VersePositionType[] = ['first', 'middle', 'last', 'previous'];
 
 const POSITION_LABEL: Record<VersePositionType, string> = {
   first: 'Premier verset',
@@ -34,10 +36,15 @@ function orderPositions(positions: VersePositionType[]): VersePositionType[] {
 
 /**
  * Verset précédant `verse` dans l'ordre du Mushaf (numéro global - 1).
- * S'il est sur la page affichée on a sa position exacte, sinon on construit
- * une position minimale (suffisante pour le masquage par clé et l'audio).
+ * S'il est sur la page interrogée on a sa position exacte ; sinon il se termine
+ * sur la page d'avant (pageNumber - 1) et on construit une position minimale
+ * (suffisante pour le masquage par clé, l'audio et le choix de la page affichée).
  */
-function getPreviousVerse(verse: VersePosition, pageVerses: PageVerses): VersePosition | null {
+function getPreviousVerse(
+  verse: VersePosition,
+  pageVerses: PageVerses,
+  pageNumber: number
+): VersePosition | null {
   const prevGlobal = verse.globalNumber - 1;
   if (prevGlobal < 1) return null;
   const onPage = pageVerses.verses.find((v) => v.globalNumber === prevGlobal);
@@ -47,10 +54,15 @@ function getPreviousVerse(verse: VersePosition, pageVerses: PageVerses): VersePo
     verseKey: getVerseKey(surah, verseNum),
     surah,
     verse: verseNum,
-    page: verse.page,
+    page: Math.max(1, pageNumber - 1),
     lines: [],
     globalNumber: prevGlobal,
   };
+}
+
+/** Page impaire (droite) de la double page contenant `page`. */
+function spreadRightPage(page: number): number {
+  return Math.max(1, page % 2 === 1 ? page : page - 1);
 }
 
 /** Récupère le verset correspondant à une position sur la page. */
@@ -84,7 +96,7 @@ function getVerseForPosition(
 
 export const audioQuizSteps: StepGenerator = (
   pageVerses: PageVerses,
-  _pageNumber: number,
+  pageNumber: number,
   config: ExerciseConfig,
   verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
@@ -148,7 +160,7 @@ export const audioQuizSteps: StepGenerator = (
       pos,
       verse:
         pos === 'previous'
-          ? getPreviousVerse(identifyVerse, pageVerses)
+          ? getPreviousVerse(identifyVerse, pageVerses, pageNumber)
           : getVerseForPosition(pageVerses, pos, verseMapData),
     }))
     .filter(
@@ -157,6 +169,13 @@ export const audioQuizSteps: StepGenerator = (
     );
 
   remaining.forEach(({ pos, verse }, idx) => {
+    // Verset précédent hors de la double page courante (page interrogée = page de
+    // droite) → la révélation bascule sur la double page d'avant pour le montrer.
+    const flipTo =
+      pos === 'previous' && spreadRightPage(verse.page) !== spreadRightPage(pageNumber)
+        ? verse.page
+        : undefined;
+
     // Question : les versets déjà révélés restent visibles, la cible reste masquée.
     steps.push({
       type: 'questioning',
@@ -185,7 +204,7 @@ export const audioQuizSteps: StepGenerator = (
       targetPosition: pos,
       targetVerse: verse,
       message: {
-        title: POSITION_LABEL[pos],
+        title: flipTo ? `${POSITION_LABEL[pos]} (page d’avant)` : POSITION_LABEL[pos],
         subtitle: isLast ? 'Double page suivante' : 'Tapez pour continuer',
       },
       ui: {
@@ -194,6 +213,7 @@ export const audioQuizSteps: StepGenerator = (
         visibleVerses: [...visible],
         highlightedVerse: verse.verseKey,
         revealFraction: fraction,
+        displayPage: flipTo,
       },
     });
   });

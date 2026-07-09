@@ -76,6 +76,11 @@ export interface ExerciseStepUI {
   revealFraction?: number;
   /** Si true, l'étape attend une récitation au micro avant de révéler. */
   awaitsRecitation?: boolean;
+  /**
+   * Page dont la double page doit être affichée pendant cette étape (au lieu de
+   * la page du tour) — ex. verset précédent situé sur la double page d'avant.
+   */
+  displayPage?: number;
 }
 
 export interface ExerciseStep {

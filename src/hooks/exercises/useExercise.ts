@@ -176,10 +176,12 @@ export function useExercise(): UseExerciseReturn {
   const singlePage = currentStep?.ui.singlePage ?? SINGLE_PAGE_EXERCISES.includes(state.exerciseId);
   const displayedPage = state.currentRound?.pageNumber ?? state.progress.currentPage;
 
-  // Page pair
+  // Page pair — une étape peut demander l'affichage d'une autre double page
+  // (ex. révélation du verset précédent situé sur la double page d'avant).
+  const stepDisplayPage = currentStep?.ui.displayPage;
   const pagePair = useMemo(
-    () => getPagePair(state.progress.currentPage),
-    [state.progress.currentPage]
+    () => getPagePair(stepDisplayPage ?? state.progress.currentPage),
+    [stepDisplayPage, state.progress.currentPage]
   );
 
   // Load pages when page changes
