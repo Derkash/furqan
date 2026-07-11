@@ -3,6 +3,8 @@
 
 import type { RangeMode } from './rangeToPages';
 import type { VersePositionType } from '@/types/exercises';
+import { getCurrentUser } from './userStats';
+import { pushSetup } from './progressSync';
 
 export interface StoredSetup {
   /** Mode de plage (page / hizb / juz / sourate) — pour les exercices à plage. */
@@ -57,5 +59,22 @@ export function saveSetup(exerciseId: string, data: StoredSetup): void {
     window.localStorage.setItem(PREFIX + exerciseId, JSON.stringify(data));
   } catch {
     // Quota plein ou stockage indisponible : on ignore silencieusement.
+  }
+  const user = getCurrentUser();
+  if (user) pushSetup(user, exerciseId, data); // sync Supabase en arrière-plan
+}
+
+/**
+ * Écrit dans le cache local les réglages récupérés depuis Supabase à la
+ * connexion (map { exerciseId: data }). N'appelle PAS pushSetup (pas de boucle).
+ */
+export function hydrateSetupsLocal(setups: Record<string, unknown>): void {
+  if (!isBrowser()) return;
+  for (const [exerciseId, data] of Object.entries(setups)) {
+    try {
+      window.localStorage.setItem(PREFIX + exerciseId, JSON.stringify(data));
+    } catch {
+      // ignore
+    }
   }
 }

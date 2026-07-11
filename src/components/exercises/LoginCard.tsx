@@ -20,17 +20,27 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const switchMode = (m: Mode) => {
     setMode(m);
     setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = mode === 'login' ? login(username, password) : register(username, password);
-    if (result.ok) onLoggedIn(username.trim());
-    else setError(result.error ?? 'Opération impossible');
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = mode === 'login' ? await login(username, password) : await register(username, password);
+      if (result.ok) onLoggedIn(username.trim());
+      else setError(result.error ?? 'Opération impossible');
+    } catch {
+      setError('Connexion au serveur impossible');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -95,9 +105,14 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
 
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] hover:from-[#4a7c23] hover:to-[#2d5016] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98]"
+            disabled={submitting}
+            className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] hover:from-[#4a7c23] hover:to-[#2d5016] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
+            {submitting
+              ? 'Veuillez patienter…'
+              : mode === 'login'
+                ? 'Se connecter'
+                : 'Créer mon compte'}
           </button>
         </form>
 

@@ -1,7 +1,18 @@
 // Comptes simples (identifiant + mot de passe, création automatique) et
 // mémoire des fautes de récitation / résultats de quiz.
-// Stockage : localStorage (par appareil) ; session : cookie (1 an).
-// Volontairement simple — pas de vraie sécurité, c'est un outil personnel.
+// Stockage : localStorage (cache local, lectures synchrones) synchronisé avec
+// Supabase (sauvegarde + partage entre appareils) quand il est configuré.
+// Session : cookie (1 an). Volontairement simple — outil personnel.
+
+import {
+  registerRemote,
+  loginRemote,
+  fetchStats,
+  fetchSetups,
+  pushWordMistakes,
+  pushVerseResult,
+} from './progressSync';
+import { hydrateSetupsLocal } from './exerciseMemory';
 
 export type MistakeType = 'oubli' | 'inversion' | 'harakat' | 'mot';
 
@@ -87,14 +98,36 @@ function validateCredentials(
   };
 }
 
-/** Connexion : l'identifiant doit exister et le mot de passe correspondre. */
-export function login(
+/** Hydrate le cache local (stats + réglages) depuis Supabase après connexion. */
+async function hydrateFromRemote(username: string): Promise<void> {
+  const [stats, setups] = await Promise.all([fetchStats(username), fetchSetups(username)]);
+  if (stats) saveStats(username, stats);
+  if (setups) hydrateSetupsLocal(setups);
+}
+
+/**
+ * Connexion : l'identifiant doit exister et le mot de passe correspondre.
+ * Si Supabase est configuré, il fait autorité (et on hydrate le cache local) ;
+ * sinon on retombe sur la vérification localStorage (mode hors-ligne).
+ */
+export async function login(
   username: string,
   password: string
-): { ok: boolean; error?: string } {
+): Promise<{ ok: boolean; error?: string }> {
   const creds = validateCredentials(username, password);
   if ('error' in creds) return { ok: false, error: creds.error };
 
+  const remote = await loginRemote(creds.name, creds.hash);
+  if (remote) {
+    if (!remote.ok) return remote;
+    // Cache local (permet lecture synchrone + connexion hors-ligne ultérieure).
+    window.localStorage.setItem(creds.key, creds.hash);
+    setUserCookie(creds.name);
+    await hydrateFromRemote(creds.name);
+    return { ok: true };
+  }
+
+  // Fallback local (Supabase absent ou injoignable).
   const existing = window.localStorage.getItem(creds.key);
   if (existing === null) {
     return { ok: false, error: 'Cet identifiant n’existe pas. Créez un compte.' };
@@ -107,13 +140,22 @@ export function login(
 }
 
 /** Inscription : l'identifiant ne doit pas déjà exister. */
-export function register(
+export async function register(
   username: string,
   password: string
-): { ok: boolean; error?: string } {
+): Promise<{ ok: boolean; error?: string }> {
   const creds = validateCredentials(username, password);
   if ('error' in creds) return { ok: false, error: creds.error };
 
+  const remote = await registerRemote(creds.name, creds.hash);
+  if (remote) {
+    if (!remote.ok) return remote;
+    window.localStorage.setItem(creds.key, creds.hash);
+    setUserCookie(creds.name);
+    return { ok: true };
+  }
+
+  // Fallback local (Supabase absent ou injoignable).
   if (window.localStorage.getItem(creds.key) !== null) {
     return { ok: false, error: 'Cet identifiant existe déjà. Connectez-vous.' };
   }
@@ -165,6 +207,7 @@ export function recordWordMistakes(username: string | null, mistakes: WordMistak
   const stats = loadStats(username);
   stats.wordMistakes.push(...mistakes);
   saveStats(username, stats);
+  pushWordMistakes(username, mistakes); // sync Supabase en arrière-plan
 }
 
 export function recordVerseResult(username: string | null, result: VerseResult) {
@@ -172,6 +215,7 @@ export function recordVerseResult(username: string | null, result: VerseResult) 
   const stats = loadStats(username);
   stats.verseResults.push(result);
   saveStats(username, stats);
+  pushVerseResult(username, result); // sync Supabase en arrière-plan
 }
 
 // ---------- Priorités pour les quiz adaptatifs ----------
