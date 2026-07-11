@@ -25,6 +25,8 @@ export interface StoredSetup {
   revealFraction?: number;
   /** Quiz audio : mode de réponse (taper l'écran ou réciter au micro). */
   answerMode?: 'tap' | 'recite';
+  /** Quiz audio (mode taper) : temps autorisé (s) avant révélation auto. 0 = sans limite. */
+  revealTimeout?: number;
   /** Séquentiel : positions de versets à afficher. */
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression. */

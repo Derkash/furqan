@@ -186,6 +186,8 @@ function MushafPractice() {
   const audioSeconds = Number(searchParams.get('dur')) || 0;
   const fracParam = Number(searchParams.get('frac')) || 0;
   const answerMode = searchParams.get('ans') === 'recite' ? 'recite' : 'tap';
+  // Temps autorisé (mode taper) avant révélation auto. 0 = sans limite.
+  const revealTimeout = Number(searchParams.get('to')) || 0;
 
   const {
     state,
@@ -207,6 +209,7 @@ function MushafPractice() {
     initialize,
     start,
     nextStep,
+    requeuePage,
     reset,
   } = useExercise();
 
@@ -426,10 +429,11 @@ function MushafPractice() {
       audioSeconds: audioSeconds > 0 ? audioSeconds : undefined,
       revealFraction: fracParam >= 1 && fracParam <= 6 ? fracParam : undefined,
       answerMode,
+      revealTimeout: revealTimeout > 0 ? revealTimeout : undefined,
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {
@@ -491,6 +495,45 @@ function MushafPractice() {
     }
   }, [isQuiz, currentStep]);
 
+  // ---- Compte à rebours (mode taper) : à 0, révélation automatique du verset ----
+  // S'applique à la localisation (écoute) et aux questions de rappel, jamais en
+  // mode récitation (qui se temporise via la fin de l'enregistrement).
+  const timedStep =
+    isQuiz &&
+    answerMode === 'tap' &&
+    revealTimeout > 0 &&
+    (currentStep?.type === 'listening' ||
+      (currentStep?.type === 'questioning' && !awaitingRecitation));
+  const [countdown, setCountdown] = useState(0);
+  const nextStepRef = useRef(nextStep);
+  useEffect(() => {
+    nextStepRef.current = nextStep;
+  }, [nextStep]);
+  const audioStopRef = useRef(audio.stop);
+  useEffect(() => {
+    audioStopRef.current = audio.stop;
+  }, [audio.stop]);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!timedStep) {
+      setCountdown(0);
+      return;
+    }
+    let left = revealTimeout;
+    setCountdown(left);
+    const id = setInterval(() => {
+      left -= 1;
+      setCountdown(left);
+      if (left <= 0) {
+        clearInterval(id);
+        audioStopRef.current();
+        nextStepRef.current();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timedStep, currentStep, revealTimeout]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // « Avez-vous trouvé ? » : demandé en fin de tour pour les exercices de quiz,
   // et mémorisé pour orienter les prochaines interrogations vers les échecs.
   const [askFound, setAskFound] = useState(false);
@@ -508,6 +551,10 @@ function MushafPractice() {
     const at = new Date().toISOString();
     for (const t of roundTargets) {
       recordVerseResult(user, { verseKey: t.verseKey, page: t.page, found, exercise: exerciseId, at });
+    }
+    // Faux → re-poser la question sur cette page peu de tours plus tard (session).
+    if (!found) {
+      requeuePage(state.currentRound?.pageNumber ?? state.progress.currentPage);
     }
     setAskFound(false);
     nextStep();
@@ -687,6 +734,17 @@ function MushafPractice() {
                 <path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
+          )}
+          {timedStep && countdown > 0 && (
+            <span className="ml-1 flex items-center gap-1 text-[#c9a959] text-sm font-bold tabular-nums flex-shrink-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="13" r="8" />
+                <path d="M12 9v4l2 2" />
+                <path d="M5 3 2 6" />
+                <path d="m22 6-3-3" />
+              </svg>
+              {countdown}s
+            </span>
           )}
         </div>
       )}
@@ -894,6 +952,15 @@ function MushafPractice() {
                     </div>
                   )}
                 </>
+              ) : timedStep ? (
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="text-5xl font-bold tabular-nums text-[#2d5016] leading-none">
+                    {countdown}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Révélation automatique à la fin — ou tapez pour révéler
+                  </p>
+                </div>
               ) : (
                 <p className="text-xs text-gray-400">Tapez l&apos;écran pour révéler</p>
               )}

@@ -143,6 +143,11 @@ export interface ExerciseConfig extends QuizConfig {
   revealFraction?: number;
   /** Quiz audio : mode de réponse aux questions (taper l'écran ou réciter au micro). */
   answerMode?: AnswerMode;
+  /**
+   * Quiz audio (mode « taper l'écran ») : temps autorisé en secondes avant la
+   * révélation automatique du verset. Absent/0 = sans limite (révélation au tap).
+   */
+  revealTimeout?: number;
   /** Séquentiel : positions de versets à afficher, ordre premier→milieu→dernier. */
   showPositions?: VersePositionType[];
   /** Séquentiel : sens de progression dans la plage. */

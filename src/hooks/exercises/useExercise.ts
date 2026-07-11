@@ -49,6 +49,8 @@ interface UseExerciseReturn {
   initialize: (config: ExerciseConfig) => Promise<void>;
   start: () => void;
   nextStep: () => Promise<void>;
+  /** Re-poser bientôt (même session) la question portant sur cette page. */
+  requeuePage: (page: number) => void;
   pause: () => void;
   resume: () => void;
   reset: () => void;
@@ -149,6 +151,18 @@ export function useExercise(): UseExerciseReturn {
 
   // Historique des pages récemment visitées (pour éviter les répétitions immédiates)
   const recentPagesRef = useRef<number[]>([]);
+
+  // File de re-questionnement (fautes de la session en cours) : quand une réponse
+  // est fausse, on ré-interroge la même page peu de tours plus tard, sans attendre
+  // la pondération inter-sessions. `remaining` = nombre de tours avant réémission.
+  const requeueRef = useRef<{ page: number; remaining: number }[]>([]);
+
+  const requeuePage = useCallback((page: number) => {
+    // Écrase une entrée existante pour cette page (évite les doublons) et la
+    // programme ~2 questions plus tard.
+    requeueRef.current = requeueRef.current.filter((e) => e.page !== page);
+    requeueRef.current.push({ page, remaining: 2 });
+  }, []);
 
   // Charger le verse-map pour les positions précises
   const { getPageVerses: getVerseMapPage } = useVerseMap();
@@ -257,8 +271,9 @@ export function useExercise(): UseExerciseReturn {
         : Math.min(config.maxRounds, totalPages)
       : totalPages;
 
-    // Reset historique pour le nouvel exercice
+    // Reset historique + file de re-questionnement pour le nouvel exercice
     recentPagesRef.current = [];
+    requeueRef.current = [];
 
     // Page de départ : aléatoire pour les exos random, sinon début/fin selon progression
     let startPage: number;
@@ -330,8 +345,17 @@ export function useExercise(): UseExerciseReturn {
       let nextPage: number;
 
       if (isDoublePageExercise) {
-        // Page aléatoire dans la plage en évitant les pages récemment vues
-        nextPage = pickRandomPage(startPage, endPage, recentPagesRef.current);
+        // Priorité à la file de re-questionnement (fautes de cette session) :
+        // on décrémente les compteurs et on réémet une page arrivée à échéance.
+        for (const e of requeueRef.current) e.remaining -= 1;
+        const dueIdx = requeueRef.current.findIndex((e) => e.remaining <= 0);
+        if (dueIdx !== -1) {
+          nextPage = requeueRef.current[dueIdx].page;
+          requeueRef.current.splice(dueIdx, 1);
+        } else {
+          // Page aléatoire dans la plage en évitant les pages récemment vues
+          nextPage = pickRandomPage(startPage, endPage, recentPagesRef.current);
+        }
       } else {
         // Progression normale page par page, sens selon la config (Séquentiel)
         nextPage = isBackward(state.exerciseId, state.config, definition.progression)
@@ -430,6 +454,7 @@ export function useExercise(): UseExerciseReturn {
     initialize,
     start,
     nextStep,
+    requeuePage,
     pause,
     resume,
     reset,

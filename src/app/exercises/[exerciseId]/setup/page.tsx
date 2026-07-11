@@ -45,6 +45,14 @@ const FRACTION_OPTIONS: { value: number; label: string }[] = [
   { value: 6, label: 'Tout' },
 ];
 
+// Temps autorisé (mode « taper l'écran ») avant la révélation automatique.
+const TIMEOUT_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Sans limite' },
+  { value: 10, label: '10 s' },
+  { value: 20, label: '20 s' },
+  { value: 30, label: '30 s' },
+];
+
 function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -170,6 +178,7 @@ export default function SetupPage() {
   const [audioSeconds, setAudioSeconds] = useState<number>(0);
   const [revealFraction, setRevealFraction] = useState<number>(6);
   const [answerMode, setAnswerMode] = useState<'tap' | 'recite'>('tap');
+  const [revealTimeout, setRevealTimeout] = useState<number>(0);
   const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [questionCount, setQuestionCount] = useState<number>(10);
@@ -198,6 +207,7 @@ export default function SetupPage() {
     if (saved.audioSeconds != null) setAudioSeconds(saved.audioSeconds);
     if (saved.revealFraction != null) setRevealFraction(saved.revealFraction);
     if (saved.answerMode) setAnswerMode(saved.answerMode);
+    if (saved.revealTimeout != null) setRevealTimeout(saved.revealTimeout);
     if (saved.showPositions) setShowPositions(saved.showPositions);
     if (saved.direction) setDirection(saved.direction);
     if (saved.questionCount) setQuestionCount(saved.questionCount);
@@ -274,6 +284,9 @@ export default function SetupPage() {
       if (audioSeconds > 0) query.set('dur', String(audioSeconds));
       if (revealFraction >= 1 && revealFraction < 6) query.set('frac', String(revealFraction));
       if (answerMode === 'recite') query.set('ans', 'recite');
+      // Temps autorisé : uniquement en mode « taper l'écran » (la récitation gère
+      // sa propre temporisation via la fin de l'enregistrement).
+      if (answerMode === 'tap' && revealTimeout > 0) query.set('to', String(revealTimeout));
       saveSetup(exerciseId, {
         ...base,
         identifyPosition,
@@ -281,6 +294,7 @@ export default function SetupPage() {
         audioSeconds,
         revealFraction,
         answerMode,
+        revealTimeout,
       });
     } else if (isSequential) {
       query.set('show', showPositions.join(','));
@@ -390,6 +404,15 @@ export default function SetupPage() {
                     Au micro : vous récitez, la fin de l&apos;enregistrement révèle le verset et vous pouvez vous réécouter.
                   </p>
                 </OptionGroup>
+                {answerMode === 'tap' && (
+                  <OptionGroup label="Temps autorisé (puis révélation)">
+                    <NumberSelect options={TIMEOUT_OPTIONS} value={revealTimeout} onChange={setRevealTimeout} />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Un compte à rebours démarre à chaque question ; à la fin, le verset se révèle
+                      automatiquement (vous pouvez révéler avant en tapant).
+                    </p>
+                  </OptionGroup>
+                )}
               </>
             )}
 
