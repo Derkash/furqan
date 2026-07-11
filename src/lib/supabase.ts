@@ -13,7 +13,6 @@ export const supabase =
   url && anonKey
     ? createClient(url, anonKey, {
         auth: { persistSession: false },
-        db: { schema: 'app' },
       })
     : null;
 
