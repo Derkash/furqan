@@ -8,7 +8,8 @@ export type ExerciseId =
   | 'audio-quiz'
   | 'sequential'
   | 'hifz'
-  | 'recitation';
+  | 'recitation'
+  | 'page-number';
 
 // ============================================
 // EXERCISE ENUMS

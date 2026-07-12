@@ -3,6 +3,7 @@ import type { VersePositionType } from '@/types/exercises';
 import type { PageVerses, VersePosition } from '@/types';
 import type { PageVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
+import { getSurahPageInfo } from '@/utils/exercises/surahPages';
 import { fromGlobalAyahNumber, getVerseKey } from '@/utils/ayahMapping';
 
 // ============================================
@@ -271,6 +272,104 @@ export const sequentialSteps: StepGenerator = (
 };
 
 // ============================================
+// NUMÉRO DE PAGE
+// On demande « quelle est la Nᵉ page de la sourate X ? » (N = rang de la page
+// dans sa sourate). L'utilisateur la retrouve, puis dévoile au tap le premier
+// verset, celui du milieu, puis le dernier pour vérifier.
+// ============================================
+
+/** Ordinal français court : 1 → « 1re », n → « nᵉ ». */
+function frOrdinal(n: number): string {
+  return n <= 1 ? '1re' : `${n}ᵉ`;
+}
+
+export const pageNumberSteps: StepGenerator = (
+  pageVerses: PageVerses,
+  pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
+): ExerciseStep[] => {
+  const first = pageVerses.firstVerse;
+  const last = pageVerses.lastVerse;
+  const middle = getMiddleVerse(pageVerses, verseMapData);
+  if (!first || !last) return [];
+
+  // Sourate « dominante » de la page = celle qui y a le plus de versets. Le rang
+  // de la page se calcule par rapport à la première page de cette sourate.
+  const counts = new Map<number, number>();
+  for (const v of pageVerses.verses) counts.set(v.surah, (counts.get(v.surah) ?? 0) + 1);
+  let dominant = first.surah;
+  let best = -1;
+  for (const [surah, c] of counts) {
+    if (c > best) {
+      best = c;
+      dominant = surah;
+    }
+  }
+
+  const info = getSurahPageInfo(dominant);
+  const ordinal = info ? pageNumber - info.startPage + 1 : 1;
+  const surahName = info?.nameSimple ?? '';
+  const question = info
+    ? `Quelle est la ${frOrdinal(ordinal)} page de ${surahName} ?`
+    : 'Quelle est cette page ?';
+
+  // Positions à dévoiler (premier → milieu → dernier), dédoublonnées (pages
+  // courtes où milieu = premier/dernier).
+  const labelled = [
+    { verse: first, label: POSITION_LABEL.first },
+    { verse: middle, label: POSITION_LABEL.middle },
+    { verse: last, label: POSITION_LABEL.last },
+  ].filter((x): x is { verse: VersePosition; label: string } => x.verse !== null);
+
+  const seen = new Set<string>();
+  const uniq = labelled.filter((x) => {
+    if (seen.has(x.verse.verseKey)) return false;
+    seen.add(x.verse.verseKey);
+    return true;
+  });
+
+  const steps: ExerciseStep[] = [];
+
+  // Étape 1 : la question, page entièrement masquée (rien de dévoilé).
+  steps.push({
+    type: 'questioning',
+    targetVerse: first,
+    question: 'identify_page',
+    message: {
+      title: question,
+      subtitle: 'Retrouvez la page, puis tapez pour dévoiler le premier verset',
+    },
+    ui: {
+      isBlurred: false,
+      maskAll: true,
+      visibleVerses: [],
+    },
+  });
+
+  // Étapes suivantes : un dévoilement par position (un seul verset visible à la fois).
+  uniq.forEach(({ verse, label }, idx) => {
+    const isLast = idx === uniq.length - 1;
+    steps.push({
+      type: 'revealing',
+      targetVerse: verse,
+      message: {
+        title: question,
+        subtitle: isLast ? `${label} — question suivante au tap` : `${label} — tapez pour la suite`,
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [verse.verseKey],
+        highlightedVerse: verse.verseKey,
+      },
+    });
+  });
+
+  return steps;
+};
+
+// ============================================
 // HIFZ
 // Double page affichée, l'utilisateur choisit son niveau de masquage (0-8)
 // et feuillette la plage avec les boutons gauche/droite.
@@ -308,6 +407,7 @@ import type { ExerciseId } from '@/types/exercises';
 export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   'audio-quiz': audioQuizSteps,
   sequential: sequentialSteps,
+  'page-number': pageNumberSteps,
   hifz: hifzSteps,
   // La récitation n'utilise pas la machine à états Mushaf : interface dédiée
   // (RecitationPractice) ; ce générateur ne sert jamais.

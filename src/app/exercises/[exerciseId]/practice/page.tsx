@@ -460,10 +460,12 @@ function MushafPractice() {
 
   // ---- Quiz audio : question en grand sur la moitié opposée + réponse par récitation ----
   const isQuiz = exerciseId === 'audio-quiz';
+  // « Numéro de page » : même panneau de question en grand (sans audio ni micro).
+  const isPageNumber = exerciseId === 'page-number';
   const awaitingRecitation = isQuiz && currentStep?.ui.awaitsRecitation === true;
   // La question s'affiche pendant les étapes "questioning" uniquement (pas pendant
   // l'écoute, pour ne pas trahir de quel côté se trouve le verset à localiser).
-  const showQuestionPanel = isQuiz && currentStep?.type === 'questioning';
+  const showQuestionPanel = (isQuiz || isPageNumber) && currentStep?.type === 'questioning';
   // La question s'affiche sur la moitié OPPOSÉE à la page du verset visé
   // (page impaire → affichée à droite → question à gauche, et inversement).
   const roundPage = state.currentRound?.pageNumber ?? 0;
@@ -537,7 +539,8 @@ function MushafPractice() {
   // « Avez-vous trouvé ? » : demandé en fin de tour pour les exercices de quiz,
   // et mémorisé pour orienter les prochaines interrogations vers les échecs.
   const [askFound, setAskFound] = useState(false);
-  const asksFeedback = exerciseId === 'audio-quiz' || exerciseId === 'sequential';
+  const asksFeedback =
+    exerciseId === 'audio-quiz' || exerciseId === 'sequential' || exerciseId === 'page-number';
   const roundTargets = useMemo(() => {
     const seen = new Map<string, number>();
     for (const step of state.currentRound?.steps ?? []) {

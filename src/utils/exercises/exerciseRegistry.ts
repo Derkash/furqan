@@ -55,6 +55,20 @@ export const EXERCISES: ExerciseDefinition[] = [
     difficulty: 5,
   },
   {
+    id: 'page-number',
+    name: 'Numéro de page',
+    nameArabic: 'رقم الصفحة',
+    description:
+      'On vous demande une page d’une sourate (« la 12ᵉ page d’Al-Baqarah »). Retrouvez-la, puis dévoilez au tap le premier verset, celui du milieu, puis le dernier',
+    category: 'sequential',
+    hasAudio: false,
+    progression: 'random',
+    versePositions: ['first', 'middle', 'last'],
+    questions: ['identify_page'],
+    icon: 'help-circle',
+    difficulty: 4,
+  },
+  {
     id: 'hifz',
     name: 'Hifz',
     nameArabic: 'حفظ',

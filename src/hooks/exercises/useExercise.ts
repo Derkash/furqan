@@ -80,7 +80,7 @@ function getPagePair(page: number): PagePair {
 
 // Exercices qui interrogent sur une seule page aléatoire de la double page
 // et sautent des doubles pages aléatoirement
-const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = ['audio-quiz'];
+const DOUBLE_PAGE_RANDOM_EXERCISES: ExerciseId[] = ['audio-quiz', 'page-number'];
 
 /**
  * Sens de progression effectif : pour le Séquentiel il vient de la config
