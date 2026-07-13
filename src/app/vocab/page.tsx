@@ -10,6 +10,7 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
+import ReviewSession from '@/components/vocab/ReviewSession';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getVocab,
@@ -24,40 +25,43 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
-type Mode = 'read' | 'list';
+type Mode = 'review' | 'capture' | 'list';
 
 export default function VocabPage() {
-  const [mode, setMode] = useState<Mode>('read');
+  const [mode, setMode] = useState<Mode>('review');
+
+  const tabs: { id: Mode; label: string }[] = [
+    { id: 'review', label: '🔁 Réviser' },
+    { id: 'capture', label: '➕ Enregistrer' },
+    { id: 'list', label: '📚 Lexique' },
+  ];
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col">
       {/* Barre */}
-      <div className="flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
-        <Link href="/exercises" className="text-sm hover:underline">
+      <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+        <Link href="/exercises" className="text-sm hover:underline whitespace-nowrap">
           ← Exercices
         </Link>
         <div className="flex gap-1 bg-[#1f3a0f] rounded-full p-0.5">
-          <button
-            onClick={() => setMode('read')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-              mode === 'read' ? 'bg-[#c9a959] text-[#2d5016]' : 'text-[#c9a959]'
-            }`}
-          >
-            📖 Lire & capturer
-          </button>
-          <button
-            onClick={() => setMode('list')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-              mode === 'list' ? 'bg-[#c9a959] text-[#2d5016]' : 'text-[#c9a959]'
-            }`}
-          >
-            📚 Mon lexique
-          </button>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setMode(t.id)}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                mode === t.id ? 'bg-[#c9a959] text-[#2d5016]' : 'text-[#c9a959]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
         <span className="text-xs opacity-75 hidden sm:inline">Vocabulaire</span>
       </div>
 
-      {mode === 'read' ? <ReadMode /> : <ListMode />}
+      {mode === 'review' && <ReviewSession onEmpty={() => setMode('capture')} />}
+      {mode === 'capture' && <ReadMode />}
+      {mode === 'list' && <ListMode />}
     </div>
   );
 }

@@ -7,6 +7,9 @@ import {
   type RootOccurrence,
 } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
+import { unitToPageRange } from '@/utils/exercises/rangeToPages';
+import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 interface Props {
   root: string;
@@ -14,12 +17,20 @@ interface Props {
   onClose: () => void;
 }
 
-/** Explorateur : toutes les formes d'une racine sur une plage de pages. */
+/** Explorateur : toutes les formes d'une racine sur une plage (page/hizb/juz/sourate). */
 export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
-  const [start, setStart] = useState(1);
-  const [end, setEnd] = useState(604);
+  const { data: units } = useQuranUnits();
+  const [range, setRange] = useState<RangePickerValue>({ mode: 'juz', start: null, end: null });
   const [occ, setOcc] = useState<RootOccurrence[] | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const { startPage, endPage } = useMemo(
+    () => unitToPageRange(range.mode, range.start, range.end, units),
+    [range, units]
+  );
+  // Plage effective : la sélection, sinon tout le Coran.
+  const start = startPage ?? 1;
+  const end = endPage ?? 604;
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -81,29 +92,19 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
             </button>
           </div>
 
-          {/* Plage de pages */}
-          <div className="flex items-center gap-2 mt-3 text-sm">
-            <span className="text-[#7a5d2c] font-semibold">Pages</span>
-            <input
-              type="number"
-              min={1}
-              max={604}
-              value={start}
-              onChange={(e) => setStart(Math.max(1, Math.min(604, Number(e.target.value) || 1)))}
-              className="w-16 px-2 py-1 rounded-lg border-2 border-[#c9a959]/30 text-center font-bold text-[#2d5016]"
-            />
-            <span className="text-gray-400">→</span>
-            <input
-              type="number"
-              min={1}
-              max={604}
-              value={end}
-              onChange={(e) => setEnd(Math.max(1, Math.min(604, Number(e.target.value) || 604)))}
-              className="w-16 px-2 py-1 rounded-lg border-2 border-[#c9a959]/30 text-center font-bold text-[#2d5016]"
-            />
-            <span className="ml-auto text-[#4a7c23] font-bold">
-              {occ ? `${toArabicNumbers(occ.length)} occ.` : ''}
-            </span>
+          {/* Plage : page / hizb / juz / sourate (vide = tout le Coran) */}
+          <div className="mt-3">
+            <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
+            <div className="flex items-center justify-between mt-2 text-xs">
+              <span className="text-[#7a5d2c]">
+                {startPage != null
+                  ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
+                  : 'tout le Coran'}
+              </span>
+              <span className="text-[#4a7c23] font-bold">
+                {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
+              </span>
+            </div>
           </div>
 
           {/* Formes distinctes */}

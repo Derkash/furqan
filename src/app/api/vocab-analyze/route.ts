@@ -36,7 +36,7 @@ const MODEL = 'claude-haiku-4-5';
 const SYSTEM = `Tu es un professeur d'arabe coranique qui aide un francophone ayant des bases en naḥw et ṣarf à mémoriser du vocabulaire.
 
 On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, ne la contredis pas), le verset où il apparaît, et la traduction française de Hamidullah de ce verset. Tu produis, en JSON :
-- baseForm : la forme de base à retenir, VOCALISÉE en arabe. Pour un verbe : le māḍī 3e pers. masc. sing. (forme فَعَلَ) ; pour un nom/adjectif : le singulier indéfini ; ajoute le maṣdar entre parenthèses s'il est pertinent et connu.
+- baseForm : la forme de base CLASSIQUE à retenir (celle d'un dictionnaire), VOCALISÉE en arabe. Pour un VERBE : donne le māḍī PUIS le muḍāriʿ, 3e pers. masc. sing. (ex. « هَزَمَ يَهْزِمُ », « أَفْسَدَ يُفْسِدُ ») — mets la bonne voyelle du muḍāriʿ. Pour un nom/adjectif : le singulier indéfini. Si c'est un participe, donne le verbe de base (māḍī + muḍāriʿ) dont il dérive.
 - baseFormType : l'un de "verbe", "nom", "adjectif", "maṣdar", "particule", "autre".
 - frenchGloss : le sens USUEL et CONCRET de la forme de base (pas de la forme fléchie), courte (1 à 6 mots). RÈGLES IMPORTANTES :
   • Reste fidèle à la manière dont HAMIDULLAH rend ce mot dans le verset fourni (aligne-toi sur son vocabulaire quand c'est ce mot précis qui est traduit).

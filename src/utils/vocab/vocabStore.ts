@@ -135,6 +135,29 @@ export function removeVocab(id: string): void {
   writeVocab(getVocab().filter((e) => e.id !== id));
 }
 
+// Intervalles Leitner (jours) par boîte 0..5.
+const INTERVALS_DAYS = [0, 1, 3, 7, 16, 45];
+
+/** Un mot est « à réviser » s'il n'a jamais été vu ou si son intervalle est écoulé. */
+export function isDue(e: VocabEntry, now: number = Date.now()): boolean {
+  if (!e.lastReviewed) return true;
+  const days = INTERVALS_DAYS[Math.min(e.box, INTERVALS_DAYS.length - 1)];
+  return now - new Date(e.lastReviewed).getTime() >= days * 86400000;
+}
+
+/** Mots à réviser maintenant, les moins maîtrisés / plus anciens d'abord. */
+export function dueVocab(): VocabEntry[] {
+  const now = Date.now();
+  return getVocab()
+    .filter((e) => isDue(e, now))
+    .sort(
+      (a, b) =>
+        a.box - b.box ||
+        (a.lastReviewed ? new Date(a.lastReviewed).getTime() : 0) -
+          (b.lastReviewed ? new Date(b.lastReviewed).getTime() : 0)
+    );
+}
+
 /** Enregistre une révision : monte/descend la boîte Leitner. */
 export function recordReview(id: string, correct: boolean): void {
   const list = getVocab().map((e) => {
