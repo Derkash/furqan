@@ -193,6 +193,20 @@ export async function getRootLocations(
   return out;
 }
 
+/** Page de PREMIÈRE apparition d'une racine dans le Mushaf (depuis le début). */
+export async function getRootFirstPage(root: string): Promise<number> {
+  const [roots, vp] = await Promise.all([loadRoots(), loadVersePage()]);
+  const entry = roots[root];
+  if (!entry) return Number.POSITIVE_INFINITY;
+  let min = Number.POSITIVE_INFINITY;
+  for (const loc of entry.occ) {
+    const [s, v] = loc.split(':');
+    const p = vp[`${s}:${v}`] ?? Number.POSITIVE_INFINITY;
+    if (p < min) min = p;
+  }
+  return min;
+}
+
 /** Texte arabe (vocalisé) d'un verset, reconstruit depuis les formes QAC. */
 export async function getVerseText(verseKey: string): Promise<string> {
   const [s, v] = verseKey.split(':').map(Number);
@@ -201,6 +215,18 @@ export async function getVerseText(verseKey: string): Promise<string> {
     .filter((k) => Number(k.split(':')[0]) === v)
     .sort((a, b) => Number(a.split(':')[1]) - Number(b.split(':')[1]));
   return words.map((k) => surah[k].form).join(' ');
+}
+
+/** Mots (position + forme) d'un verset, pour surligner un mot précis. */
+export async function getVerseWords(
+  verseKey: string
+): Promise<{ position: number; form: string }[]> {
+  const [s, v] = verseKey.split(':').map(Number);
+  const surah = await loadSurah(s);
+  return Object.keys(surah)
+    .filter((k) => Number(k.split(':')[0]) === v)
+    .map((k) => ({ position: Number(k.split(':')[1]), form: surah[k].form }))
+    .sort((a, b) => a.position - b.position);
 }
 
 // ---- Libellés nahw en français (déterministes) ----

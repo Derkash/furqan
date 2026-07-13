@@ -8,6 +8,7 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
+import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
 import type { VersePositionType } from '@/types/exercises';
 import Link from 'next/link';
 
@@ -193,18 +194,23 @@ export default function SetupPage() {
   // Lecture localStorage après montage → 1er rendu vide (pas de décalage d'hydratation).
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    // Plage GLOBALE partagée entre exercices : elle prime (donnée une fois,
+    // appliquée partout). Sinon, on retombe sur les derniers réglages de l'exo.
+    const shared = loadSharedRange();
     const saved = loadSetup(exerciseId);
-    if (!saved) return;
-    if (saved.mode != null || saved.start != null || saved.end != null) {
+    if (shared && (shared.start != null || shared.end != null)) {
+      setRange({ mode: shared.mode, start: shared.start, end: shared.end });
+    } else if (saved && (saved.mode != null || saved.start != null || saved.end != null)) {
       setRange({
         mode: saved.mode ?? 'page',
         start: saved.start ?? null,
         end: saved.end ?? null,
       });
-    } else if (saved.singlePage != null) {
+    } else if (saved?.singlePage != null) {
       // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
       setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
+    if (!saved) return;
     if (saved.identifyPosition) setIdentifyPosition(saved.identifyPosition);
     if (saved.revealAfter) setRevealAfter(saved.revealAfter);
     if (saved.audioSeconds != null) setAudioSeconds(saved.audioSeconds);
@@ -263,6 +269,9 @@ export default function SetupPage() {
       setError('La plage doit être entre 1 et 604');
       return;
     }
+
+    // Mémorise la plage comme plage GLOBALE (appliquée aux autres exercices).
+    saveSharedRange({ mode: range.mode, start: range.start, end: range.end });
 
     if ((isSequential || isPageNumber) && showPositions.length === 0) {
       setError('Choisissez au moins un verset à afficher');

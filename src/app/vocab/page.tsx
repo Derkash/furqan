@@ -11,6 +11,7 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import ReviewTab from '@/components/vocab/ReviewTab';
+import { getRootFirstPage } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getVocab,
@@ -239,6 +240,8 @@ function ListMode() {
   const [query, setQuery] = useState('');
   const [explore, setExplore] = useState<{ root: string; gloss?: string; lemma?: string } | null>(null);
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  // Page de 1re apparition (racine) → tri par ordre du Mushaf depuis Baqara.
+  const [firstPage, setFirstPage] = useState<Record<string, number>>({});
 
   const refresh = () => setItems(getVocab());
 
@@ -246,18 +249,38 @@ function ListMode() {
   useEffect(() => {
     seedVocabIfNeeded().then(() => refresh());
   }, []);
+
+  // Calcule la page de 1re apparition de chaque mot (via sa racine).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const map: Record<string, number> = {};
+      for (const e of items) {
+        if (e.root) map[e.id] = await getRootFirstPage(e.root);
+      }
+      if (!cancelled) setFirstPage(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (e) =>
-        e.gloss.toLowerCase().includes(q) ||
-        e.arabic.includes(query.trim()) ||
-        (e.root && e.root.includes(query.trim()))
-    );
-  }, [items, query]);
+    const list = q
+      ? items.filter(
+          (e) =>
+            e.gloss.toLowerCase().includes(q) ||
+            e.arabic.includes(query.trim()) ||
+            (e.root && e.root.includes(query.trim()))
+        )
+      : items;
+    // Tri par ORDRE D'APPARITION dans le Mushaf (depuis le début de Baqara),
+    // quel que soit l'endroit où le mot a été ajouté.
+    const rank = (e: VocabEntry) => firstPage[e.id] ?? Number.POSITIVE_INFINITY;
+    return [...list].sort((a, b) => rank(a) - rank(b));
+  }, [items, query, firstPage]);
 
   const doImport = async () => {
     const n = await importSeed();

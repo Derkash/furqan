@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   getRootOccurrences,
+  getVerseWords,
   describeMorphology,
   type RootOccurrence,
 } from '@/utils/vocab/morphology';
@@ -27,6 +28,9 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Pro
   const [range, setRange] = useState<RangePickerValue>({ mode: 'juz', start: null, end: null });
   const [occ, setOcc] = useState<RootOccurrence[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // Traduction Hamidullah (verset → FR) + mots arabes par verset (pour surligner).
+  const [trans, setTrans] = useState<Record<string, string> | null>(null);
+  const [verseWords, setVerseWords] = useState<Record<string, { position: number; form: string }[]>>({});
 
   const { startPage, endPage } = useMemo(
     () => unitToPageRange(range.mode, range.start, range.end, units),
@@ -37,13 +41,31 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Pro
   const end = endPage ?? 604;
 
   /* eslint-disable react-hooks/set-state-in-effect */
+  // Traduction Hamidullah (chargée une fois).
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/qcf-data/translation-hamidullah.fr.json')
+      .then((r) => r.json())
+      .then((d) => !cancelled && setTrans(d))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getRootOccurrences(root, start, end).then((res) => {
+    getRootOccurrences(root, start, end).then(async (res) => {
       if (cancelled) return;
       setOcc(res);
       setLoading(false);
+      // Charge les mots arabes des versets concernés (pour surligner le mot).
+      const keys = Array.from(new Set(res.map((o) => o.verseKey)));
+      const entries = await Promise.all(
+        keys.map(async (vk) => [vk, await getVerseWords(vk)] as const)
+      );
+      if (!cancelled) setVerseWords(Object.fromEntries(entries));
     });
     return () => {
       cancelled = true;
@@ -192,17 +214,45 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Pro
                   <div className={`space-y-2 ${highlighted ? 'ring-2 ring-[#c9a959]/40 rounded-2xl p-2' : ''}`}>
                     {g.items.map((o) => (
                       <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[#c9a959]/20">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '1.7em' }}>
-                            {o.morph?.form ?? ''}
-                          </span>
+                        <div className="flex items-center justify-between gap-2 mb-1">
                           <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
                             {o.verseKey} · p.{toArabicNumbers(o.page)}
                           </span>
+                          {o.morph && (
+                            <span className="text-[10px] text-gray-400 text-right">
+                              {describeMorphology(o.morph).slice(0, 2).join(' · ')}
+                            </span>
+                          )}
                         </div>
-                        {o.morph && (
-                          <p className="text-[11px] text-gray-500 mt-1">
-                            {describeMorphology(o.morph).slice(0, 3).join(' · ')}
+
+                        {/* Verset arabe — le mot ciblé surligné */}
+                        <p dir="rtl" className="text-[#2d5016] leading-loose" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.6em' }}>
+                          {(verseWords[o.verseKey] ?? []).map((w) => (
+                            <span
+                              key={w.position}
+                              className={
+                                w.position === o.word
+                                  ? 'bg-[#c9a959]/45 rounded px-0.5 font-bold'
+                                  : ''
+                              }
+                            >
+                              {w.form}{' '}
+                            </span>
+                          ))}
+                          {!verseWords[o.verseKey] && (o.morph?.form ?? '')}
+                        </p>
+
+                        {/* Traduction Hamidullah du verset */}
+                        {trans?.[o.verseKey] && (
+                          <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
+                            {trans[o.verseKey]}
+                          </p>
+                        )}
+
+                        {/* Sens du mot, EN GRAS */}
+                        {gloss && (
+                          <p className="text-[12px] text-[#2d5016] mt-1">
+                            → <span className="font-bold">{gloss}</span>
                           </p>
                         )}
                       </div>

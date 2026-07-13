@@ -12,10 +12,10 @@ import { getRootLocations } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
+import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 const THRESHOLD = 110;
-const RANGE_KEY = 'almuraja3a:vocab-range';
 
 interface QItem {
   entry: VocabEntry;
@@ -55,13 +55,9 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
   useEffect(() => {
     seedVocabIfNeeded().then(() => {
       setTotal(getVocab().length);
-      // Restaure la dernière plage (progression) si présente.
-      try {
-        const raw = localStorage.getItem(RANGE_KEY);
-        if (raw) setRange(JSON.parse(raw));
-      } catch {
-        /* ignore */
-      }
+      // Plage GLOBALE partagée (même « où j'en suis » que les exercices).
+      const shared = loadSharedRange();
+      if (shared) setRange({ mode: shared.mode, start: shared.start, end: shared.end });
       setReady(true);
     });
   }, []);
@@ -74,11 +70,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     const lo = Math.min(startPage, endPage);
     const hi = Math.max(startPage, endPage);
     setBuilding(true);
-    try {
-      localStorage.setItem(RANGE_KEY, JSON.stringify(range));
-    } catch {
-      /* ignore */
-    }
+    saveSharedRange({ mode: range.mode, start: range.start, end: range.end });
     const items: QItem[] = [];
     for (const entry of getVocab()) {
       if (!entry.root) continue; // sans racine → non localisable
