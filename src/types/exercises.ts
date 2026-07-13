@@ -9,7 +9,8 @@ export type ExerciseId =
   | 'sequential'
   | 'hifz'
   | 'recitation'
-  | 'page-number';
+  | 'page-number'
+  | 'verse-start';
 
 // ============================================
 // EXERCISE ENUMS

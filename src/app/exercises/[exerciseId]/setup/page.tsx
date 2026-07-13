@@ -169,6 +169,7 @@ export default function SetupPage() {
 
   const isAudioQuiz = exerciseId === 'audio-quiz';
   const isSequential = exerciseId === 'sequential';
+  const isPageNumber = exerciseId === 'page-number';
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
@@ -179,7 +180,9 @@ export default function SetupPage() {
   const [revealFraction, setRevealFraction] = useState<number>(6);
   const [answerMode, setAnswerMode] = useState<'tap' | 'recite'>('tap');
   const [revealTimeout, setRevealTimeout] = useState<number>(0);
-  const [showPositions, setShowPositions] = useState<VersePositionType[]>(['first']);
+  const [showPositions, setShowPositions] = useState<VersePositionType[]>(
+    isPageNumber ? ['first', 'middle', 'last'] : ['first']
+  );
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +264,7 @@ export default function SetupPage() {
       return;
     }
 
-    if (isSequential && showPositions.length === 0) {
+    if ((isSequential || isPageNumber) && showPositions.length === 0) {
       setError('Choisissez au moins un verset à afficher');
       return;
     }
@@ -300,6 +303,9 @@ export default function SetupPage() {
       query.set('show', showPositions.join(','));
       query.set('dir', direction);
       saveSetup(exerciseId, { ...base, showPositions, direction });
+    } else if (isPageNumber) {
+      query.set('show', showPositions.join(','));
+      saveSetup(exerciseId, { ...base, showPositions });
     } else {
       saveSetup(exerciseId, base);
     }
@@ -414,6 +420,17 @@ export default function SetupPage() {
                   </OptionGroup>
                 )}
               </>
+            )}
+
+            {/* Choix spécifiques : Numéro de page */}
+            {isPageNumber && (
+              <OptionGroup label="Versets à dévoiler">
+                <MultiSelect options={POSITION_OPTIONS} selected={showPositions} onToggle={toggleShow} />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Après avoir retrouvé la page, on dévoile au tap les versets choisis
+                  (premier, milieu et/ou dernier).
+                </p>
+              </OptionGroup>
             )}
 
             {/* Choix spécifiques : Séquentiel */}

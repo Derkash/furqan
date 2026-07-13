@@ -540,7 +540,10 @@ function MushafPractice() {
   // et mémorisé pour orienter les prochaines interrogations vers les échecs.
   const [askFound, setAskFound] = useState(false);
   const asksFeedback =
-    exerciseId === 'audio-quiz' || exerciseId === 'sequential' || exerciseId === 'page-number';
+    exerciseId === 'audio-quiz' ||
+    exerciseId === 'sequential' ||
+    exerciseId === 'page-number' ||
+    exerciseId === 'verse-start';
   const roundTargets = useMemo(() => {
     const seen = new Map<string, number>();
     for (const step of state.currentRound?.steps ?? []) {

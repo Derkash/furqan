@@ -8,7 +8,7 @@ export interface RegisteredExercise {
 const EXERCISE_REGISTRY = new Map<ExerciseId, RegisteredExercise>();
 
 // ============================================
-// DÉFINITIONS DES 9 EXERCICES
+// DÉFINITIONS DES EXERCICES
 // ============================================
 
 export const EXERCISES: ExerciseDefinition[] = [
@@ -66,6 +66,20 @@ export const EXERCISES: ExerciseDefinition[] = [
     versePositions: ['first', 'middle', 'last'],
     questions: ['identify_page'],
     icon: 'help-circle',
+    difficulty: 4,
+  },
+  {
+    id: 'verse-start',
+    name: 'Début verset',
+    nameArabic: 'بداية الآية',
+    description:
+      'Seul le début (1/6) d’un verset est dévoilé sur la double page : récitez la suite, puis tapez pour révéler le verset entier',
+    category: 'random',
+    hasAudio: false,
+    progression: 'random',
+    versePositions: ['random'],
+    questions: ['recite_verse'],
+    icon: 'pencil',
     difficulty: 4,
   },
   {

@@ -286,13 +286,23 @@ function frOrdinal(n: number): string {
 export const pageNumberSteps: StepGenerator = (
   pageVerses: PageVerses,
   pageNumber: number,
-  _config: ExerciseConfig,
+  config: ExerciseConfig,
   verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
   const first = pageVerses.firstVerse;
   const last = pageVerses.lastVerse;
   const middle = getMiddleVerse(pageVerses, verseMapData);
   if (!first || !last) return [];
+
+  // Positions à dévoiler, choisies par l'utilisateur (premier / milieu / dernier).
+  // Ordonnées premier→milieu→dernier ; défaut = les trois.
+  const chosen = orderPositions(
+    config.showPositions && config.showPositions.length > 0
+      ? config.showPositions
+      : ['first', 'middle', 'last']
+  );
+  const verseFor = (pos: VersePositionType): VersePosition | null =>
+    pos === 'first' ? first : pos === 'last' ? last : pos === 'middle' ? middle : null;
 
   // Sourate « dominante » de la page = celle qui y a le plus de versets. Le rang
   // de la page se calcule par rapport à la première page de cette sourate.
@@ -314,13 +324,11 @@ export const pageNumberSteps: StepGenerator = (
     ? `Quelle est la ${frOrdinal(ordinal)} page de ${surahName} ?`
     : 'Quelle est cette page ?';
 
-  // Positions à dévoiler (premier → milieu → dernier), dédoublonnées (pages
-  // courtes où milieu = premier/dernier).
-  const labelled = [
-    { verse: first, label: POSITION_LABEL.first },
-    { verse: middle, label: POSITION_LABEL.middle },
-    { verse: last, label: POSITION_LABEL.last },
-  ].filter((x): x is { verse: VersePosition; label: string } => x.verse !== null);
+  // Positions demandées → versets correspondants, dédoublonnés (pages courtes
+  // où milieu = premier/dernier).
+  const labelled = chosen
+    .map((pos) => ({ verse: verseFor(pos), label: POSITION_LABEL[pos] }))
+    .filter((x): x is { verse: VersePosition; label: string } => x.verse !== null);
 
   const seen = new Set<string>();
   const uniq = labelled.filter((x) => {
@@ -329,16 +337,19 @@ export const pageNumberSteps: StepGenerator = (
     return true;
   });
 
+  if (uniq.length === 0) return [];
+
   const steps: ExerciseStep[] = [];
+  const firstLabel = uniq[0].label.toLowerCase();
 
   // Étape 1 : la question, page entièrement masquée (rien de dévoilé).
   steps.push({
     type: 'questioning',
-    targetVerse: first,
+    targetVerse: uniq[0].verse,
     question: 'identify_page',
     message: {
       title: question,
-      subtitle: 'Retrouvez la page, puis tapez pour dévoiler le premier verset',
+      subtitle: `Retrouvez la page, puis tapez pour dévoiler le ${firstLabel}`,
     },
     ui: {
       isBlurred: false,
@@ -367,6 +378,70 @@ export const pageNumberSteps: StepGenerator = (
   });
 
   return steps;
+};
+
+// ============================================
+// DÉBUT VERSET
+// On dévoile uniquement le début (1/6) d'un verset sur la double page ;
+// l'utilisateur récite la suite, puis tape pour révéler le verset entier.
+// Petite préférence pour des versets autres que premier / milieu / dernier
+// de la page (mais on ne s'en prive pas si la page n'en a pas d'autres).
+// ============================================
+
+export const verseStartSteps: StepGenerator = (
+  pageVerses: PageVerses,
+  _pageNumber: number,
+  _config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
+): ExerciseStep[] => {
+  const verses = pageVerses.verses;
+  if (verses.length === 0) return [];
+
+  // Versets « remarquables » de la page à éviter légèrement.
+  const notable = new Set(
+    [
+      pageVerses.firstVerse?.verseKey,
+      pageVerses.lastVerse?.verseKey,
+      getMiddleVerse(pageVerses, verseMapData)?.verseKey,
+    ].filter((k): k is string => Boolean(k))
+  );
+  const others = verses.filter((v) => !notable.has(v.verseKey));
+  // Préférence douce (~70 %) pour les autres versets, sinon tirage sur toute la page.
+  const pool = others.length > 0 && Math.random() < 0.7 ? others : verses;
+  const verse = pool[Math.floor(Math.random() * pool.length)];
+
+  return [
+    {
+      type: 'questioning',
+      targetVerse: verse,
+      question: 'recite_verse',
+      message: {
+        title: 'Complétez le verset',
+        subtitle: 'Voici son début — récitez la suite, puis tapez pour révéler',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [verse.verseKey],
+        highlightedVerse: verse.verseKey,
+        revealFraction: 1,
+      },
+    },
+    {
+      type: 'revealing',
+      targetVerse: verse,
+      message: {
+        title: 'Verset complet',
+        subtitle: 'Question suivante au tap',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: [verse.verseKey],
+        highlightedVerse: verse.verseKey,
+      },
+    },
+  ];
 };
 
 // ============================================
@@ -408,6 +483,7 @@ export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   'audio-quiz': audioQuizSteps,
   sequential: sequentialSteps,
   'page-number': pageNumberSteps,
+  'verse-start': verseStartSteps,
   hifz: hifzSteps,
   // La récitation n'utilise pas la machine à états Mushaf : interface dédiée
   // (RecitationPractice) ; ce générateur ne sert jamais.
