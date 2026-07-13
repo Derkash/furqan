@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 /.next.nosync/
 scripts/.asbab-cache.json
+
+# Source personnelle du lexique (le seed dérivé est dans public/vocab-seed.json)
+ARAB_VOCAB.pdf
+public/morphology/.quran-morphology.txt

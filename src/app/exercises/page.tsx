@@ -63,6 +63,18 @@ export default function ExercisesPage() {
             <ExerciseCard key={exercise.id} exercise={exercise} index={idx} />
           ))}
 
+          {/* Vocabulaire */}
+          <Link
+            href="/vocab"
+            className="group flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#c9a959]/40 text-[#4a7c23] font-semibold text-sm hover:border-[#c9a959] hover:bg-white/60 transition-all"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 7v14" />
+              <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+            </svg>
+            Vocabulaire — capture &amp; racines
+          </Link>
+
           {/* Tableau de bord de maîtrise */}
           <Link
             href="/dashboard"
