@@ -14,11 +14,15 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 interface Props {
   root: string;
   gloss?: string;
+  /** Lemme du mot étudié : son groupe est mis en avant (même sens). */
+  lemma?: string;
   onClose: () => void;
 }
 
-/** Explorateur : toutes les formes d'une racine sur une plage (page/hizb/juz/sourate). */
-export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
+/** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
+ *  (une même racine peut couvrir plusieurs sens : فَتَاة « jeune fille » vs
+ *   اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي mais pas le sens). */
+export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Props) {
   const { data: units } = useQuranUnits();
   const [range, setRange] = useState<RangePickerValue>({ mode: 'juz', start: null, end: null });
   const [occ, setOcc] = useState<RootOccurrence[] | null>(null);
@@ -61,6 +65,27 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
     }
     return forms;
   }, [occ]);
+
+  // Regroupement par LEMME (proxy déterministe du sens). Le lemme du mot étudié
+  // passe en premier ; sinon ordre d'apparition dans le Mushaf.
+  const groups = useMemo(() => {
+    if (!occ) return [];
+    const map = new Map<string, RootOccurrence[]>();
+    for (const o of occ) {
+      const key = o.morph?.lemma ?? '—';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    const arr = Array.from(map, ([lem, items]) => ({ lem, items }));
+    arr.sort((a, b) => {
+      if (lemma) {
+        if (a.lem === lemma) return -1;
+        if (b.lem === lemma) return 1;
+      }
+      return a.items[0].page - b.items[0].page;
+    });
+    return arr;
+  }, [occ, lemma]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={onClose}>
@@ -124,32 +149,68 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
           )}
         </div>
 
-        {/* Liste */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Liste groupée par lemme */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {loading && <p className="text-center text-gray-400 py-6 text-sm">Recherche…</p>}
           {!loading && occ?.length === 0 && (
             <p className="text-center text-gray-500 py-6 text-sm">
               Aucune occurrence sur cette plage.
             </p>
           )}
+          {!loading && groups.length > 1 && (
+            <p className="text-[11px] text-gray-400 italic">
+              Regroupé par forme-mère (lemme) : une même racine peut couvrir plusieurs sens.
+            </p>
+          )}
           {!loading &&
-            occ?.map((o) => (
-              <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[#c9a959]/20">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '1.7em' }}>
-                    {o.morph?.form ?? ''}
-                  </span>
-                  <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
-                    {o.verseKey} · p.{toArabicNumbers(o.page)}
-                  </span>
+            groups.map((g) => {
+              const highlighted = lemma && g.lem === lemma;
+              return (
+                <div key={g.lem}>
+                  {/* En-tête de lemme */}
+                  <div
+                    className={`flex items-baseline gap-2 mb-1.5 px-1 ${
+                      highlighted ? '' : ''
+                    }`}
+                  >
+                    <span
+                      dir="rtl"
+                      className={`font-bold ${highlighted ? 'text-[#2d5016]' : 'text-[#7a5d2c]'}`}
+                      style={{ fontFamily: "'Amiri',serif", fontSize: '1.5em' }}
+                    >
+                      {g.lem}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      {toArabicNumbers(g.items.length)} forme{g.items.length > 1 ? 's' : ''}
+                    </span>
+                    {highlighted && (
+                      <span className="text-[10px] font-bold text-[#4a7c23] bg-[#4a7c23]/10 rounded-full px-2 py-0.5">
+                        ton mot
+                      </span>
+                    )}
+                  </div>
+                  <div className={`space-y-2 ${highlighted ? 'ring-2 ring-[#c9a959]/40 rounded-2xl p-2' : ''}`}>
+                    {g.items.map((o) => (
+                      <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[#c9a959]/20">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '1.7em' }}>
+                            {o.morph?.form ?? ''}
+                          </span>
+                          <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
+                            {o.verseKey} · p.{toArabicNumbers(o.page)}
+                          </span>
+                        </div>
+                        {o.morph && (
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            {describeMorphology(o.morph).slice(0, 3).join(' · ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {o.morph && (
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    {describeMorphology(o.morph).slice(0, 3).join(' · ')}
-                  </p>
-                )}
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
     </div>

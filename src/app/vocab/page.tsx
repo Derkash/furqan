@@ -237,7 +237,7 @@ function ReadMode() {
 function ListMode() {
   const [items, setItems] = useState<VocabEntry[]>([]);
   const [query, setQuery] = useState('');
-  const [explore, setExplore] = useState<{ root: string; gloss?: string } | null>(null);
+  const [explore, setExplore] = useState<{ root: string; gloss?: string; lemma?: string } | null>(null);
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
 
   const refresh = () => setItems(getVocab());
@@ -323,7 +323,7 @@ function ListMode() {
               </div>
               {e.root && (
                 <button
-                  onClick={() => setExplore({ root: e.root!, gloss: e.gloss })}
+                  onClick={() => setExplore({ root: e.root!, gloss: e.gloss, lemma: e.lemma })}
                   title="Voir toutes les formes dans le Coran"
                   className="flex-none text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5 hover:bg-[#2d5016]/20"
                 >
@@ -348,7 +348,7 @@ function ListMode() {
       </div>
 
       {explore && (
-        <OccurrencesExplorer root={explore.root} gloss={explore.gloss} onClose={() => setExplore(null)} />
+        <OccurrencesExplorer root={explore.root} gloss={explore.gloss} lemma={explore.lemma} onClose={() => setExplore(null)} />
       )}
     </div>
   );
