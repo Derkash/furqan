@@ -1,5 +1,21 @@
 import { NextRequest } from 'next/server';
+import { readFile } from 'fs/promises';
+import path from 'path';
 import Anthropic from '@anthropic-ai/sdk';
+
+// Traduction Hamidullah (verset → français), chargée une fois puis mise en
+// cache mémoire. Sert d'ancrage concret pour les glosses.
+let hamidullah: Record<string, string> | null = null;
+async function getHamidullah(): Promise<Record<string, string>> {
+  if (hamidullah) return hamidullah;
+  try {
+    const p = path.join(process.cwd(), 'public', 'qcf-data', 'translation-hamidullah.fr.json');
+    hamidullah = JSON.parse(await readFile(p, 'utf8'));
+  } catch {
+    hamidullah = {};
+  }
+  return hamidullah ?? {};
+}
 
 // Analyse pédagogique d'un mot du Coran pour la section Vocabulaire.
 // La morphologie (racine, temps, mode, préfixes…) vient déjà, de façon
@@ -19,11 +35,14 @@ const MODEL = 'claude-haiku-4-5';
 // Instructions stables → mises en cache (prompt caching) pour réduire le coût.
 const SYSTEM = `Tu es un professeur d'arabe coranique qui aide un francophone ayant des bases en naḥw et ṣarf à mémoriser du vocabulaire.
 
-On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, ne la contredis pas) et le verset où il apparaît. Tu produis, en JSON :
+On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, ne la contredis pas), le verset où il apparaît, et la traduction française de Hamidullah de ce verset. Tu produis, en JSON :
 - baseForm : la forme de base à retenir, VOCALISÉE en arabe. Pour un verbe : le māḍī 3e pers. masc. sing. (forme فَعَلَ) ; pour un nom/adjectif : le singulier indéfini ; ajoute le maṣdar entre parenthèses s'il est pertinent et connu.
 - baseFormType : l'un de "verbe", "nom", "adjectif", "maṣdar", "particule", "autre".
-- frenchGloss : la traduction française de la forme de BASE (pas la forme fléchie), courte (1 à 6 mots).
-- nahw : UNE à DEUX phrases en français expliquant la forme fléchie telle qu'elle apparaît dans le verset — temps/mode, personne, et surtout les préfixes/particules (ex. « précédé de لا nāhiya, d'où le مجزوم », « و de coordination », « article défini », préposition attachée…). Sois précis et pédagogique, sans jargon inutile.
+- frenchGloss : le sens USUEL et CONCRET de la forme de base (pas de la forme fléchie), courte (1 à 6 mots). RÈGLES IMPORTANTES :
+  • Reste fidèle à la manière dont HAMIDULLAH rend ce mot dans le verset fourni (aligne-toi sur son vocabulaire quand c'est ce mot précis qui est traduit).
+  • Donne le sens du registre d'un dictionnaire arabe-français usuel comme l'ABDEL-NOUR (Abd An-Nour) : le mot courant, concret, celui qu'on emploie vraiment — PAS une traduction théorique, littérale ou étymologique.
+  • Ex. préfère « semer la corruption / corrompre » à « détériorer » ; « craindre » à « appréhender par révérence ». Pas de calque morphologique.
+- nahw : UNE à DEUX phrases en français expliquant la forme fléchie telle qu'elle apparaît dans le verset — temps/mode, personne, et surtout les préfixes/particules (ex. « précédé de لا nāhiya, d'où le مجزوم », « و de coordination », « article défini », préposition attachée…). Concret et pédagogique, sans jargon inutile.
 
 Réponds uniquement via le format structuré demandé.`;
 
@@ -69,6 +88,8 @@ export async function POST(req: NextRequest) {
   const { form, root, lemma, pos, morphology, verseKey, verseText } = body;
   if (!form) return new Response('form requis', { status: 400 });
 
+  const trad = verseKey ? (await getHamidullah())[verseKey] : undefined;
+
   const facts = [
     `Mot fléchi : ${form}`,
     root ? `Racine : ${root}` : null,
@@ -77,6 +98,7 @@ export async function POST(req: NextRequest) {
     morphology?.length ? `Analyse : ${morphology.join(' ; ')}` : null,
     verseKey ? `Référence : ${verseKey}` : null,
     verseText ? `Verset : ${verseText}` : null,
+    trad ? `Traduction Hamidullah du verset : ${trad}` : null,
   ]
     .filter(Boolean)
     .join('\n');

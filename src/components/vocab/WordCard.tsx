@@ -194,6 +194,11 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded }:
             {/* Gloss éditable */}
             <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1">
               Traduction (modifiable)
+              {analysis?.llm && (
+                <span className="ml-1 normal-case tracking-normal font-normal text-gray-400">
+                  — sens usuel (Hamidullah / Abdel-Nour)
+                </span>
+              )}
             </label>
             <input
               value={gloss}
