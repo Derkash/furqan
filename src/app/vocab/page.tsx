@@ -12,6 +12,8 @@ import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import ReviewTab from '@/components/vocab/ReviewTab';
 import { getRootFirstPage } from '@/utils/vocab/morphology';
+import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
+import { MODE_LABELS } from '@/utils/exercises/rangeToPages';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getVocab,
@@ -30,6 +32,36 @@ type Mode = 'review' | 'capture' | 'list';
 
 export default function VocabPage() {
   const [mode, setMode] = useState<Mode>('review');
+  const { data: units } = useQuranUnits();
+
+  // Plage GLOBALE, visible et modifiable en permanence en haut.
+  const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
+  const [editing, setEditing] = useState(false);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const s = loadSharedRange();
+    if (s) setRange({ mode: s.mode, start: s.start, end: s.end });
+    else setEditing(true); // 1re fois : on invite à définir la plage
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const { startPage, endPage } = useMemo(
+    () => unitToPageRange(range.mode, range.start, range.end, units),
+    [range, units]
+  );
+  const hasRange = startPage != null && endPage != null;
+
+  const applyRange = (r: RangePickerValue) => {
+    setRange(r);
+    saveSharedRange({ mode: r.mode, start: r.start, end: r.end });
+  };
+
+  // Clé de remontage : quand la plage change, les sous-onglets se recalent.
+  const rangeKey = `${range.mode}:${range.start}:${range.end}`;
+  const recap = hasRange
+    ? `${MODE_LABELS[range.mode]} · pages ${Math.min(startPage!, endPage!)}–${Math.max(startPage!, endPage!)}`
+    : 'Plage non définie';
 
   const tabs: { id: Mode; label: string }[] = [
     { id: 'review', label: '🔁 Réviser' },
@@ -60,9 +92,36 @@ export default function VocabPage() {
         <span className="text-xs opacity-75 hidden sm:inline">Vocabulaire</span>
       </div>
 
-      {mode === 'review' && <ReviewTab onEmpty={() => setMode('capture')} />}
-      {mode === 'capture' && <ReadMode />}
-      {mode === 'list' && <ListMode />}
+      {/* Sélecteur de plage GLOBAL, permanent */}
+      <div className="flex-none bg-[#f4e9d0] border-b border-[#c9a959]/40 px-3 py-1.5">
+        <div className="max-w-2xl mx-auto flex items-center gap-2">
+          <span className="text-[13px]">📍</span>
+          <span className="text-[13px] font-bold text-[#2d5016] flex-1 truncate">
+            {recap}
+          </span>
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="text-[11px] font-bold text-[#4a7c23] border border-[#c9a959]/50 rounded-full px-2.5 py-1 hover:bg-white/60"
+          >
+            {editing ? 'Fermer' : 'Modifier la plage'}
+          </button>
+        </div>
+        {editing && (
+          <div className="max-w-2xl mx-auto mt-2 pb-1">
+            <RangePicker value={range} onChange={applyRange} chapters={units?.chapters ?? []} />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Cette plage s&apos;applique à la révision, aux occurrences et aux exercices.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Contenu — se recale quand la plage change */}
+      <div key={rangeKey} className="flex-1 min-h-0 flex flex-col">
+        {mode === 'review' && <ReviewTab onEmpty={() => setMode('capture')} />}
+        {mode === 'capture' && <ReadMode />}
+        {mode === 'list' && <ListMode />}
+      </div>
     </div>
   );
 }
@@ -88,6 +147,12 @@ function ReadMode() {
   const pair = pairOf(page);
 
   /* eslint-disable react-hooks/set-state-in-effect */
+  // Pré-remplit avec la plage globale (celle du haut).
+  useEffect(() => {
+    const s = loadSharedRange();
+    if (s) setRange({ mode: s.mode, start: s.start, end: s.end });
+  }, []);
+
   useEffect(() => {
     if (!started) return;
     let cancelled = false;

@@ -12,8 +12,8 @@ import { getRootLocations } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
-import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
-import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
+import { loadSharedRange } from '@/utils/exercises/sharedRange';
+import { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 const THRESHOLD = 110;
 
@@ -39,6 +39,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
   const [idx, setIdx] = useState(0);
   const [done, setDone] = useState<{ reviewed: number; known: number } | null>(null);
   const scored = useRef({ reviewed: 0, known: 0 });
+  const [knownCount, setKnownCount] = useState(0); // pour l'affichage (pas de ref en rendu)
 
   const [dx, setDx] = useState(0);
   const [animating, setAnimating] = useState(false);
@@ -70,7 +71,6 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     const lo = Math.min(startPage, endPage);
     const hi = Math.max(startPage, endPage);
     setBuilding(true);
-    saveSharedRange({ mode: range.mode, start: range.start, end: range.end });
     const items: QItem[] = [];
     for (const entry of getVocab()) {
       if (!entry.root) continue; // sans racine → non localisable
@@ -94,6 +94,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     setDx(0);
     setStarted(true);
     scored.current = { reviewed: 0, known: 0 };
+    setKnownCount(0);
   };
 
   const current = queue[idx];
@@ -112,7 +113,10 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     committing.current = true;
     recordReview(current.entry.id, known);
     scored.current.reviewed++;
-    if (known) scored.current.known++;
+    if (known) {
+      scored.current.known++;
+      setKnownCount((c) => c + 1);
+    }
     setAnimating(true);
     setDx(known ? 700 : -700);
   };
@@ -161,38 +165,36 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     );
   }
 
-  // Écran d'accueil : « où en es-tu ? »
+  // Écran d'accueil : on se cale sur la plage GLOBALE (sélecteur en haut).
   if (!started) {
     const hasRange = startPage != null && endPage != null;
     return (
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-5 border border-[#c9a959]/20 mt-2">
-          <h2 className="text-lg font-bold text-[#2d5016] mb-1">Où en es-tu dans le Coran ?</h2>
+      <Centered>
+        <p className="text-[#2d5016] text-lg font-bold mb-1">Parcourir mon vocabulaire</p>
+        {hasRange ? (
           <p className="text-sm text-gray-500 mb-4">
-            Choisis la plage que tu as déjà vue. Je ne te ferai réviser que les mots qui{' '}
-            <b>apparaissent dans cette plage</b> — les autres viendront quand tu avanceras.
+            Sur ta plage (pages {Math.min(startPage!, endPage!)}→{Math.max(startPage!, endPage!)}),
+            je ne te propose que les mots qui <b>y apparaissent</b>.
           </p>
-          <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
-          {hasRange && (
-            <p className="text-xs text-[#7a5d2c] mt-2">
-              pages {Math.min(startPage!, endPage!)} → {Math.max(startPage!, endPage!)}
-            </p>
-          )}
+        ) : (
+          <p className="text-sm text-gray-500 mb-4">Définis ta plage en haut ↑ pour cibler ta révision.</p>
+        )}
+        <div className="flex gap-2 justify-center">
           <button
             onClick={beginRange}
             disabled={!hasRange || building}
-            className="w-full mt-4 py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl disabled:opacity-40 active:scale-[0.98] transition-all"
+            className="px-5 py-2.5 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white rounded-xl text-sm font-bold disabled:opacity-40"
           >
             {building ? 'Préparation…' : 'Réviser cette plage'}
           </button>
           <button
             onClick={beginAll}
-            className="w-full mt-2 py-2 text-[#4a7c23] font-bold text-sm hover:underline"
+            className="px-5 py-2.5 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-xl text-sm font-bold hover:border-[#c9a959]"
           >
-            ou réviser tout mon lexique ({toArabicNumbers(total)})
+            Tout ({toArabicNumbers(total)})
           </button>
         </div>
-      </div>
+      </Centered>
     );
   }
 
@@ -201,9 +203,14 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     return (
       <Centered>
         <p className="text-gray-500 mb-4">Aucun mot de ton lexique dans cette plage.</p>
-        <button onClick={() => setStarted(false)} className="px-4 py-2 bg-[#2d5016] text-white rounded-lg text-sm font-bold">
-          Changer de plage
-        </button>
+        <div className="flex gap-2 justify-center">
+          <button onClick={() => setStarted(false)} className="px-4 py-2 bg-[#2d5016] text-white rounded-lg text-sm font-bold">
+            Retour
+          </button>
+          <button onClick={beginAll} className="px-4 py-2 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-lg text-sm font-bold">
+            Tout mon lexique
+          </button>
+        </div>
       </Centered>
     );
   }
@@ -220,7 +227,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
             Recommencer
           </button>
           <button onClick={() => setStarted(false)} className="px-5 py-2.5 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-xl text-sm font-bold">
-            Changer de plage
+            Retour
           </button>
         </div>
       </Centered>
@@ -242,7 +249,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
           <span>
             {toArabicNumbers(idx + 1)} / {toArabicNumbers(queue.length)}
           </span>
-          <span className="text-[#4a7c23]">✓ {toArabicNumbers(scored.current.known)}</span>
+          <span className="text-[#4a7c23]">✓ {toArabicNumbers(knownCount)}</span>
         </div>
         <div className="h-1.5 bg-[#c9a959]/20 rounded-full overflow-hidden">
           <div className="h-full bg-[#4a7c23] transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
