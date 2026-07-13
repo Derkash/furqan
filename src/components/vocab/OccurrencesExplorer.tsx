@@ -10,6 +10,7 @@ import {
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
+import { loadSharedRange } from '@/utils/exercises/sharedRange';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
  *   اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي mais pas le sens). */
 export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Props) {
   const { data: units } = useQuranUnits();
+  // Par défaut, on se limite à la plage GLOBALE définie en entrant dans le
+  // vocabulaire (modifiable via le sélecteur ci-dessous).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'juz', start: null, end: null });
   const [occ, setOcc] = useState<RootOccurrence[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +44,14 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose }: Pro
   const end = endPage ?? 604;
 
   /* eslint-disable react-hooks/set-state-in-effect */
+  // Se cale sur la plage globale (celle définie en entrant dans le vocabulaire).
+  useEffect(() => {
+    const s = loadSharedRange();
+    if (s && (s.start != null || s.end != null)) {
+      setRange({ mode: s.mode, start: s.start, end: s.end });
+    }
+  }, []);
+
   // Traduction Hamidullah (chargée une fois).
   useEffect(() => {
     let cancelled = false;
