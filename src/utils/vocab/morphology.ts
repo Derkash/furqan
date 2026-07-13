@@ -11,7 +11,7 @@ export interface MorphPGN {
 
 export interface MorphPrefix {
   form: string;
-  type: 'conj' | 'det' | 'prep' | 'fut' | 'emph' | 'intg' | 'neg' | 'other';
+  type: 'conj' | 'rem' | 'det' | 'prep' | 'fut' | 'emph' | 'intg' | 'neg' | 'other';
 }
 
 export interface WordMorphology {
@@ -20,6 +20,8 @@ export interface WordMorphology {
   root?: string; // racine (arabe)
   lemma?: string; // lemme (forme de base du dictionnaire)
   aspect?: 'perf' | 'impf' | 'impv'; // madi / mudari3 / amr
+  voice?: 'pass'; // passif (مبني للمجهول)
+  deriv?: 'act_pcpl' | 'pass_pcpl' | 'masdar'; // اسم فاعل / اسم مفعول / مصدر
   mood?: 'ind' | 'subj' | 'jus'; // marfū' / manṣūb / majzūm
   verbForm?: string; // wazn (1-10)
   pgn?: MorphPGN;
@@ -205,6 +207,7 @@ const POS_LABEL: Record<string, string> = {
 
 const PREFIX_LABEL: Record<MorphPrefix['type'], string> = {
   conj: 'conjonction (و / ف)',
+  rem: 'فـ de reprise (استئناف)',
   det: 'article défini (الـ)',
   prep: 'préposition (بـ / كـ / لـ)',
   fut: 'particule du futur (سـ)',
@@ -218,12 +221,42 @@ const PERSON_LABEL: Record<string, string> = { '1': '1re pers.', '2': '2e pers.'
 const GENDER_LABEL: Record<string, string> = { M: 'masc.', F: 'fém.' };
 const NUMBER_LABEL: Record<string, string> = { S: 'singulier', D: 'duel', P: 'pluriel' };
 
+// Patron (wazn) de chaque forme dérivée, écrit en toutes lettres. Le māḍī est
+// toujours donné ; le muḍāriʿ est ajouté quand il est déterministe (formes II→X).
+// La forme I ne montre que فَعَلَ car sa voyelle de muḍāriʿ n'est pas prévisible.
+const WAZN: Record<number, string> = {
+  1: 'فَعَلَ',
+  2: 'فَعَّلَ يُفَعِّلُ',
+  3: 'فَاعَلَ يُفَاعِلُ',
+  4: 'أَفْعَلَ يُفْعِلُ',
+  5: 'تَفَعَّلَ يَتَفَعَّلُ',
+  6: 'تَفَاعَلَ يَتَفَاعَلُ',
+  7: 'اِنْفَعَلَ يَنْفَعِلُ',
+  8: 'اِفْتَعَلَ يَفْتَعِلُ',
+  9: 'اِفْعَلَّ يَفْعَلُّ',
+  10: 'اِسْتَفْعَلَ يَسْتَفْعِلُ',
+};
+
+function waznLabel(vf: string): string {
+  const n = Number(vf);
+  const w = WAZN[n];
+  return w ? `forme ${w} (${romanForm(vf)})` : `forme ${romanForm(vf)}`;
+}
+
 /** Description nahw compacte d'un mot, en français. */
 export function describeMorphology(m: WordMorphology): string[] {
   const out: string[] = [];
-  out.push(POS_LABEL[m.pos] ?? m.pos);
-  if (m.aspect) out.push(ASPECT_LABEL[m.aspect] ?? m.aspect);
-  if (m.verbForm) out.push(`forme ${romanForm(m.verbForm)}`);
+  const DERIV_LABEL: Record<string, string> = {
+    act_pcpl: 'participe actif (اسم فاعل)',
+    pass_pcpl: 'participe passif (اسم مفعول)',
+    masdar: 'nom d’action (مصدر)',
+  };
+  out.push(m.deriv ? DERIV_LABEL[m.deriv] : POS_LABEL[m.pos] ?? m.pos);
+  if (m.aspect) {
+    const a = ASPECT_LABEL[m.aspect] ?? m.aspect;
+    out.push(m.voice === 'pass' ? `${a} — passif (مبني للمجهول)` : a);
+  }
+  if (m.verbForm) out.push(waznLabel(m.verbForm));
   if (m.mood) out.push(MOOD_LABEL[m.mood] ?? m.mood);
   if (m.pgn) {
     const bits = [

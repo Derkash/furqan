@@ -79,6 +79,7 @@ function parsePGN(flags) {
 /** Type de préfixe lisible depuis les flags d'un segment PREF. */
 function prefixType(flags) {
   if (flags.includes('CONJ')) return 'conj'; // و / ف (coordination)
+  if (flags.includes('REM')) return 'rem'; // ف de reprise (استئناف)
   if (flags.includes('DET')) return 'det'; // ال (article défini)
   if (flags.includes('P')) return 'prep'; // بِ كِ لِ (préposition)
   if (flags.includes('FUT')) return 'fut'; // سَ (futur)
@@ -173,6 +174,13 @@ function build(src) {
     else if (sf.MOOD === 'JUS') mood = 'jus';
     else if (sf.MOOD === 'IND') mood = 'ind';
 
+    // Voix (passif) et type de dérivé nominal (participes, maṣdar)
+    const voice = sf.flags.includes('PASS') ? 'pass' : null;
+    let deriv = null;
+    if (sf.flags.includes('ACT_PCPL')) deriv = 'act_pcpl'; // اسم فاعل
+    else if (sf.flags.includes('PASS_PCPL')) deriv = 'pass_pcpl'; // اسم مفعول
+    else if (sf.flags.includes('VN')) deriv = 'masdar'; // مصدر
+
     const entry = {
       form,
       pos: stem.tag, // V, N, PN, ADJ, PRON, P, ...
@@ -180,6 +188,8 @@ function build(src) {
     if (sf.ROOT) entry.root = sf.ROOT;
     if (sf.LEM) entry.lemma = sf.LEM;
     if (aspect) entry.aspect = aspect;
+    if (voice) entry.voice = voice;
+    if (deriv) entry.deriv = deriv;
     if (mood) entry.mood = mood;
     if (sf.VF) entry.verbForm = sf.VF; // wazn (1-10)
     if (pgn) entry.pgn = pgn;
