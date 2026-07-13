@@ -10,7 +10,7 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
-import ReviewSession from '@/components/vocab/ReviewSession';
+import ReviewTab from '@/components/vocab/ReviewTab';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getVocab,
@@ -59,7 +59,7 @@ export default function VocabPage() {
         <span className="text-xs opacity-75 hidden sm:inline">Vocabulaire</span>
       </div>
 
-      {mode === 'review' && <ReviewSession onEmpty={() => setMode('capture')} />}
+      {mode === 'review' && <ReviewTab onEmpty={() => setMode('capture')} />}
       {mode === 'capture' && <ReadMode />}
       {mode === 'list' && <ListMode />}
     </div>

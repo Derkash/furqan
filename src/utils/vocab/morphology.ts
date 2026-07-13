@@ -167,6 +167,32 @@ export async function getRootInfo(root: string): Promise<RootEntry | null> {
   return roots[root] ?? null;
 }
 
+/**
+ * Emplacements (léger : pages + versets, SANS charger la morphologie détaillée)
+ * d'une racine, éventuellement bornés à une plage de pages. Utilisé pour scoper
+ * la révision « jusqu'où j'en suis ».
+ */
+export async function getRootLocations(
+  root: string,
+  startPage?: number,
+  endPage?: number
+): Promise<{ location: string; verseKey: string; page: number }[]> {
+  const [roots, vp] = await Promise.all([loadRoots(), loadVersePage()]);
+  const entry = roots[root];
+  if (!entry) return [];
+  const lo = startPage ?? 1;
+  const hi = endPage ?? 604;
+  const out: { location: string; verseKey: string; page: number }[] = [];
+  for (const loc of entry.occ) {
+    const [s, v] = loc.split(':');
+    const verseKey = `${s}:${v}`;
+    const page = vp[verseKey] ?? 0;
+    if (page >= lo && page <= hi) out.push({ location: loc, verseKey, page });
+  }
+  out.sort((a, b) => a.page - b.page);
+  return out;
+}
+
 /** Texte arabe (vocalisé) d'un verset, reconstruit depuis les formes QAC. */
 export async function getVerseText(verseKey: string): Promise<string> {
   const [s, v] = verseKey.split(':').map(Number);
