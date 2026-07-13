@@ -1,10 +1,28 @@
 import { NextRequest } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import Anthropic from '@anthropic-ai/sdk';
+import { translate as bingTranslate } from 'bing-translate-api';
 
-// Traduction Hamidullah (verset → français), chargée une fois puis mise en
-// cache mémoire. Sert d'ancrage concret pour les glosses.
+// Analyse rédactionnelle d'un mot du Coran pour la section Vocabulaire.
+// La morphologie (racine, temps, mode, préfixes…) est DÉTERMINISTE côté client
+// (corpus QAC). Cette route ne fournit que : forme de base + traduction FR
+// (+ explication nahw si un LLM est configuré).
+//
+// DEUX MODES, choisis automatiquement :
+//   1) GRATUIT (par défaut, aucune clé) : mot-à-mot ANGLAIS de Quran.com →
+//      traduction FR via Bing (déjà utilisé pour Ibn Kathir). Mis en cache.
+//   2) Claude (si ANTHROPIC_API_KEY est présente) : forme de base classique
+//      (māḍī + muḍāriʿ), gloss usuel ancré Hamidullah/Abdel-Nour, et nahw rédigé.
+
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
+const MODEL = 'claude-haiku-4-5';
+
+// ---- Caches mémoire (par instance) ----
+const verseWordsCache = new Map<string, { position: number; en: string }[]>();
+const translateCache = new Map<string, string>();
+
 let hamidullah: Record<string, string> | null = null;
 async function getHamidullah(): Promise<Record<string, string>> {
   if (hamidullah) return hamidullah;
@@ -17,22 +35,76 @@ async function getHamidullah(): Promise<Record<string, string>> {
   return hamidullah ?? {};
 }
 
-// Analyse pédagogique d'un mot du Coran pour la section Vocabulaire.
-// La morphologie (racine, temps, mode, préfixes…) vient déjà, de façon
-// DÉTERMINISTE, du corpus QAC côté client. Cette route ne fait que la partie
-// rédactionnelle : forme de base à mémoriser, traduction française, et une
-// courte explication nahw en français — à partir des faits fournis.
-//
-// Modèle : Claude Haiku 4.5 (rapide et peu coûteux ; la tâche est cadrée).
-// Le résultat est mémorisé dans l'entrée de vocabulaire de l'utilisateur :
-// chaque mot n'est donc analysé qu'une seule fois.
+// ---- Mode gratuit : Quran.com (mot-à-mot EN) + Bing (EN→FR) ----
 
-export const runtime = 'nodejs';
-export const maxDuration = 30;
+/** Récupère le mot-à-mot anglais d'un verset (Quran.com), mis en cache. */
+async function getVerseWordsEn(verseKey: string): Promise<{ position: number; en: string }[]> {
+  if (verseWordsCache.has(verseKey)) return verseWordsCache.get(verseKey)!;
+  const url = `https://api.quran.com/api/v4/verses/by_key/${verseKey}?words=true&word_translation_language=en`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`quran.com ${res.status}`);
+  const data = await res.json();
+  const words = (data?.verse?.words ?? [])
+    .filter((w: { char_type_name?: string }) => w.char_type_name === 'word')
+    .map((w: { position: number; translation?: { text?: string } }) => ({
+      position: w.position,
+      en: w.translation?.text ?? '',
+    }));
+  verseWordsCache.set(verseKey, words);
+  return words;
+}
 
-const MODEL = 'claude-haiku-4-5';
+/** Traduit EN→FR via Bing, avec cache. Renvoie '' en cas d'échec. */
+async function toFrench(en: string): Promise<string> {
+  const clean = en.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  if (translateCache.has(clean)) return translateCache.get(clean)!;
+  try {
+    const r = await bingTranslate(clean, 'en', 'fr');
+    const fr = r?.translation?.trim() ?? '';
+    translateCache.set(clean, fr);
+    return fr;
+  } catch {
+    return '';
+  }
+}
 
-// Instructions stables → mises en cache (prompt caching) pour réduire le coût.
+function baseTypeFromPos(pos?: string): string {
+  if (pos === 'V') return 'verbe';
+  if (pos === 'ADJ') return 'adjectif';
+  if (pos === 'N' || pos === 'PN') return 'nom';
+  return 'autre';
+}
+
+async function freeAnalyze(input: {
+  form: string;
+  lemma?: string;
+  pos?: string;
+  verseKey?: string;
+  position?: number;
+}) {
+  let frenchGloss = '';
+  if (input.verseKey && input.position) {
+    try {
+      const words = await getVerseWordsEn(input.verseKey);
+      const w = words.find((x) => x.position === input.position);
+      if (w?.en) frenchGloss = await toFrench(w.en);
+    } catch {
+      /* réseau — on renvoie sans gloss */
+    }
+  }
+  return {
+    baseForm: input.lemma || input.form,
+    baseFormType: baseTypeFromPos(input.pos),
+    frenchGloss,
+    nahw: '',
+    llm: false,
+    source: 'quran.com+bing',
+  };
+}
+
+// ---- Mode Claude (optionnel) ----
+
 const SYSTEM = `Tu es un professeur d'arabe coranique qui aide un francophone ayant des bases en naḥw et ṣarf à mémoriser du vocabulaire.
 
 On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, ne la contredis pas), le verset où il apparaît, et la traduction française de Hamidullah de ce verset. Tu produis, en JSON :
@@ -61,15 +133,46 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export async function POST(req: NextRequest) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) {
-    return Response.json(
-      { error: 'ANTHROPIC_API_KEY non configurée', llm: false },
-      { status: 503 }
-    );
-  }
+async function claudeAnalyze(input: {
+  form: string;
+  root?: string;
+  lemma?: string;
+  pos?: string;
+  morphology?: string[];
+  verseKey?: string;
+  verseText?: string;
+}) {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const trad = input.verseKey ? (await getHamidullah())[input.verseKey] : undefined;
+  const facts = [
+    `Mot fléchi : ${input.form}`,
+    input.root ? `Racine : ${input.root}` : null,
+    input.lemma ? `Lemme (QAC) : ${input.lemma}` : null,
+    input.pos ? `Nature : ${input.pos}` : null,
+    input.morphology?.length ? `Analyse : ${input.morphology.join(' ; ')}` : null,
+    input.verseKey ? `Référence : ${input.verseKey}` : null,
+    input.verseText ? `Verset : ${input.verseText}` : null,
+    trad ? `Traduction Hamidullah du verset : ${trad}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 700,
+    system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content: facts }],
+  });
+  const textBlock = message.content.find((b) => b.type === 'text');
+  if (!textBlock || textBlock.type !== 'text') throw new Error('Réponse vide');
+  return { ...JSON.parse(textBlock.text), llm: true, source: 'claude' };
+}
+
+// ---- Point d'entrée ----
+
+export async function POST(req: NextRequest) {
   let body: {
     form?: string;
     root?: string;
@@ -78,51 +181,23 @@ export async function POST(req: NextRequest) {
     morphology?: string[];
     verseKey?: string;
     verseText?: string;
+    position?: number;
   };
   try {
     body = await req.json();
   } catch {
     return new Response('Corps JSON invalide', { status: 400 });
   }
+  if (!body.form) return new Response('form requis', { status: 400 });
+  const input = { ...body, form: body.form };
 
-  const { form, root, lemma, pos, morphology, verseKey, verseText } = body;
-  if (!form) return new Response('form requis', { status: 400 });
-
-  const trad = verseKey ? (await getHamidullah())[verseKey] : undefined;
-
-  const facts = [
-    `Mot fléchi : ${form}`,
-    root ? `Racine : ${root}` : null,
-    lemma ? `Lemme (QAC) : ${lemma}` : null,
-    pos ? `Nature : ${pos}` : null,
-    morphology?.length ? `Analyse : ${morphology.join(' ; ')}` : null,
-    verseKey ? `Référence : ${verseKey}` : null,
-    verseText ? `Verset : ${verseText}` : null,
-    trad ? `Traduction Hamidullah du verset : ${trad}` : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  try {
-    const client = new Anthropic({ apiKey: key });
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 700,
-      system: [
-        { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-      ],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content: facts }],
-    });
-
-    const textBlock = message.content.find((b) => b.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      return Response.json({ error: 'Réponse vide' }, { status: 502 });
+  // Claude si une clé est présente, sinon repli automatique sur le gratuit.
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      return Response.json(await claudeAnalyze(input));
+    } catch {
+      /* échec LLM → on bascule sur le mode gratuit */
     }
-    const parsed = JSON.parse(textBlock.text);
-    return Response.json({ ...parsed, llm: true });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erreur inconnue';
-    return Response.json({ error: msg, llm: false }, { status: 502 });
   }
+  return Response.json(await freeAnalyze(input));
 }
