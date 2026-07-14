@@ -22,7 +22,20 @@ function bare(s) {
     .replace(/ى/g, 'ي')
     .replace(/ؤ/g, 'و')
     .replace(/ئ/g, 'ي')
-    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, '');
+}
+
+// Normalisation « moyenne » : GARDE les voyelles brèves/sukūn/shadda (pour
+// distinguer un nom d'un verbe homographe : بَرْق « éclair » ≠ بَرِقَ verbe),
+// mais neutralise tanwin, alef superscrit, tatweel, sièges de hamza, alef/ya.
+function mnorm(s) {
+  return s
+    .normalize('NFKC')
+    .replace(/[ًٌٍ]/g, '')
+    .replace(/[ٰـ]/g, '')
+    .replace(/[إأآٱ]/g, 'ا')
+    .replace(/[ؤئ]/g, 'ء')
+    .replace(/ى/g, 'ي')
     .replace(/\s+/g, '');
 }
 
@@ -53,8 +66,8 @@ function main() {
   const seed = JSON.parse(fs.readFileSync(srcArg, 'utf8'));
   const verbs = JSON.parse(fs.readFileSync(path.join(MORPH, 'verbs.json'), 'utf8'));
 
-  // Index bare-form -> meilleure info {root, lemma, pos} (par fréquence).
-  const formInfo = new Map(); // bareForm -> Map(sig -> {root,lemma,pos,count})
+  // Index bare-form -> lectures {mnorm, root, lemma, pos, verbForm, count}.
+  const formInfo = new Map();
   for (let s = 1; s <= 114; s++) {
     const f = path.join(MORPH, 'words', `surah-${s}.json`);
     if (!fs.existsSync(f)) continue;
@@ -64,11 +77,13 @@ function main() {
       if (!m.root || !m.form) continue;
       const b = bare(m.form);
       if (!b) continue;
-      const sig = `${m.root}|${m.pos || ''}|${m.verbForm || ''}`;
+      const mn = mnorm(m.form);
+      const sig = `${mn}|${m.root}|${m.pos || ''}|${m.verbForm || ''}`;
       if (!formInfo.has(b)) formInfo.set(b, new Map());
       const im = formInfo.get(b);
       const cur =
-        im.get(sig) || { root: m.root, lemma: m.lemma, pos: m.pos, verbForm: m.verbForm, count: 0 };
+        im.get(sig) ||
+        { mnorm: mn, root: m.root, lemma: m.lemma, pos: m.pos, verbForm: m.verbForm, count: 0 };
       cur.count++;
       im.set(sig, cur);
     }
@@ -80,17 +95,29 @@ function main() {
     const entry = { n: row.n, arabic, french: (row.french || '').trim() };
     const im = formInfo.get(bare(arabic));
     if (im && im.size > 0) {
-      let best = null;
-      for (const info of im.values()) if (!best || info.count > best.count) best = info;
-      entry.root = best.root;
-      if (best.lemma) entry.lemma = best.lemma;
-      // Forme de base classique : VERBE → māḍī + muḍāriʿ (depuis racine|forme).
-      // Repli : lemme normalisé (retire le marqueur féminin ـتْ du māḍī 3fs).
-      if (best.pos === 'V') {
-        const v = best.verbForm ? verbs[`${best.root}|${best.verbForm}`] : null;
+      const readings = Array.from(im.values());
+      // Racine : lecture la plus fréquente (toutes natures confondues).
+      let byFreq = null;
+      for (const r of readings) if (!byFreq || r.count > byFreq.count) byFreq = r;
+      entry.root = byFreq.root;
+      if (byFreq.lemma) entry.lemma = byFreq.lemma;
+
+      // Nature EXACTE : on exige que la forme vocalisée du mot corresponde à une
+      // lecture du corpus (mnorm). Sinon on NE FORCE PAS (homographe nom/verbe).
+      const sform = mnorm(arabic);
+      let chosen = null;
+      for (const r of readings) {
+        if (r.mnorm === sform && (!chosen || r.count > chosen.count)) chosen = r;
+      }
+
+      // māḍī + muḍāriʿ UNIQUEMENT si le mot est réellement un verbe.
+      if (chosen && chosen.pos === 'V') {
+        entry.root = chosen.root;
+        if (chosen.lemma) entry.lemma = chosen.lemma;
+        const v = chosen.verbForm ? verbs[`${chosen.root}|${chosen.verbForm}`] : null;
         const parts = [v?.madi, v?.mudari3].filter(Boolean);
         if (parts.length) entry.baseForm = parts.join(' ');
-        else if (best.lemma) entry.baseForm = normalizeVerbLemma(best.lemma);
+        else if (chosen.lemma) entry.baseForm = normalizeVerbLemma(chosen.lemma);
       }
       matched++;
     }

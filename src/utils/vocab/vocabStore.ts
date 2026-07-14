@@ -30,7 +30,7 @@ const PREFIX = 'almuraja3a:vocab:';
 const SEEDED_PREFIX = 'almuraja3a:vocab-seeded:';
 // Version du seed : bump → resynchronise les formes affichées (baseForm…) des
 // entrées « seed » existantes, SANS toucher à la progression Leitner.
-const SEED_VERSION = '2';
+const SEED_VERSION = '3';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && !!window.localStorage;
@@ -202,24 +202,36 @@ export async function seedVocabIfNeeded(): Promise<number> {
   try {
     const rows: SeedRow[] = await fetch('/vocab-seed.json').then((r) => r.json());
     const list = getVocab();
-    const byId = new Map(list.map((e) => [e.id, e]));
+
+    // Reconstruit entièrement les entrées « seed » (les racines/formes ont pu
+    // être corrigées → l'ancre change). On CONSERVE la progression Leitner en
+    // la reliant par la traduction (gloss), stable d'une version à l'autre.
+    const prog = new Map<
+      string,
+      { box: number; seen: number; correct: number; lastReviewed?: string; addedAt: string }
+    >();
+    for (const e of list) {
+      if (e.source === 'seed') {
+        prog.set(e.gloss, {
+          box: e.box,
+          seen: e.seen,
+          correct: e.correct,
+          lastReviewed: e.lastReviewed,
+          addedAt: e.addedAt,
+        });
+      }
+    }
+
+    const kept = list.filter((e) => e.source !== 'seed'); // mots capturés / manuels
+    const ids = new Set(kept.map((e) => e.id));
     const now = new Date().toISOString();
-    let changed = 0;
+    let count = 0;
     for (const row of rows) {
       const id = anchorOf(row.root, row.arabic);
-      const ex = byId.get(id);
-      if (ex) {
-        // Resynchronise la forme affichée sans effacer la progression.
-        if (ex.source === 'seed') {
-          ex.arabic = row.baseForm || row.arabic;
-          ex.baseForm = row.baseForm;
-          ex.lemma = row.lemma;
-          ex.root = row.root;
-          changed++;
-        }
-        continue;
-      }
-      const entry: VocabEntry = {
+      if (ids.has(id)) continue; // même racine qu'un mot déjà capturé
+      ids.add(id);
+      const p = prog.get(row.french);
+      kept.push({
         id,
         arabic: row.baseForm || row.arabic,
         gloss: row.french,
@@ -227,18 +239,17 @@ export async function seedVocabIfNeeded(): Promise<number> {
         lemma: row.lemma,
         baseForm: row.baseForm,
         source: 'seed',
-        addedAt: now,
-        box: 0,
-        seen: 0,
-        correct: 0,
-      };
-      list.push(entry);
-      byId.set(id, entry);
-      changed++;
+        addedAt: p?.addedAt ?? now,
+        box: p?.box ?? 0,
+        seen: p?.seen ?? 0,
+        correct: p?.correct ?? 0,
+        lastReviewed: p?.lastReviewed,
+      });
+      count++;
     }
-    writeVocab(list);
+    writeVocab(kept);
     window.localStorage.setItem(flagKey, SEED_VERSION);
-    return changed;
+    return count;
   } catch {
     return 0;
   }
