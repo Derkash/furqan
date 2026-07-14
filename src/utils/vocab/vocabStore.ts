@@ -28,6 +28,9 @@ export interface VocabEntry {
 
 const PREFIX = 'almuraja3a:vocab:';
 const SEEDED_PREFIX = 'almuraja3a:vocab-seeded:';
+// Version du seed : bump → resynchronise les formes affichées (baseForm…) des
+// entrées « seed » existantes, SANS toucher à la progression Leitner.
+const SEED_VERSION = '2';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && !!window.localStorage;
@@ -181,6 +184,8 @@ interface SeedRow {
   arabic: string;
   french: string;
   root?: string;
+  lemma?: string;
+  baseForm?: string;
 }
 
 /**
@@ -191,35 +196,49 @@ interface SeedRow {
 export async function seedVocabIfNeeded(): Promise<number> {
   if (!isBrowser()) return 0;
   const flagKey = SEEDED_PREFIX + userKey();
-  if (window.localStorage.getItem(flagKey)) return 0;
-  if (getVocab().length > 0) {
-    window.localStorage.setItem(flagKey, '1');
-    return 0;
-  }
+  // Déjà à la bonne version → rien à faire.
+  if (window.localStorage.getItem(flagKey) === SEED_VERSION) return 0;
+
   try {
     const rows: SeedRow[] = await fetch('/vocab-seed.json').then((r) => r.json());
+    const list = getVocab();
+    const byId = new Map(list.map((e) => [e.id, e]));
     const now = new Date().toISOString();
-    const seen = new Set<string>();
-    const entries: VocabEntry[] = [];
+    let changed = 0;
     for (const row of rows) {
       const id = anchorOf(row.root, row.arabic);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      entries.push({
+      const ex = byId.get(id);
+      if (ex) {
+        // Resynchronise la forme affichée sans effacer la progression.
+        if (ex.source === 'seed') {
+          ex.arabic = row.baseForm || row.arabic;
+          ex.baseForm = row.baseForm;
+          ex.lemma = row.lemma;
+          ex.root = row.root;
+          changed++;
+        }
+        continue;
+      }
+      const entry: VocabEntry = {
         id,
-        arabic: row.arabic,
+        arabic: row.baseForm || row.arabic,
         gloss: row.french,
         root: row.root,
+        lemma: row.lemma,
+        baseForm: row.baseForm,
         source: 'seed',
         addedAt: now,
         box: 0,
         seen: 0,
         correct: 0,
-      });
+      };
+      list.push(entry);
+      byId.set(id, entry);
+      changed++;
     }
-    writeVocab(entries);
-    window.localStorage.setItem(flagKey, '1');
-    return entries.length;
+    writeVocab(list);
+    window.localStorage.setItem(flagKey, SEED_VERSION);
+    return changed;
   } catch {
     return 0;
   }
@@ -240,9 +259,11 @@ export async function importSeed(): Promise<number> {
       have.add(id);
       list.push({
         id,
-        arabic: row.arabic,
+        arabic: row.baseForm || row.arabic,
         gloss: row.french,
         root: row.root,
+        lemma: row.lemma,
+        baseForm: row.baseForm,
         source: 'seed',
         addedAt: now,
         box: 0,

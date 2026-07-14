@@ -23,6 +23,19 @@ const MODEL = 'claude-haiku-4-5';
 const verseWordsCache = new Map<string, { position: number; en: string }[]>();
 const translateCache = new Map<string, string>();
 
+// Table verbe (racine|forme) → { madi, mudari3 } pour la forme de base classique.
+let verbs: Record<string, { madi?: string; mudari3?: string }> | null = null;
+async function getVerbs(): Promise<Record<string, { madi?: string; mudari3?: string }>> {
+  if (verbs) return verbs;
+  try {
+    const p = path.join(process.cwd(), 'public', 'morphology', 'verbs.json');
+    verbs = JSON.parse(await readFile(p, 'utf8'));
+  } catch {
+    verbs = {};
+  }
+  return verbs ?? {};
+}
+
 let hamidullah: Record<string, string> | null = null;
 async function getHamidullah(): Promise<Record<string, string>> {
   if (hamidullah) return hamidullah;
@@ -76,10 +89,23 @@ function baseTypeFromPos(pos?: string): string {
   return 'autre';
 }
 
+/** Forme de base classique : VERBE → māḍī + muḍāriʿ (via racine|forme) ; sinon lemme. */
+async function baseForm(input: { form: string; lemma?: string; pos?: string; root?: string; verbForm?: string }) {
+  if (input.pos === 'V' && input.root && input.verbForm) {
+    const v = (await getVerbs())[`${input.root}|${input.verbForm}`];
+    const parts = [v?.madi, v?.mudari3].filter(Boolean);
+    if (parts.length) return parts.join(' ');
+    if (input.lemma) return input.lemma.replace(/تْ?$/, '') || input.lemma;
+  }
+  return input.lemma || input.form;
+}
+
 async function freeAnalyze(input: {
   form: string;
   lemma?: string;
   pos?: string;
+  root?: string;
+  verbForm?: string;
   verseKey?: string;
   position?: number;
 }) {
@@ -94,7 +120,7 @@ async function freeAnalyze(input: {
     }
   }
   return {
-    baseForm: input.lemma || input.form,
+    baseForm: await baseForm(input),
     baseFormType: baseTypeFromPos(input.pos),
     frenchGloss,
     nahw: '',
@@ -178,6 +204,7 @@ export async function POST(req: NextRequest) {
     root?: string;
     lemma?: string;
     pos?: string;
+    verbForm?: string;
     morphology?: string[];
     verseKey?: string;
     verseText?: string;

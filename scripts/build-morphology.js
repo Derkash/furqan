@@ -229,6 +229,53 @@ function build(src) {
     );
   }
 
+  // 3bis) Table VERBE (clé = racine|forme) → { madi, mudari3 } de citation 3ᵐˢ.
+  //   On dérive la citation depuis les occurrences 3e masc. sing. SANS suffixe
+  //   et à préfixes retirables (و/ف/س…) — la forme obtenue est déjà فَعَلَ / يَفْعُلُ.
+  //   On n'utilise PAS le champ « lemme » (non fiable dans ce corpus).
+  const STRIPPABLE = new Set(['conj', 'rem', 'fut', 'emph', 'intg', 'neg']);
+  const stripPrefixes = (form, prefixes) => {
+    let f = form;
+    for (const p of prefixes || []) if (f.startsWith(p.form)) f = f.slice(p.form.length);
+    return f;
+  };
+  const perfCite = new Map(); // racine|vf -> { form, score }
+  const impfCite = new Map();
+  for (const [, obj] of bySurah) {
+    for (const k of Object.keys(obj)) {
+      const e = obj[k];
+      if (
+        e.pos !== 'V' ||
+        !e.root ||
+        !e.verbForm ||
+        !e.pgn ||
+        e.pgn.person !== '3' ||
+        e.pgn.gender !== 'M' ||
+        e.pgn.number !== 'S' ||
+        e.suffixes ||
+        e.voice === 'pass'
+      ) {
+        continue;
+      }
+      if (e.prefixes && !e.prefixes.every((p) => STRIPPABLE.has(p.type))) continue;
+      const key = `${e.root}|${e.verbForm}`;
+      const citation = stripPrefixes(e.form, e.prefixes);
+      const score = (e.prefixes ? 2 : 0) + (e.mood === 'ind' || !e.mood ? 0 : 1);
+      const map = e.aspect === 'perf' ? perfCite : e.aspect === 'impf' ? impfCite : null;
+      if (!map) continue;
+      const cur = map.get(key);
+      if (!cur || score < cur.score) map.set(key, { form: citation, score });
+    }
+  }
+  const verbs = {};
+  const keys = new Set([...perfCite.keys(), ...impfCite.keys()]);
+  for (const key of keys) {
+    verbs[key] = {};
+    if (perfCite.has(key)) verbs[key].madi = perfCite.get(key).form;
+    if (impfCite.has(key)) verbs[key].mudari3 = impfCite.get(key).form;
+  }
+  fs.writeFileSync(path.join(OUT_DIR, 'verbs.json'), JSON.stringify(verbs));
+
   const rootsObj = {};
   for (const [r, data] of roots) {
     rootsObj[r] = {
@@ -244,7 +291,7 @@ function build(src) {
   );
 
   console.log(
-    `OK — ${wordSegments.size} mots, ${roots.size} racines, ${bySurah.size} sourates.`
+    `OK — ${wordSegments.size} mots, ${roots.size} racines, ${bySurah.size} sourates, ${Object.keys(verbs).length} verbes (racine|forme).`
   );
 }
 

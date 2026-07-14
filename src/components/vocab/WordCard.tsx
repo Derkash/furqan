@@ -68,6 +68,7 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded }:
             root: m.root,
             lemma: m.lemma,
             pos: m.pos,
+            verbForm: m.verbForm,
             position,
             morphology: describeMorphology(m),
             verseKey,
