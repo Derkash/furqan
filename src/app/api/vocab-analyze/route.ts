@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { translate as bingTranslate } from 'bing-translate-api';
+import { getVerseWordsEn, toFrench } from '@/lib/quranWords';
 
 // Analyse rédactionnelle d'un mot du Coran pour la section Vocabulaire.
 // La morphologie (racine, temps, mode, préfixes…) est DÉTERMINISTE côté client
@@ -18,10 +18,6 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 const MODEL = 'claude-haiku-4-5';
-
-// ---- Caches mémoire (par instance) ----
-const verseWordsCache = new Map<string, { position: number; en: string }[]>();
-const translateCache = new Map<string, string>();
 
 // Table verbe (racine|forme) → { madi, mudari3 } pour la forme de base classique.
 let verbs: Record<string, { madi?: string; mudari3?: string }> | null = null;
@@ -48,39 +44,7 @@ async function getHamidullah(): Promise<Record<string, string>> {
   return hamidullah ?? {};
 }
 
-// ---- Mode gratuit : Quran.com (mot-à-mot EN) + Bing (EN→FR) ----
-
-/** Récupère le mot-à-mot anglais d'un verset (Quran.com), mis en cache. */
-async function getVerseWordsEn(verseKey: string): Promise<{ position: number; en: string }[]> {
-  if (verseWordsCache.has(verseKey)) return verseWordsCache.get(verseKey)!;
-  const url = `https://api.quran.com/api/v4/verses/by_key/${verseKey}?words=true&word_translation_language=en`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`quran.com ${res.status}`);
-  const data = await res.json();
-  const words = (data?.verse?.words ?? [])
-    .filter((w: { char_type_name?: string }) => w.char_type_name === 'word')
-    .map((w: { position: number; translation?: { text?: string } }) => ({
-      position: w.position,
-      en: w.translation?.text ?? '',
-    }));
-  verseWordsCache.set(verseKey, words);
-  return words;
-}
-
-/** Traduit EN→FR via Bing, avec cache. Renvoie '' en cas d'échec. */
-async function toFrench(en: string): Promise<string> {
-  const clean = en.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
-  if (!clean) return '';
-  if (translateCache.has(clean)) return translateCache.get(clean)!;
-  try {
-    const r = await bingTranslate(clean, 'en', 'fr');
-    const fr = r?.translation?.trim() ?? '';
-    translateCache.set(clean, fr);
-    return fr;
-  } catch {
-    return '';
-  }
-}
+// ---- Mode gratuit : Quran.com (mot-à-mot EN) + Bing (EN→FR), via @/lib/quranWords ----
 
 function baseTypeFromPos(pos?: string): string {
   if (pos === 'V') return 'verbe';
