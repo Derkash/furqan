@@ -11,6 +11,7 @@ import { getVerseRoots } from '@/utils/vocab/morphology';
 import { getVocab } from '@/utils/vocab/vocabStore';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
+import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 function pairOf(page: number): PagePair {
@@ -48,7 +49,8 @@ export default function LecturePractice() {
   const [rate, setRate] = useState(1);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState(false);
-  const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right' } | null>(null);
+  const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
+  const [occRoot, setOccRoot] = useState<{ root: string; beforePage: number } | null>(null);
   const [loopMode, setLoopMode] = useState(false);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
@@ -317,7 +319,7 @@ export default function LecturePractice() {
     if (!Number.isFinite(position)) return;
     audioRef.current?.pause();
     setPlaying(false);
-    setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right' });
+    setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right', page: p });
   };
 
   const onAdded = useCallback(() => {
@@ -477,6 +479,15 @@ export default function LecturePractice() {
             side={selected.side}
             onClose={() => setSelected(null)}
             onAdded={onAdded}
+            onOccurrences={(root) => setOccRoot({ root, beforePage: selected.page })}
+          />
+        )}
+
+        {occRoot && (
+          <OccurrencesExplorer
+            root={occRoot.root}
+            beforePage={occRoot.beforePage}
+            onClose={() => setOccRoot(null)}
           />
         )}
 

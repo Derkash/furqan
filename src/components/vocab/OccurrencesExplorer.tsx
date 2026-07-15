@@ -19,6 +19,11 @@ interface Props {
   /** Lemme du mot étudié (conservé pour compat. d'appel). */
   lemma?: string;
   onClose: () => void;
+  /**
+   * Si fourni : mode « déjà vu » — on montre les occurrences des pages
+   * 1..beforePage-1 (avant la page courante), sans sélecteur de plage.
+   */
+  beforePage?: number;
 }
 
 /** Clé d'info par forme/wazn : le lemme (chaque dérivation = un sens). */
@@ -29,7 +34,8 @@ function infoKey(o: RootOccurrence): string {
 /** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
  *  (une même racine peut couvrir plusieurs sens : فَتَاة « jeune fille » vs
  *   اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي mais pas le sens). */
-export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
+export default function OccurrencesExplorer({ root, gloss, onClose, beforePage }: Props) {
+  const locked = typeof beforePage === 'number';
   const { data: units } = useQuranUnits();
   // Par défaut, on se limite à la plage GLOBALE définie en entrant dans le
   // vocabulaire (modifiable via le sélecteur ci-dessous).
@@ -46,18 +52,20 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
     () => unitToPageRange(range.mode, range.start, range.end, units),
     [range, units]
   );
-  // Plage effective : la sélection, sinon tout le Coran.
-  const start = startPage ?? 1;
-  const end = endPage ?? 604;
+  // Plage effective : en mode « déjà vu », pages 1..beforePage-1 ; sinon la
+  // sélection, sinon tout le Coran.
+  const start = locked ? 1 : (startPage ?? 1);
+  const end = locked ? Math.max(0, (beforePage ?? 1) - 1) : (endPage ?? 604);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   // Se cale sur la plage globale (celle définie en entrant dans le vocabulaire).
   useEffect(() => {
+    if (locked) return; // plage figée en mode « déjà vu »
     const s = loadSharedRange();
     if (s && (s.start != null || s.end != null)) {
       setRange({ mode: s.mode, start: s.start, end: s.end });
     }
-  }, []);
+  }, [locked]);
 
   // Traduction Hamidullah (chargée une fois).
   useEffect(() => {
@@ -179,19 +187,34 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
             </button>
           </div>
 
-          {/* Plage : page / hizb / juz / sourate (vide = tout le Coran) */}
+          {/* Plage : mode « déjà vu » figé, sinon sélecteur page/hizb/juz/sourate */}
           <div className="mt-3">
-            <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
-            <div className="flex items-center justify-between mt-2 text-xs">
-              <span className="text-[#7a5d2c]">
-                {startPage != null
-                  ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
-                  : 'tout le Coran'}
-              </span>
-              <span className="text-[#4a7c23] font-bold">
-                {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
-              </span>
-            </div>
+            {locked ? (
+              <div className="flex items-center justify-between text-xs bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5">
+                <span className="text-[#2d5016] font-semibold">
+                  {end >= start
+                    ? `Déjà rencontré avant la page ${toArabicNumbers(beforePage!)} (pages ${toArabicNumbers(start)}–${toArabicNumbers(end)})`
+                    : `Aucune page avant la page ${toArabicNumbers(beforePage!)}`}
+                </span>
+                <span className="text-[#4a7c23] font-bold whitespace-nowrap ml-2">
+                  {occ ? `${toArabicNumbers(occ.length)} fois` : ''}
+                </span>
+              </div>
+            ) : (
+              <>
+                <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
+                <div className="flex items-center justify-between mt-2 text-xs">
+                  <span className="text-[#7a5d2c]">
+                    {startPage != null
+                      ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
+                      : 'tout le Coran'}
+                  </span>
+                  <span className="text-[#4a7c23] font-bold">
+                    {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Formes distinctes */}

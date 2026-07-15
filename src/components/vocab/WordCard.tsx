@@ -15,6 +15,8 @@ interface WordCardProps {
   side: 'left' | 'right';
   onClose: () => void;
   onAdded?: (entry: VocabEntry) => void;
+  /** Si fourni : affiche un bouton « occurrences avant cette page » (mode Lecture). */
+  onOccurrences?: (root: string) => void;
 }
 
 interface Analysis {
@@ -26,7 +28,7 @@ interface Analysis {
   stored?: boolean; // rechargé depuis le lexique (aucun appel API)
 }
 
-export default function WordCard({ verseKey, position, side, onClose, onAdded }: WordCardProps) {
+export default function WordCard({ verseKey, position, side, onClose, onAdded, onOccurrences }: WordCardProps) {
   const [morph, setMorph] = useState<WordMorphology | null>(null);
   const [loadingMorph, setLoadingMorph] = useState(true);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -186,6 +188,17 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded }:
                 </span>
               )}
             </div>
+
+            {/* Occurrences déjà rencontrées avant la page courante (mode Lecture) */}
+            {onOccurrences && morph.root && (
+              <button
+                type="button"
+                onClick={() => onOccurrences(morph.root!)}
+                className="w-full mb-3 text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-3 py-2 hover:bg-[#2d5016]/20 flex items-center justify-center gap-1.5"
+              >
+                📜 Déjà vu avant cette page ?
+              </button>
+            )}
 
             {/* Analyse nahw déterministe */}
             <ul className="text-[13px] text-[#4a5a2e] space-y-0.5 mb-3 bg-white/60 rounded-xl p-3 border border-[#c9a959]/20">
