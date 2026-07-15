@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
@@ -20,6 +20,9 @@ import {
   removeVocab,
   seedVocabIfNeeded,
   importSeed,
+  exportVocab,
+  importVocab,
+  autoLocalBackup,
   type VocabEntry,
 } from '@/utils/vocab/vocabStore';
 
@@ -307,12 +310,16 @@ function ListMode() {
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
   // Page de 1re apparition (racine) → tri par ordre du Mushaf depuis Baqara.
   const [firstPage, setFirstPage] = useState<Record<string, number>>({});
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   const refresh = () => setItems(getVocab());
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    seedVocabIfNeeded().then(() => refresh());
+    seedVocabIfNeeded().then(() => {
+      refresh();
+      autoLocalBackup(); // snapshot local quotidien
+    });
   }, []);
 
   // Calcule la page de 1re apparition de chaque mot (via sa racine).
@@ -354,6 +361,35 @@ function ListMode() {
     setTimeout(() => setSeedMsg(null), 2500);
   };
 
+  const flash = (msg: string) => {
+    setSeedMsg(msg);
+    setTimeout(() => setSeedMsg(null), 3000);
+  };
+
+  // Télécharge une sauvegarde JSON de tout le lexique.
+  const doExport = () => {
+    const text = exportVocab();
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `almuraja3a-vocabulaire-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    flash(`Sauvegarde de ${items.length} mot(s) téléchargée ✓`);
+  };
+
+  // Restaure depuis un fichier de sauvegarde (fusion : rien n'est écrasé).
+  const doRestore = async (file: File) => {
+    try {
+      const res = importVocab(await file.text());
+      refresh();
+      flash(`Restauré : +${res.added} ajouté(s), ${res.total} au total`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Import impossible');
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto p-4">
@@ -371,6 +407,35 @@ function ListMode() {
           >
             Importer lexique
           </button>
+        </div>
+
+        {/* Sauvegarde / restauration du lexique perso */}
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={doExport}
+            title="Télécharger une sauvegarde JSON de tous tes mots"
+            className="flex-1 text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-3 py-2 hover:bg-[#2d5016]/20 whitespace-nowrap"
+          >
+            ⬇︎ Exporter (sauvegarde)
+          </button>
+          <button
+            onClick={() => fileInput.current?.click()}
+            title="Restaurer depuis un fichier de sauvegarde (aucun mot écrasé)"
+            className="flex-1 text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-3 py-2 hover:bg-[#2d5016]/20 whitespace-nowrap"
+          >
+            ⬆︎ Restaurer un fichier
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) doRestore(f);
+              e.target.value = ''; // permet de réimporter le même fichier
+            }}
+          />
         </div>
         {seedMsg && <p className="text-xs text-[#4a7c23] mb-2">{seedMsg}</p>}
 

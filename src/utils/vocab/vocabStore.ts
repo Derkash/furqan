@@ -144,6 +144,87 @@ export function removeVocab(id: string): void {
   writeVocab(getVocab().filter((e) => e.id !== id));
 }
 
+// ---- Sauvegarde / restauration ----
+
+const BACKUP_PREFIX = 'almuraja3a:vocab-backup:';
+
+/** Exporte tout le lexique de l'utilisateur courant en JSON (téléchargeable). */
+export function exportVocab(): string {
+  return JSON.stringify(
+    {
+      app: 'almuraja3a',
+      kind: 'vocab-export',
+      version: 1,
+      user: userKey(),
+      exportedAt: new Date().toISOString(),
+      count: getVocab().length,
+      entries: getVocab(),
+    },
+    null,
+    2
+  );
+}
+
+/**
+ * Restaure depuis un JSON exporté (ou un tableau d'entrées). Fusionne par défaut :
+ * on AJOUTE les mots absents et on GARDE l'existant (aucune perte). Renvoie les
+ * compteurs. Lève une erreur si le fichier est illisible / vide.
+ */
+export function importVocab(text: string): { added: number; kept: number; total: number } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('Fichier illisible (JSON invalide).');
+  }
+  const incoming: VocabEntry[] = Array.isArray(parsed)
+    ? (parsed as VocabEntry[])
+    : Array.isArray((parsed as { entries?: VocabEntry[] })?.entries)
+      ? (parsed as { entries: VocabEntry[] }).entries
+      : [];
+  if (!incoming.length) throw new Error('Aucun mot trouvé dans le fichier.');
+
+  const current = getVocab();
+  const byId = new Map(current.map((e) => [e.id, e] as const));
+  const kept = current.length;
+  let added = 0;
+  for (const e of incoming) {
+    if (!e || typeof e.id !== 'string') continue;
+    if (!byId.has(e.id)) {
+      byId.set(e.id, e);
+      added++;
+    }
+  }
+  const merged = [...byId.values()];
+  writeVocab(merged);
+  return { added, kept, total: merged.length };
+}
+
+/**
+ * Snapshot local automatique (une par jour, 7 derniers jours conservés). Filet de
+ * secours contre une suppression accidentelle dans l'app / une reconstruction du
+ * seed — NE protège pas d'un vidage complet du navigateur (→ utiliser l'export).
+ */
+export function autoLocalBackup(): void {
+  if (!isBrowser()) return;
+  try {
+    const cur = getVocab();
+    if (!cur.length) return;
+    const prefix = BACKUP_PREFIX + userKey() + ':';
+    const stamp = new Date().toISOString().slice(0, 10); // AAAA-MM-JJ
+    window.localStorage.setItem(prefix + stamp, JSON.stringify(cur));
+    const keys = Object.keys(window.localStorage)
+      .filter((k) => k.startsWith(prefix))
+      .sort();
+    while (keys.length > 7) {
+      const k = keys.shift();
+      if (k) window.localStorage.removeItem(k);
+    }
+  } catch {
+    /* quota — silencieux */
+  }
+}
+
 // Intervalles Leitner (jours) par boîte 0..5.
 const INTERVALS_DAYS = [0, 1, 3, 7, 16, 45];
 
