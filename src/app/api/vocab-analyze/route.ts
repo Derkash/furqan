@@ -98,7 +98,7 @@ async function freeAnalyze(input: {
 const SYSTEM = `Tu es un professeur d'arabe coranique qui aide un francophone ayant des bases en naḥw et ṣarf à mémoriser du vocabulaire.
 
 On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, ne la contredis pas), le verset où il apparaît, et la traduction française de Hamidullah de ce verset. Tu produis, en JSON :
-- baseForm : la forme de base CLASSIQUE à retenir (celle d'un dictionnaire), VOCALISÉE en arabe. Pour un VERBE : donne le māḍī PUIS le muḍāriʿ, 3e pers. masc. sing. (ex. « هَزَمَ يَهْزِمُ », « أَفْسَدَ يُفْسِدُ ») — mets la bonne voyelle du muḍāriʿ. Pour un nom/adjectif : le singulier indéfini. Si c'est un participe, donne le verbe de base (māḍī + muḍāriʿ) dont il dérive.
+- baseForm : la forme de base à retenir, VOCALISÉE en arabe. Pour un VERBE : donne PAR DÉFAUT le verbe de la RACINE à la FORME I (le triliteral de base), māḍī puis muḍāriʿ 3e pers. masc. sing. — patron فَعَلَ يَفْعُلُ — À CONDITION que ce verbe de forme I existe réellement en arabe. Exemples : اِسْتَغْفَرَ → « غَفَرَ يَغْفِرُ » ; أَفْسَدَ → « فَسَدَ يَفْسُدُ » ; كَتَبَ → « كَتَبَ يَكْتُبُ ». La forme dérivée (استغفر…) sera vue dans les occurrences, pas ici. SEULEMENT si la forme I n'existe pas dans l'usage (racine employée uniquement en forme dérivée), donne alors la forme dérivée réellement employée (ex. اِسْتَطَاعَ يَسْتَطِيعُ). NE FABRIQUE JAMAIS un verbe de forme I inexistant juste pour respecter la règle. Mets la bonne voyelle du muḍāriʿ. Pour un participe, remonte au verbe de forme I de la racine (même règle). Pour un nom/adjectif : le singulier indéfini.
 - baseFormType : l'un de "verbe", "nom", "adjectif", "maṣdar", "particule", "autre".
 - frenchGloss : le sens USUEL et CONCRET de la forme de base (pas de la forme fléchie), courte (1 à 6 mots). RÈGLES IMPORTANTES :
   • Reste fidèle à la manière dont HAMIDULLAH rend ce mot dans le verset fourni (aligne-toi sur son vocabulaire quand c'est ce mot précis qui est traduit).
@@ -128,6 +128,7 @@ async function claudeAnalyze(input: {
   root?: string;
   lemma?: string;
   pos?: string;
+  verbForm?: string;
   morphology?: string[];
   verseKey?: string;
   verseText?: string;
@@ -139,6 +140,7 @@ async function claudeAnalyze(input: {
     input.root ? `Racine : ${input.root}` : null,
     input.lemma ? `Lemme (QAC) : ${input.lemma}` : null,
     input.pos ? `Nature : ${input.pos}` : null,
+    input.verbForm ? `Forme verbale (wazn) : ${input.verbForm} (I=فَعَلَ, IV=أَفْعَلَ, VIII=اِفْتَعَلَ, X=اِسْتَفْعَلَ…)` : null,
     input.morphology?.length ? `Analyse : ${input.morphology.join(' ; ')}` : null,
     input.verseKey ? `Référence : ${input.verseKey}` : null,
     input.verseText ? `Verset : ${input.verseText}` : null,
