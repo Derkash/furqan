@@ -16,9 +16,14 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 interface Props {
   root: string;
   gloss?: string;
-  /** Lemme du mot étudié : son groupe est mis en avant (même sens). */
+  /** Lemme du mot étudié (conservé pour compat. d'appel). */
   lemma?: string;
   onClose: () => void;
+}
+
+/** Clé d'info par forme/wazn : le lemme (chaque dérivation = un sens). */
+function infoKey(o: RootOccurrence): string {
+  return o.morph?.lemma || o.morph?.form || `${o.verseKey}:${o.word}`;
 }
 
 /** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
@@ -34,8 +39,8 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
   // Traduction Hamidullah (verset → FR) + mots arabes par verset (pour surligner).
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   const [verseWords, setVerseWords] = useState<Record<string, { position: number; form: string }[]>>({});
-  // Glose française PAR OCCURRENCE (clé "verseKey:word"), gratuit (Quran.com+Bing).
-  const [wordGloss, setWordGloss] = useState<Record<string, string>>({});
+  // Info par forme/wazn (clé = lemme) : { gloss, note }. Claude si clé, sinon gratuit.
+  const [info, setInfo] = useState<Record<string, { gloss: string; note: string }>>({});
 
   const { startPage, endPage } = useMemo(
     () => unitToPageRange(range.mode, range.start, range.end, units),
@@ -69,7 +74,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setWordGloss({});
+    setInfo({});
     getRootOccurrences(root, start, end).then(async (res) => {
       if (cancelled) return;
       setOcc(res);
@@ -80,18 +85,39 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
         keys.map(async (vk) => [vk, await getVerseWords(vk)] as const)
       );
       if (!cancelled) setVerseWords(Object.fromEntries(entries));
-      // Traduction PAR OCCURRENCE (mot-à-mot Quran.com → FR).
+      // Info par forme/wazn : traduction de la forme + mini-explication.
+      // Clés ASCII (k0, k1…) car Claude ne réécrit pas l'arabe à l'identique.
       try {
-        const items = res.map((o) => ({ verseKey: o.verseKey, position: o.word }));
-        const r = await fetch('/api/word-glosses', {
+        const synth = new Map<string, string>(); // infoKey (arabe) -> clé ASCII
+        const items = [];
+        for (const o of res) {
+          const ik = infoKey(o);
+          if (synth.has(ik)) continue;
+          const sk = `k${synth.size}`;
+          synth.set(ik, sk);
+          items.push({
+            key: sk,
+            form: o.morph?.form,
+            root: o.morph?.root,
+            verbForm: o.morph?.verbForm,
+            pos: o.morph?.pos,
+            verseKey: o.verseKey,
+            position: o.word,
+          });
+        }
+        const r = await fetch('/api/occurrence-info', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items }),
         });
         const data = await r.json();
-        if (!cancelled && data?.glosses) setWordGloss(data.glosses);
+        if (!cancelled && data?.info) {
+          const remapped: Record<string, { gloss: string; note: string }> = {};
+          for (const [ik, sk] of synth) if (data.info[sk]) remapped[ik] = data.info[sk];
+          setInfo(remapped);
+        }
       } catch {
-        /* réseau — on garde le gloss de base */
+        /* réseau — on garde le sens de base */
       }
     });
     return () => {
@@ -195,7 +221,8 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
           )}
           {!loading &&
             ordered.map((o) => {
-              const occGloss = wordGloss[`${o.verseKey}:${o.word}`];
+              const inf = info[infoKey(o)];
+              const occGloss = inf?.gloss;
               return (
                 <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[#c9a959]/20">
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -234,10 +261,13 @@ export default function OccurrencesExplorer({ root, gloss, onClose }: Props) {
                     <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">{trans[o.verseKey]}</p>
                   )}
 
-                  {/* Traduction DE CETTE OCCURRENCE (le mot ici), en gras */}
+                  {/* Traduction DE CETTE forme (en gras) + mini-explication du wazn */}
                   <p className="text-[12px] text-[#2d5016] mt-1">
                     → <span className="font-bold">{occGloss || gloss || '…'}</span>
                   </p>
+                  {inf?.note && (
+                    <p className="text-[11px] text-gray-500 italic mt-0.5">{inf.note}</p>
+                  )}
                 </div>
               );
             })}
