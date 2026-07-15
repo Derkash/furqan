@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
@@ -9,6 +9,7 @@ import { getAudioUrl } from '@/utils/ayahMapping';
 import { getVerseRoots } from '@/utils/vocab/morphology';
 import { getVocab } from '@/utils/vocab/vocabStore';
 import MushafDoublePage from '@/components/MushafDoublePage';
+import WordCard from '@/components/vocab/WordCard';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 function pairOf(page: number): PagePair {
@@ -16,12 +17,18 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
+function vocabRootSet(): Set<string> {
+  const s = new Set<string>();
+  for (const e of getVocab()) if (e.root) s.add(e.root);
+  return s;
+}
+
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 /**
  * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary
- * (vitesse réglable, lecture continue avec tourne-page auto), et voir surlignés
- * tous les mots dont la racine figure dans le lexique personnel.
+ * (vitesse réglable, lecture continue + tourne-page auto), voir surlignés les
+ * mots du lexique, et — en mode « Ajouter » — toucher un mot pour l'ajouter.
  */
 export default function LecturePractice() {
   const params = useSearchParams();
@@ -35,9 +42,12 @@ export default function LecturePractice() {
   const [right, setRight] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
   const [marks, setMarks] = useState<Map<string, string>>(new Map());
+  const [vocabRoots, setVocabRoots] = useState<Set<string>>(new Set());
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
+  const [captureMode, setCaptureMode] = useState(false);
+  const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right' } | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
@@ -50,60 +60,64 @@ export default function LecturePractice() {
   const canPrev = pair.rightPage > loP;
   const canNext = pair.rightPage < hiP;
 
-  // Racines du lexique (pour le surlignage).
-  const vocabRoots = useMemo(() => {
-    const s = new Set<string>();
-    for (const e of getVocab()) if (e.root) s.add(e.root);
-    return s;
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // Racines du lexique (rechargeable après ajout d'un mot).
+  useEffect(() => {
+    setVocabRoots(vocabRootSet());
   }, []);
 
-  // Charge les pages + calcule les marques du lexique quand la double page change.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Charge les pages quand la double page change (+ reprise lecture continue).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     Promise.all([fetchPageVerses(pair.leftPage), fetchPageVerses(pair.rightPage)])
-      .then(async ([l, r]) => {
+      .then(([l, r]) => {
         if (cancelled) return;
         setLeft(l);
         setRight(r);
-        // Marques lexique : mots dont la racine est dans le lexique.
-        const verseKeys = [...(r?.verses ?? []), ...(l?.verses ?? [])].map((v) => v.verseKey);
-        const m = new Map<string, string>();
-        if (vocabRoots.size > 0) {
-          await Promise.all(
-            verseKeys.map(async (vk) => {
-              const words = await getVerseRoots(vk);
-              for (const w of words) {
-                if (w.root && vocabRoots.has(w.root)) m.set(`${vk}#${w.position}`, 'lexicon');
-              }
-            })
-          );
-        }
-        if (!cancelled) {
-          setMarks(m);
-          // Reprise de la lecture continue après un tourne-page.
-          if (autoContinueRef.current) {
-            autoContinueRef.current = false;
-            buildPlaylist(r, l);
-            idxRef.current = 0;
-            playCurrent();
-          }
+        if (autoContinueRef.current) {
+          autoContinueRef.current = false;
+          buildPlaylist(r, l);
+          idxRef.current = 0;
+          playCurrent();
         }
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [pair.leftPage, pair.rightPage, vocabRoots]);
+  }, [pair.leftPage, pair.rightPage]);
+
+  // Marques du lexique : mots dont la racine figure dans le lexique.
+  useEffect(() => {
+    let cancelled = false;
+    const verseKeys = [...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey);
+    if (vocabRoots.size === 0 || verseKeys.length === 0) {
+      setMarks(new Map());
+      return;
+    }
+    (async () => {
+      const m = new Map<string, string>();
+      await Promise.all(
+        verseKeys.map(async (vk) => {
+          const words = await getVerseRoots(vk);
+          for (const w of words) {
+            if (w.root && vocabRoots.has(w.root)) m.set(`${vk}#${w.position}`, 'lexicon');
+          }
+        })
+      );
+      if (!cancelled) setMarks(m);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [right, left, vocabRoots]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Applique la vitesse à l'audio.
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = rate;
   }, [rate]);
 
-  // Nettoyage.
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
@@ -138,7 +152,6 @@ export default function LecturePractice() {
         if (idxRef.current < playlistRef.current.length) {
           playCurrent();
         } else if (pair.rightPage < hiP) {
-          // Fin de la double page → tourner et continuer.
           autoContinueRef.current = true;
           setPage((p) => (p % 2 === 1 ? p : p - 1) + 2);
         } else {
@@ -166,7 +179,6 @@ export default function LecturePractice() {
       setPlaying(false);
       return;
     }
-    // (Re)construit la playlist de la double page courante si besoin.
     if (playlistRef.current.length === 0 || idxRef.current >= playlistRef.current.length) {
       buildPlaylist(right, left);
       idxRef.current = 0;
@@ -187,6 +199,7 @@ export default function LecturePractice() {
 
   function flip(dir: 'prev' | 'next') {
     stop();
+    setSelected(null);
     setPage((p) => {
       const cur = p % 2 === 1 ? p : p - 1;
       let t = cur + (dir === 'next' ? 2 : -2);
@@ -194,6 +207,27 @@ export default function LecturePractice() {
       return t;
     });
   }
+
+  // Tap sur un mot en mode « Ajouter » → ouvrir sa fiche (racine + ajout).
+  const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!captureMode) return;
+    const el = (e.target as HTMLElement).closest('[data-verse]');
+    const verseKey = el?.getAttribute('data-verse');
+    if (!verseKey || el?.classList.contains('ayah-marker')) {
+      setSelected(null);
+      return;
+    }
+    const position = Number(el?.getAttribute('data-pos'));
+    const p = Number(el?.getAttribute('data-page'));
+    if (!Number.isFinite(position)) return;
+    audioRef.current?.pause();
+    setPlaying(false);
+    setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right' });
+  };
+
+  const onAdded = useCallback(() => {
+    setVocabRoots(vocabRootSet()); // le nouveau mot se surligne aussitôt
+  }, []);
 
   const orientation: Orientation = 'landscape';
   const visibleVerses = useMemo(
@@ -211,11 +245,21 @@ export default function LecturePractice() {
         <span className="text-sm font-medium">
           Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
         </span>
-        <span className="text-xs opacity-75 hidden sm:inline">Lecture</span>
+        <button
+          onClick={() => {
+            setCaptureMode((m) => !m);
+            setSelected(null);
+          }}
+          className={`text-xs font-bold rounded-full px-2.5 py-1 border ${
+            captureMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
+          }`}
+        >
+          ➕ Ajouter un mot
+        </button>
       </div>
 
       {/* Contrôles : lecture + vitesse */}
-      <div className="flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3">
+      <div className="flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
         <button
           onClick={togglePlay}
           className="flex items-center gap-2 bg-[#c9a959] text-[#2d5016] font-bold rounded-full px-4 py-1.5 active:scale-95 transition-all"
@@ -248,16 +292,19 @@ export default function LecturePractice() {
         </div>
       </div>
 
-      {/* Légende lexique */}
-      {vocabRoots.size > 0 && (
-        <div className="flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(74,124,35,0.35)', boxShadow: '0 0 0 1.5px rgba(74,124,35,0.5)' }} />
-          mots dont la racine est dans ton lexique
-        </div>
-      )}
+      {/* Légende / mode */}
+      <div className="flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2">
+        {vocabRoots.size > 0 && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(74,124,35,0.35)', boxShadow: '0 0 0 1.5px rgba(74,124,35,0.5)' }} />
+            mots de ton lexique
+          </span>
+        )}
+        {captureMode && <span className="text-[#7a5d2c] font-semibold">· touche un mot pour l&apos;ajouter</span>}
+      </div>
 
       {/* Mushaf */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative" onClick={onMushafClick}>
         <MushafDoublePage
           leftPageVerses={left}
           rightPageVerses={right}
@@ -273,12 +320,25 @@ export default function LecturePractice() {
           onTap={() => {}}
         />
 
+        {selected && (
+          <WordCard
+            verseKey={selected.verseKey}
+            position={selected.position}
+            side={selected.side}
+            onClose={() => setSelected(null)}
+            onAdded={onAdded}
+          />
+        )}
+
         {/* Feuilletage (RTL : avancer = gauche) */}
         <button
           type="button"
           aria-label="Pages précédentes"
           disabled={!canPrev}
-          onClick={() => flip('prev')}
+          onClick={(e) => {
+            e.stopPropagation();
+            flip('prev');
+          }}
           className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
           }`}
@@ -289,7 +349,10 @@ export default function LecturePractice() {
           type="button"
           aria-label="Pages suivantes"
           disabled={!canNext}
-          onClick={() => flip('next')}
+          onClick={(e) => {
+            e.stopPropagation();
+            flip('next');
+          }}
           className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
           }`}
