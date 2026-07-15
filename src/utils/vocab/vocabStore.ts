@@ -129,6 +129,12 @@ export function hasVocab(root: string | undefined, arabic: string): boolean {
   return getVocab().some((e) => e.id === id);
 }
 
+/** L'entrée du lexique pour cette racine (ou forme), sinon null. */
+export function getVocabEntry(root: string | undefined, arabic: string): VocabEntry | null {
+  const id = anchorOf(root, arabic);
+  return getVocab().find((e) => e.id === id) ?? null;
+}
+
 export function updateVocab(id: string, patch: Partial<VocabEntry>): void {
   const list = getVocab().map((e) => (e.id === id ? { ...e, ...patch } : e));
   writeVocab(list);

@@ -7,7 +7,7 @@ import {
   describeMorphology,
   type WordMorphology,
 } from '@/utils/vocab/morphology';
-import { addVocab, hasVocab, type VocabEntry } from '@/utils/vocab/vocabStore';
+import { addVocab, getVocabEntry, type VocabEntry } from '@/utils/vocab/vocabStore';
 
 interface WordCardProps {
   verseKey: string;
@@ -23,6 +23,7 @@ interface Analysis {
   frenchGloss: string;
   nahw: string;
   llm: boolean;
+  stored?: boolean; // rechargé depuis le lexique (aucun appel API)
 }
 
 export default function WordCard({ verseKey, position, side, onClose, onAdded }: WordCardProps) {
@@ -53,7 +54,21 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded }:
       setLoadingMorph(false);
       if (!m) return;
 
-      setAlready(hasVocab(m.root, m.form));
+      // Déjà dans le lexique → on réutilise l'analyse stockée, AUCUN appel API.
+      const existing = getVocabEntry(m.root, m.form);
+      setAlready(!!existing);
+      if (existing && existing.baseForm) {
+        setAnalysis({
+          baseForm: existing.baseForm,
+          baseFormType: existing.baseFormType || '',
+          frenchGloss: existing.gloss,
+          nahw: existing.nahw || '',
+          llm: false,
+          stored: true,
+        });
+        setGloss(existing.gloss);
+        return;
+      }
 
       // Analyse rédactionnelle (forme de base + gloss + nahw) via l'API.
       setLoadingLLM(true);
@@ -198,7 +213,11 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded }:
               Traduction (modifiable)
               {analysis && (
                 <span className="ml-1 normal-case tracking-normal font-normal text-gray-400">
-                  {analysis.llm ? '— sens usuel (Hamidullah / Abdel-Nour)' : '— d’après Quran.com'}
+                  {analysis.stored
+                    ? '— depuis ton lexique (sans nouvel appel)'
+                    : analysis.llm
+                      ? '— sens usuel (Hamidullah / Abdel-Nour)'
+                      : '— d’après Quran.com'}
                 </span>
               )}
             </label>

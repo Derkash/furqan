@@ -24,6 +24,13 @@ interface Item {
 
 const cache = new Map<string, { gloss: string; note: string }>();
 
+// Clé de cache STABLE (identité linguistique de la forme), et non la clé
+// éphémère k0/k1… envoyée par le client — celle-ci est réutilisée d'une racine à
+// l'autre et provoquerait des collisions + un cache inefficace.
+function cacheKey(it: Item): string {
+  return `${it.root ?? ''}|${it.form ?? ''}|${it.verbForm ?? ''}|${it.pos ?? ''}|${it.verseKey ?? ''}`;
+}
+
 let hamidullah: Record<string, string> | null = null;
 async function getHamidullah(): Promise<Record<string, string>> {
   if (hamidullah) return hamidullah;
@@ -102,7 +109,8 @@ export async function POST(req: NextRequest) {
   const result: Record<string, { gloss: string; note: string }> = {};
   const todo: Item[] = [];
   for (const it of items) {
-    if (cache.has(it.key)) result[it.key] = cache.get(it.key)!;
+    const ck = cacheKey(it);
+    if (cache.has(ck)) result[it.key] = cache.get(ck)!;
     else todo.push(it);
   }
   if (todo.length === 0) return Response.json({ info: result });
@@ -112,7 +120,7 @@ export async function POST(req: NextRequest) {
       const got = await claudeBatch(todo);
       for (const it of todo) {
         const v = got[it.key] ?? { gloss: '', note: '' };
-        cache.set(it.key, v);
+        cache.set(cacheKey(it), v);
         result[it.key] = v;
       }
       return Response.json({ info: result });
@@ -126,7 +134,7 @@ export async function POST(req: NextRequest) {
     const gloss =
       it.verseKey && it.position ? await frenchWordGloss(it.verseKey, it.position) : '';
     const v = { gloss, note: '' };
-    if (gloss) cache.set(it.key, v);
+    if (gloss) cache.set(cacheKey(it), v);
     result[it.key] = v;
   }
   return Response.json({ info: result });
