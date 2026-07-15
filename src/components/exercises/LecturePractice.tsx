@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import { getAudioUrl } from '@/utils/ayahMapping';
+import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
 import { getVerseRoots } from '@/utils/vocab/morphology';
 import { getVocab } from '@/utils/vocab/vocabStore';
 import MushafDoublePage from '@/components/MushafDoublePage';
@@ -24,27 +25,6 @@ function vocabRootSet(): Set<string> {
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
-
-/**
- * Récitation FRANÇAISE de Youssouf Leclerc (basée sur la traduction Hamidullah),
- * par verset. On enchaîne : verset arabe (Husary) → sa traduction lue en français.
- *
- * ⚠️ MOTIF D'URL À VERROUILLER — une seule ligne à ajuster avec une vraie URL du
- * site source (le-coran.com / lenoblecoran.fr proposent le verset-par-verset).
- * Jetons disponibles : {s}=sourate, {a}=verset, {s3}/{a3}=zéro-paddés (3 chiffres),
- * {g}=numéro global (1-6236). Ex. « https://.../audio/{s3}{a3}.mp3 ».
- */
-const FRENCH_AUDIO_URL = 'https://www.lenoblecoran.fr/audio/{s3}{a3}.mp3';
-
-function frenchAudioUrl(surah: number, verse: number, globalNumber: number): string {
-  const p3 = (n: number) => String(n).padStart(3, '0');
-  return FRENCH_AUDIO_URL
-    .replaceAll('{s3}', p3(surah))
-    .replaceAll('{a3}', p3(verse))
-    .replaceAll('{s}', String(surah))
-    .replaceAll('{a}', String(verse))
-    .replaceAll('{g}', String(globalNumber));
-}
 
 /**
  * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary
@@ -73,6 +53,7 @@ export default function LecturePractice() {
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   const [frMode, setFrMode] = useState(false); // récitation française après chaque verset arabe
+  const [frAvailable, setFrAvailable] = useState<boolean | null>(null); // édition FR trouvée ?
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
@@ -82,6 +63,7 @@ export default function LecturePractice() {
   const loopRef = useRef(false);
   const frModeRef = useRef(false); // récitation française active ?
   const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant (arabe puis français)
+  const frEditionRef = useRef<string | null>(null); // édition audio FR découverte (alquran.cloud)
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -154,6 +136,13 @@ export default function LecturePractice() {
 
   useEffect(() => {
     frModeRef.current = frMode;
+    // Découvre l'édition audio française (une fois) dès qu'on active le mode.
+    if (frMode && !frEditionRef.current) {
+      resolveFrenchEdition().then((id) => {
+        frEditionRef.current = id;
+        setFrAvailable(id !== null);
+      });
+    }
   }, [frMode]);
 
   // Traduction Hamidullah (chargée à la 1re activation).
@@ -250,20 +239,33 @@ export default function LecturePractice() {
   }
 
   // Lit la traduction française (Youssouf Leclerc) du verset courant, puis avance.
-  // Le verset reste surligné. Si l'audio français échoue (URL absente), on passe
-  // au verset suivant sans bloquer.
+  // Le verset reste surligné. On essaie les débits disponibles dans l'ordre ; si
+  // aucun ne répond (ou pas d'édition FR), on passe au verset suivant sans bloquer.
   function playFrench(rightPage: number) {
     const item = playlistRef.current[idxRef.current];
     if (!item) return;
+    const advance = makeOnEnded(rightPage);
+    const edition = frEditionRef.current;
+    if (!edition) {
+      advance(); // aucune édition française → on n'attend pas
+      return;
+    }
     const a = ensureAudio();
     phaseRef.current = 'fr';
-    const [s, v] = item.verseKey.split(':').map(Number);
-    a.src = frenchAudioUrl(s, v, item.globalNumber);
     a.playbackRate = 1; // la voix française n'a pas à être accélérée comme le tajwid
-    const advance = makeOnEnded(rightPage);
     a.onended = advance;
-    a.onerror = advance; // URL française indisponible → on n'attend pas
-    a.play().catch(() => advance());
+    const urls = frenchAyahUrls(edition, item.globalNumber);
+    let tried = 0;
+    const attempt = () => {
+      if (tried >= urls.length) {
+        advance();
+        return;
+      }
+      a.src = urls[tried++];
+      a.play().catch(() => attempt());
+    };
+    a.onerror = () => attempt(); // débit indisponible → on tente le suivant
+    attempt();
   }
 
   function togglePlay() {
@@ -443,6 +445,12 @@ export default function LecturePractice() {
           </span>
         )}
         {captureMode && <span className="text-[#7a5d2c] font-semibold">· touche un mot pour l&apos;ajouter</span>}
+        {frMode && frAvailable === false && (
+          <span className="text-[#7a3030] font-semibold">· récitation FR indisponible (édition audio introuvable)</span>
+        )}
+        {frMode && frAvailable === true && (
+          <span className="text-[#4a7c23] font-semibold">· 🎧 arabe puis français (Leclerc)</span>
+        )}
       </div>
 
       {/* Mushaf */}
