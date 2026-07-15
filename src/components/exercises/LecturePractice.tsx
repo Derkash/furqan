@@ -53,6 +53,7 @@ export default function LecturePractice() {
   const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
   const idxRef = useRef(0);
   const autoContinueRef = useRef(false);
+  const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -115,6 +116,7 @@ export default function LecturePractice() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
+    rateRef.current = rate;
     if (audioRef.current) audioRef.current.playbackRate = rate;
   }, [rate]);
 
@@ -146,7 +148,15 @@ export default function LecturePractice() {
   function ensureAudio(): HTMLAudioElement {
     if (!audioRef.current) {
       const a = new Audio();
-      a.playbackRate = rate;
+      a.playbackRate = rateRef.current;
+      // Garde une hauteur de voix naturelle même à ×1,5 / ×2.
+      a.preservesPitch = true;
+      (a as HTMLAudioElement & { webkitPreservesPitch?: boolean }).webkitPreservesPitch = true;
+      // Réaffirme la vitesse quand un nouveau verset se charge (certains
+      // navigateurs remettent playbackRate à 1 au changement de src).
+      a.onloadedmetadata = () => {
+        a.playbackRate = rateRef.current;
+      };
       a.onended = () => {
         idxRef.current += 1;
         if (idxRef.current < playlistRef.current.length) {
@@ -168,7 +178,7 @@ export default function LecturePractice() {
     if (!item) return;
     const a = ensureAudio();
     a.src = getAudioUrl(item.globalNumber);
-    a.playbackRate = rate;
+    a.playbackRate = rateRef.current;
     setCurrentVerse(item.verseKey);
     a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }
