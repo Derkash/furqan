@@ -26,6 +26,27 @@ function vocabRootSet(): Set<string> {
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 /**
+ * Récitation FRANÇAISE de Youssouf Leclerc (basée sur la traduction Hamidullah),
+ * par verset. On enchaîne : verset arabe (Husary) → sa traduction lue en français.
+ *
+ * ⚠️ MOTIF D'URL À VERROUILLER — une seule ligne à ajuster avec une vraie URL du
+ * site source (le-coran.com / lenoblecoran.fr proposent le verset-par-verset).
+ * Jetons disponibles : {s}=sourate, {a}=verset, {s3}/{a3}=zéro-paddés (3 chiffres),
+ * {g}=numéro global (1-6236). Ex. « https://.../audio/{s3}{a3}.mp3 ».
+ */
+const FRENCH_AUDIO_URL = 'https://www.lenoblecoran.fr/audio/{s3}{a3}.mp3';
+
+function frenchAudioUrl(surah: number, verse: number, globalNumber: number): string {
+  const p3 = (n: number) => String(n).padStart(3, '0');
+  return FRENCH_AUDIO_URL
+    .replaceAll('{s3}', p3(surah))
+    .replaceAll('{a3}', p3(verse))
+    .replaceAll('{s}', String(surah))
+    .replaceAll('{a}', String(verse))
+    .replaceAll('{g}', String(globalNumber));
+}
+
+/**
  * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary
  * (vitesse réglable, lecture continue + tourne-page auto), voir surlignés les
  * mots du lexique, et — en mode « Ajouter » — toucher un mot pour l'ajouter.
@@ -51,6 +72,7 @@ export default function LecturePractice() {
   const [loopMode, setLoopMode] = useState(false);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
+  const [frMode, setFrMode] = useState(false); // récitation française après chaque verset arabe
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
@@ -58,6 +80,8 @@ export default function LecturePractice() {
   const autoContinueRef = useRef(false);
   const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
   const loopRef = useRef(false);
+  const frModeRef = useRef(false); // récitation française active ?
+  const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant (arabe puis français)
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -128,6 +152,10 @@ export default function LecturePractice() {
     loopRef.current = loopMode;
   }, [loopMode]);
 
+  useEffect(() => {
+    frModeRef.current = frMode;
+  }, [frMode]);
+
   // Traduction Hamidullah (chargée à la 1re activation).
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -174,7 +202,8 @@ export default function LecturePractice() {
       // Réaffirme la vitesse quand un nouveau verset se charge (certains
       // navigateurs remettent playbackRate à 1 au changement de src).
       a.onloadedmetadata = () => {
-        a.playbackRate = rateRef.current;
+        // La voix française reste à ×1 ; seul le tajwid arabe suit la vitesse choisie.
+        a.playbackRate = phaseRef.current === 'fr' ? 1 : rateRef.current;
       };
       audioRef.current = a;
     }
@@ -185,6 +214,12 @@ export default function LecturePractice() {
   // paramètre → pas de valeurs périmées).
   function makeOnEnded(rightPage: number) {
     return () => {
+      // Après l'arabe, si la récitation française est active → lire le français
+      // du même verset avant d'avancer.
+      if (phaseRef.current === 'ar' && frModeRef.current) {
+        playFrench(rightPage);
+        return;
+      }
       idxRef.current += 1;
       if (idxRef.current < playlistRef.current.length) {
         playCurrent();
@@ -205,11 +240,30 @@ export default function LecturePractice() {
     const item = playlistRef.current[idxRef.current];
     if (!item) return;
     const a = ensureAudio();
+    phaseRef.current = 'ar';
     a.src = getAudioUrl(item.globalNumber);
     a.playbackRate = rateRef.current;
     a.onended = makeOnEnded(pair.rightPage);
+    a.onerror = null;
     setCurrentVerse(item.verseKey);
     a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }
+
+  // Lit la traduction française (Youssouf Leclerc) du verset courant, puis avance.
+  // Le verset reste surligné. Si l'audio français échoue (URL absente), on passe
+  // au verset suivant sans bloquer.
+  function playFrench(rightPage: number) {
+    const item = playlistRef.current[idxRef.current];
+    if (!item) return;
+    const a = ensureAudio();
+    phaseRef.current = 'fr';
+    const [s, v] = item.verseKey.split(':').map(Number);
+    a.src = frenchAudioUrl(s, v, item.globalNumber);
+    a.playbackRate = 1; // la voix française n'a pas à être accélérée comme le tajwid
+    const advance = makeOnEnded(rightPage);
+    a.onended = advance;
+    a.onerror = advance; // URL française indisponible → on n'attend pas
+    a.play().catch(() => advance());
   }
 
   function togglePlay() {
@@ -345,7 +399,22 @@ export default function LecturePractice() {
             showTrans ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
           }`}
         >
-          FR
+          FR texte
+        </button>
+        <button
+          onClick={() =>
+            setFrMode((v) => {
+              const next = !v;
+              if (next) setShowTrans(true); // on affiche aussi le texte pendant l'écoute
+              return next;
+            })
+          }
+          title="Réciter la traduction française (Youssouf Leclerc) après chaque verset"
+          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+            frMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
+          }`}
+        >
+          🎧 FR Leclerc
         </button>
       </div>
 
