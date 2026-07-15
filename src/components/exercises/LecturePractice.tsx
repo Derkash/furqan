@@ -48,12 +48,16 @@ export default function LecturePractice() {
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState(false);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right' } | null>(null);
+  const [loopMode, setLoopMode] = useState(false);
+  const [showTrans, setShowTrans] = useState(false);
+  const [trans, setTrans] = useState<Record<string, string> | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
   const idxRef = useRef(0);
   const autoContinueRef = useRef(false);
   const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
+  const loopRef = useRef(false);
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -121,6 +125,21 @@ export default function LecturePractice() {
   }, [rate]);
 
   useEffect(() => {
+    loopRef.current = loopMode;
+  }, [loopMode]);
+
+  // Traduction Hamidullah (chargée à la 1re activation).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!showTrans || trans) return;
+    fetch('/qcf-data/translation-hamidullah.fr.json')
+      .then((r) => r.json())
+      .then((d) => setTrans(d))
+      .catch(() => {});
+  }, [showTrans, trans]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
     return () => {
       audioRef.current?.pause();
     };
@@ -157,20 +176,29 @@ export default function LecturePractice() {
       a.onloadedmetadata = () => {
         a.playbackRate = rateRef.current;
       };
-      a.onended = () => {
-        idxRef.current += 1;
-        if (idxRef.current < playlistRef.current.length) {
-          playCurrent();
-        } else if (pair.rightPage < hiP) {
-          autoContinueRef.current = true;
-          setPage((p) => (p % 2 === 1 ? p : p - 1) + 2);
-        } else {
-          stop();
-        }
-      };
       audioRef.current = a;
     }
     return audioRef.current;
+  }
+
+  // Décide de la suite quand un verset se termine (closure fraîche via ce
+  // paramètre → pas de valeurs périmées).
+  function makeOnEnded(rightPage: number) {
+    return () => {
+      idxRef.current += 1;
+      if (idxRef.current < playlistRef.current.length) {
+        playCurrent();
+      } else if (loopRef.current) {
+        // Boucle : on rejoue la même sélection (double page courante).
+        idxRef.current = 0;
+        playCurrent();
+      } else if (rightPage < hiP) {
+        autoContinueRef.current = true;
+        setPage((p) => (p % 2 === 1 ? p : p - 1) + 2);
+      } else {
+        stop();
+      }
+    };
   }
 
   function playCurrent() {
@@ -179,6 +207,7 @@ export default function LecturePractice() {
     const a = ensureAudio();
     a.src = getAudioUrl(item.globalNumber);
     a.playbackRate = rateRef.current;
+    a.onended = makeOnEnded(pair.rightPage);
     setCurrentVerse(item.verseKey);
     a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }
@@ -300,7 +329,41 @@ export default function LecturePractice() {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setLoopMode((v) => !v)}
+          title="Répéter en boucle"
+          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+            loopMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
+          }`}
+        >
+          🔁 Boucle
+        </button>
+        <button
+          onClick={() => setShowTrans((v) => !v)}
+          title="Afficher la traduction française"
+          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+            showTrans ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
+          }`}
+        >
+          FR
+        </button>
       </div>
+
+      {/* Traduction française du verset en cours (Hamidullah) */}
+      {showTrans && (
+        <div className="flex-none bg-[#fdfaf3] border-b border-[#c9a959]/40 px-4 py-2 text-center">
+          <p className="text-[13px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
+            {currentVerse && trans?.[currentVerse] ? (
+              <>
+                <span className="text-[11px] font-bold text-[#c9a959] mr-1">{currentVerse}</span>
+                {trans[currentVerse]}
+              </>
+            ) : (
+              <span className="text-gray-400 text-xs">Lance l&apos;écoute — la traduction du verset s&apos;affichera ici.</span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Légende / mode */}
       <div className="flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2">
