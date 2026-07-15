@@ -13,6 +13,20 @@ const EXERCISE_REGISTRY = new Map<ExerciseId, RegisteredExercise>();
 
 export const EXERCISES: ExerciseDefinition[] = [
   {
+    id: 'lecture',
+    name: 'Lecture',
+    nameArabic: 'تلاوة وقراءة',
+    description:
+      'Lis le Mushaf sur la plage choisie, écoute la récitation (vitesse réglable), et vois surlignés tous les mots dont la racine est dans ton lexique',
+    category: 'sequential',
+    hasAudio: true,
+    progression: 'forward',
+    versePositions: ['first'],
+    questions: ['none'],
+    icon: 'book',
+    difficulty: 1,
+  },
+  {
     id: 'audio-quiz',
     name: 'Quiz audio',
     nameArabic: 'اختبار صوتي',

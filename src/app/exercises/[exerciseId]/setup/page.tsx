@@ -189,6 +189,8 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isHifz = exerciseId === 'hifz';
+  const isLecture = exerciseId === 'lecture';
+  const noQuestions = isHifz || isLecture;
 
   // Restauration des derniers réglages pour cet exercice (proposés par défaut).
   // Lecture localStorage après montage → 1er rendu vide (pas de décalage d'hydratation).
@@ -282,12 +284,12 @@ export default function SetupPage() {
 
     // Nombre de questions (tous les exercices sauf Hifz, qui est une lecture libre)
     const count = Math.max(1, Math.min(200, Math.round(questionCount) || 1));
-    if (!isHifz) query.set('n', String(count));
+    if (!noQuestions) query.set('n', String(count));
     const base = {
       mode: range.mode,
       start: range.start,
       end: range.end,
-      ...(isHifz ? {} : { questionCount: count }),
+      ...(noQuestions ? {} : { questionCount: count }),
     };
 
     if (isAudioQuiz) {
@@ -476,7 +478,7 @@ export default function SetupPage() {
             )}
 
             {/* Nombre de questions (tous les exercices sauf Hifz) */}
-            {!isHifz && (
+            {!noQuestions && (
               <OptionGroup label="Nombre de questions">
                 <div className="flex items-center gap-2">
                   <button

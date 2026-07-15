@@ -488,4 +488,6 @@ export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   // La récitation n'utilise pas la machine à états Mushaf : interface dédiée
   // (RecitationPractice) ; ce générateur ne sert jamais.
   recitation: () => [],
+  // La lecture a sa propre interface (LecturePractice) ; générateur inutilisé.
+  lecture: () => [],
 };

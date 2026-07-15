@@ -10,7 +10,8 @@ export type ExerciseId =
   | 'hifz'
   | 'recitation'
   | 'page-number'
-  | 'verse-start';
+  | 'verse-start'
+  | 'lecture';
 
 // ============================================
 // EXERCISE ENUMS

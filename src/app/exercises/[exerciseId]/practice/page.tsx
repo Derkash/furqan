@@ -10,6 +10,7 @@ import type { Orientation, VersePosition } from '@/types';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
+import LecturePractice from '@/components/exercises/LecturePractice';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
@@ -36,6 +37,10 @@ export default function PracticePage() {
   // sans les pages Mushaf ni la machine à états des autres exercices.
   if (exerciseId === 'recitation') {
     return <RecitationPractice />;
+  }
+  // La Lecture : lire + écouter (vitesse) + surligner le lexique. Interface dédiée.
+  if (exerciseId === 'lecture') {
+    return <LecturePractice />;
   }
   return <MushafPractice />;
 }

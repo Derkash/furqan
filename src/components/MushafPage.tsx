@@ -581,6 +581,12 @@ export default function MushafPage({
           box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.30);
           border-radius: 6px;
         }
+        /* Mots du lexique personnel (mode Lecture) — vert olive. */
+        .verse-word.mark-lexicon {
+          background-color: rgba(74, 124, 35, 0.20);
+          box-shadow: 0 0 0 2px rgba(74, 124, 35, 0.32);
+          border-radius: 6px;
+        }
         .mushaf-loader {
           position: absolute;
           inset: 0;

@@ -217,6 +217,17 @@ export async function getVerseText(verseKey: string): Promise<string> {
   return words.map((k) => surah[k].form).join(' ');
 }
 
+/** Position + racine de chaque mot d'un verset (pour surligner le lexique). */
+export async function getVerseRoots(
+  verseKey: string
+): Promise<{ position: number; root?: string }[]> {
+  const [s, v] = verseKey.split(':').map(Number);
+  const surah = await loadSurah(s);
+  return Object.keys(surah)
+    .filter((k) => Number(k.split(':')[0]) === v)
+    .map((k) => ({ position: Number(k.split(':')[1]), root: surah[k].root }));
+}
+
 /** Mots (position + forme) d'un verset, pour surligner un mot précis. */
 export async function getVerseWords(
   verseKey: string
