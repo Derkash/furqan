@@ -217,6 +217,11 @@ export async function getVerseText(verseKey: string): Promise<string> {
   return words.map((k) => surah[k].form).join(' ');
 }
 
+/** Carte verset → page (les 6236 versets). */
+export async function getVersePageMap(): Promise<Record<string, number>> {
+  return loadVersePage();
+}
+
 /** Position + racine de chaque mot d'un verset (pour surligner le lexique). */
 export async function getVerseRoots(
   verseKey: string

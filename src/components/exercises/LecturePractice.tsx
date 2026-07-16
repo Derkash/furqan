@@ -6,12 +6,21 @@ import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import { getAudioUrl } from '@/utils/ayahMapping';
-import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
-import { getVerseRoots } from '@/utils/vocab/morphology';
+import { getVerseRoots, getVersePageMap } from '@/utils/vocab/morphology';
 import { getVocab } from '@/utils/vocab/vocabStore';
+import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
+import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
+import {
+  buildSelection,
+  describeSelection,
+  DEFAULT_CONFIG,
+  type PlayConfig,
+  type SelVerse,
+} from '@/utils/exercises/lecturePlaylist';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
+import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 function pairOf(page: number): PagePair {
@@ -28,9 +37,11 @@ function vocabRootSet(): Set<string> {
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 /**
- * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary
- * (vitesse réglable, lecture continue + tourne-page auto), voir surlignés les
- * mots du lexique, et — en mode « Ajouter » — toucher un mot pour l'ajouter.
+ * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary avec
+ * un CONFIGURATEUR complet (plage verset/page/hizb/juz, répétition par verset,
+ * répétition de la sélection, français entre chaque verset), voir surlignés les
+ * mots du lexique, et — en mode « Ajouter » — toucher un mot (fiche + occurrences
+ * déjà rencontrées avant la page courante).
  */
 export default function LecturePractice() {
   const params = useSearchParams();
@@ -38,6 +49,8 @@ export default function LecturePractice() {
   const endPage = Number(params.get('end')) || Math.min(604, startPage + 1);
   const lo = Math.min(startPage, endPage);
   const hi = Math.max(startPage, endPage);
+
+  const { data: units } = useQuranUnits();
 
   const [page, setPage] = useState(lo % 2 === 0 ? lo + 1 : lo);
   const [left, setLeft] = useState<PageVerses | null>(null);
@@ -51,21 +64,29 @@ export default function LecturePractice() {
   const [captureMode, setCaptureMode] = useState(false);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [occRoot, setOccRoot] = useState<{ root: string; beforePage: number } | null>(null);
-  const [loopMode, setLoopMode] = useState(false);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
-  const [frMode, setFrMode] = useState(false); // récitation française après chaque verset arabe
-  const [frAvailable, setFrAvailable] = useState<boolean | null>(null); // édition FR trouvée ?
+  // Configurateur de lecture.
+  const [showConfig, setShowConfig] = useState(false);
+  const [config, setConfig] = useState<PlayConfig>({
+    ...DEFAULT_CONFIG,
+    selMode: 'page',
+    unitStart: lo,
+    unitEnd: hi,
+  });
+  const [sessionActive, setSessionActive] = useState(false);
+  const [frAvailable, setFrAvailable] = useState<boolean | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playlistRef = useRef<{ verseKey: string; globalNumber: number }[]>([]);
-  const idxRef = useRef(0);
-  const autoContinueRef = useRef(false);
   const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
-  const loopRef = useRef(false);
-  const frModeRef = useRef(false); // récitation française active ?
-  const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant (arabe puis français)
-  const frEditionRef = useRef<string | null>(null); // édition audio FR découverte (alquran.cloud)
+  const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant
+  const frEditionRef = useRef<string | null>(null); // édition audio FR découverte
+  // Session de lecture en cours.
+  const selRef = useRef<SelVerse[]>([]);
+  const cfgRef = useRef<PlayConfig>(config);
+  const vIdxRef = useRef(0); // index du verset dans la sélection
+  const repRef = useRef(0); // répétition courante du verset (0-based)
+  const passRef = useRef(0); // passage courant sur toute la sélection (0-based)
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -79,7 +100,7 @@ export default function LecturePractice() {
     setVocabRoots(vocabRootSet());
   }, []);
 
-  // Charge les pages quand la double page change (+ reprise lecture continue).
+  // Charge les pages quand la double page change.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -88,12 +109,6 @@ export default function LecturePractice() {
         if (cancelled) return;
         setLeft(l);
         setRight(r);
-        if (autoContinueRef.current) {
-          autoContinueRef.current = false;
-          buildPlaylist(r, l);
-          idxRef.current = 0;
-          playCurrent();
-        }
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -129,23 +144,9 @@ export default function LecturePractice() {
 
   useEffect(() => {
     rateRef.current = rate;
-    if (audioRef.current) audioRef.current.playbackRate = rate;
+    // Ne change la vitesse que pour l'arabe : la voix française reste à ×1.
+    if (audioRef.current && phaseRef.current !== 'fr') audioRef.current.playbackRate = rate;
   }, [rate]);
-
-  useEffect(() => {
-    loopRef.current = loopMode;
-  }, [loopMode]);
-
-  useEffect(() => {
-    frModeRef.current = frMode;
-    // Découvre l'édition audio française (une fois) dès qu'on active le mode.
-    if (frMode && !frEditionRef.current) {
-      resolveFrenchEdition().then((id) => {
-        frEditionRef.current = id;
-        setFrAvailable(id !== null);
-      });
-    }
-  }, [frMode]);
 
   // Traduction Hamidullah (chargée à la 1re activation).
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -164,36 +165,13 @@ export default function LecturePractice() {
     };
   }, []);
 
-  function orderedVerses(r: PageVerses | null, l: PageVerses | null): VersePosition[] {
-    const seen = new Set<number>();
-    const out: VersePosition[] = [];
-    for (const v of [...(r?.verses ?? []), ...(l?.verses ?? [])]) {
-      if (!seen.has(v.globalNumber)) {
-        seen.add(v.globalNumber);
-        out.push(v);
-      }
-    }
-    return out;
-  }
-
-  function buildPlaylist(r: PageVerses | null, l: PageVerses | null) {
-    playlistRef.current = orderedVerses(r, l).map((v) => ({
-      verseKey: v.verseKey,
-      globalNumber: v.globalNumber,
-    }));
-  }
-
   function ensureAudio(): HTMLAudioElement {
     if (!audioRef.current) {
       const a = new Audio();
       a.playbackRate = rateRef.current;
-      // Garde une hauteur de voix naturelle même à ×1,5 / ×2.
       a.preservesPitch = true;
       (a as HTMLAudioElement & { webkitPreservesPitch?: boolean }).webkitPreservesPitch = true;
-      // Réaffirme la vitesse quand un nouveau verset se charge (certains
-      // navigateurs remettent playbackRate à 1 au changement de src).
       a.onloadedmetadata = () => {
-        // La voix française reste à ×1 ; seul le tajwid arabe suit la vitesse choisie.
         a.playbackRate = phaseRef.current === 'fr' ? 1 : rateRef.current;
       };
       audioRef.current = a;
@@ -201,73 +179,120 @@ export default function LecturePractice() {
     return audioRef.current;
   }
 
-  // Décide de la suite quand un verset se termine (closure fraîche via ce
-  // paramètre → pas de valeurs périmées).
-  function makeOnEnded(rightPage: number) {
-    return () => {
-      // Après l'arabe, si la récitation française est active → lire le français
-      // du même verset avant d'avancer.
-      if (phaseRef.current === 'ar' && frModeRef.current) {
-        playFrench(rightPage);
-        return;
-      }
-      idxRef.current += 1;
-      if (idxRef.current < playlistRef.current.length) {
-        playCurrent();
-      } else if (loopRef.current) {
-        // Boucle : on rejoue la même sélection (double page courante).
-        idxRef.current = 0;
-        playCurrent();
-      } else if (rightPage < hiP) {
-        autoContinueRef.current = true;
-        setPage((p) => (p % 2 === 1 ? p : p - 1) + 2);
-      } else {
-        stop();
-      }
-    };
+  // ---- Moteur de lecture ----
+
+  function followPage(p: number) {
+    const rp = p % 2 === 1 ? p : p - 1;
+    setPage((cur) => (cur === rp ? cur : rp));
   }
 
-  function playCurrent() {
-    const item = playlistRef.current[idxRef.current];
-    if (!item) return;
-    const a = ensureAudio();
+  function playVerseArabic() {
+    const item = selRef.current[vIdxRef.current];
+    if (!item) {
+      stop();
+      return;
+    }
     phaseRef.current = 'ar';
+    setCurrentVerse(item.verseKey);
+    followPage(item.page);
+    const a = ensureAudio();
     a.src = getAudioUrl(item.globalNumber);
     a.playbackRate = rateRef.current;
-    a.onended = makeOnEnded(pair.rightPage);
-    a.onerror = null;
-    setCurrentVerse(item.verseKey);
+    a.onended = onArabicEnded;
+    a.onerror = onArabicEnded; // en cas d'échec réseau on n'attend pas
     a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }
 
-  // Lit la traduction française (Youssouf Leclerc) du verset courant, puis avance.
-  // Le verset reste surligné. On essaie les débits disponibles dans l'ordre ; si
-  // aucun ne répond (ou pas d'édition FR), on passe au verset suivant sans bloquer.
-  function playFrench(rightPage: number) {
-    const item = playlistRef.current[idxRef.current];
-    if (!item) return;
-    const advance = makeOnEnded(rightPage);
-    const edition = frEditionRef.current;
-    if (!edition) {
-      advance(); // aucune édition française → on n'attend pas
+  function onArabicEnded() {
+    const cfg = cfgRef.current;
+    if (repRef.current + 1 < cfg.verseRepeat) {
+      repRef.current += 1;
+      playVerseArabic();
       return;
     }
-    const a = ensureAudio();
+    if (cfg.french && frEditionRef.current) {
+      playVerseFrench();
+      return;
+    }
+    advanceVerse();
+  }
+
+  function playVerseFrench() {
+    const item = selRef.current[vIdxRef.current];
+    const edition = frEditionRef.current;
+    if (!item || !edition) {
+      advanceVerse();
+      return;
+    }
     phaseRef.current = 'fr';
-    a.playbackRate = 1; // la voix française n'a pas à être accélérée comme le tajwid
-    a.onended = advance;
+    const a = ensureAudio();
+    a.playbackRate = 1;
     const urls = frenchAyahUrls(edition, item.globalNumber);
     let tried = 0;
     const attempt = () => {
       if (tried >= urls.length) {
-        advance();
+        advanceVerse();
         return;
       }
       a.src = urls[tried++];
       a.play().catch(() => attempt());
     };
-    a.onerror = () => attempt(); // débit indisponible → on tente le suivant
+    a.onended = () => advanceVerse();
+    a.onerror = () => attempt();
     attempt();
+  }
+
+  function advanceVerse() {
+    const cfg = cfgRef.current;
+    const sel = selRef.current;
+    repRef.current = 0;
+    phaseRef.current = 'ar';
+    if (vIdxRef.current + 1 < sel.length) {
+      vIdxRef.current += 1;
+      playVerseArabic();
+      return;
+    }
+    // Fin de la sélection : rejoue si demandé (0 = infini).
+    passRef.current += 1;
+    if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
+      vIdxRef.current = 0;
+      playVerseArabic();
+      return;
+    }
+    stop();
+  }
+
+  function stop() {
+    audioRef.current?.pause();
+    setPlaying(false);
+    setCurrentVerse(null);
+    setSessionActive(false);
+    vIdxRef.current = 0;
+    repRef.current = 0;
+    passRef.current = 0;
+  }
+
+  async function launch(cfg: PlayConfig) {
+    const vpMap = await getVersePageMap();
+    const sel = buildSelection(cfg, units, vpMap);
+    if (sel.length === 0) return;
+    setConfig(cfg);
+    cfgRef.current = cfg;
+    selRef.current = sel;
+    vIdxRef.current = 0;
+    repRef.current = 0;
+    passRef.current = 0;
+    phaseRef.current = 'ar';
+    setSessionActive(true);
+    setShowConfig(false);
+    if (cfg.french) {
+      resolveFrenchEdition().then((id) => {
+        frEditionRef.current = id;
+        setFrAvailable(id !== null);
+      });
+    }
+    followPage(sel[0].page);
+    playVerseArabic();
   }
 
   function togglePlay() {
@@ -276,22 +301,13 @@ export default function LecturePractice() {
       setPlaying(false);
       return;
     }
-    if (playlistRef.current.length === 0 || idxRef.current >= playlistRef.current.length) {
-      buildPlaylist(right, left);
-      idxRef.current = 0;
-    }
-    if (audioRef.current && audioRef.current.src && audioRef.current.paused && currentVerse) {
+    // Reprise d'une session en pause.
+    if (sessionActive && audioRef.current && audioRef.current.src) {
       audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
-    } else {
-      playCurrent();
+      return;
     }
-  }
-
-  function stop() {
-    audioRef.current?.pause();
-    setPlaying(false);
-    setCurrentVerse(null);
-    idxRef.current = 0;
+    // Sinon : ouvrir le configurateur.
+    setShowConfig(true);
   }
 
   function flip(dir: 'prev' | 'next') {
@@ -305,7 +321,7 @@ export default function LecturePractice() {
     });
   }
 
-  // Tap sur un mot en mode « Ajouter » → ouvrir sa fiche (racine + ajout).
+  // Tap sur un mot en mode « Ajouter » → ouvrir sa fiche (racine + ajout + occurrences).
   const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!captureMode) return;
     const el = (e.target as HTMLElement).closest('[data-verse]');
@@ -331,6 +347,7 @@ export default function LecturePractice() {
     () => new Set([...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey)),
     [right, left]
   );
+  const selCount = selRef.current.length;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
@@ -355,7 +372,7 @@ export default function LecturePractice() {
         </button>
       </div>
 
-      {/* Contrôles : lecture + vitesse */}
+      {/* Contrôles : lecture + vitesse + réglages */}
       <div className="flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
         <button
           onClick={togglePlay}
@@ -369,10 +386,26 @@ export default function LecturePractice() {
           ) : (
             <>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-              Écouter
+              {sessionActive ? 'Reprendre' : 'Écouter'}
             </>
           )}
         </button>
+        <button
+          onClick={() => setShowConfig(true)}
+          title="Configurer la lecture (plage, répétitions, français)"
+          className="flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#c9a959] text-[#c9a959] hover:bg-[#1f3a0f]"
+        >
+          ⚙️ Réglages
+        </button>
+        {sessionActive && (
+          <button
+            onClick={stop}
+            title="Arrêter"
+            className="text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#7a3030] text-[#e7b7b7] hover:bg-[#1f3a0f]"
+          >
+            ■ Stop
+          </button>
+        )}
         <div className="flex items-center gap-1">
           <span className="text-[11px] text-[#c9a959] mr-1">Vitesse</span>
           {SPEEDS.map((s) => (
@@ -388,39 +421,25 @@ export default function LecturePractice() {
           ))}
         </div>
         <button
-          onClick={() => setLoopMode((v) => !v)}
-          title="Répéter en boucle"
-          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-            loopMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
-          }`}
-        >
-          🔁 Boucle
-        </button>
-        <button
           onClick={() => setShowTrans((v) => !v)}
-          title="Afficher la traduction française"
+          title="Afficher la traduction française du verset"
           className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
             showTrans ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
           }`}
         >
           FR texte
         </button>
-        <button
-          onClick={() =>
-            setFrMode((v) => {
-              const next = !v;
-              if (next) setShowTrans(true); // on affiche aussi le texte pendant l'écoute
-              return next;
-            })
-          }
-          title="Réciter la traduction française (Youssouf Leclerc) après chaque verset"
-          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-            frMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
-          }`}
-        >
-          🎧 FR Leclerc
-        </button>
       </div>
+
+      {/* Récap sélection en cours */}
+      {sessionActive && (
+        <div className="flex-none bg-[#1f3a0f] text-[#c9a959] text-[11px] px-3 py-1 text-center">
+          🎧 {describeSelection(config, selCount)}
+          {config.french && frAvailable === false && (
+            <span className="text-[#e7b7b7]"> · récitation FR indisponible</span>
+          )}
+        </div>
+      )}
 
       {/* Traduction française du verset en cours (Hamidullah) */}
       {showTrans && (
@@ -446,13 +465,7 @@ export default function LecturePractice() {
             mots de ton lexique
           </span>
         )}
-        {captureMode && <span className="text-[#7a5d2c] font-semibold">· touche un mot pour l&apos;ajouter</span>}
-        {frMode && frAvailable === false && (
-          <span className="text-[#7a3030] font-semibold">· récitation FR indisponible (édition audio introuvable)</span>
-        )}
-        {frMode && frAvailable === true && (
-          <span className="text-[#4a7c23] font-semibold">· 🎧 arabe puis français (Leclerc)</span>
-        )}
+        {captureMode && <span className="text-[#7a5d2c] font-semibold">· touche un mot pour l&apos;ajouter / voir ses occurrences</span>}
       </div>
 
       {/* Mushaf */}
@@ -521,6 +534,15 @@ export default function LecturePractice() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
         </button>
       </div>
+
+      {showConfig && (
+        <PlaybackConfig
+          initial={config}
+          chapters={units?.chapters ?? []}
+          onLaunch={launch}
+          onClose={() => setShowConfig(false)}
+        />
+      )}
     </div>
   );
 }
