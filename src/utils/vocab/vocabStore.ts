@@ -30,7 +30,7 @@ const PREFIX = 'almuraja3a:vocab:';
 const SEEDED_PREFIX = 'almuraja3a:vocab-seeded:';
 // Version du seed : bump → resynchronise les formes affichées (baseForm…) des
 // entrées « seed » existantes, SANS toucher à la progression Leitner.
-const SEED_VERSION = '3';
+const SEED_VERSION = '4';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && !!window.localStorage;
@@ -273,6 +273,7 @@ interface SeedRow {
   root?: string;
   lemma?: string;
   baseForm?: string;
+  baseFormType?: string;
 }
 
 /**
@@ -325,6 +326,7 @@ export async function seedVocabIfNeeded(): Promise<number> {
         root: row.root,
         lemma: row.lemma,
         baseForm: row.baseForm,
+        baseFormType: row.baseFormType,
         source: 'seed',
         addedAt: p?.addedAt ?? now,
         box: p?.box ?? 0,
@@ -362,6 +364,7 @@ export async function importSeed(): Promise<number> {
         root: row.root,
         lemma: row.lemma,
         baseForm: row.baseForm,
+        baseFormType: row.baseFormType,
         source: 'seed',
         addedAt: now,
         box: 0,
