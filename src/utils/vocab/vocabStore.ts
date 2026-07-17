@@ -6,6 +6,7 @@
 // ses débuts). La synchronisation Supabase pourra être ajoutée ensuite.
 
 import { getCurrentUser } from '@/utils/exercises/userStats';
+import { pushVocabEntry, deleteVocabRemote, pushVocabBulk } from './vocabSync';
 
 export interface VocabEntry {
   id: string; // ancre : "r:<racine>" ou "f:<forme nue>"
@@ -80,6 +81,11 @@ function writeVocab(list: VocabEntry[]) {
   }
 }
 
+/** Remplace la liste locale (utilisé par l'hydratation Supabase). */
+export function setVocabList(list: VocabEntry[]): void {
+  writeVocab(list);
+}
+
 export interface AddInput {
   arabic: string;
   gloss: string;
@@ -120,6 +126,7 @@ export function addVocab(input: AddInput): AddResult {
     correct: 0,
   };
   writeVocab([entry, ...list]);
+  pushVocabEntry(getCurrentUser(), entry); // sync Supabase (compte)
   return { status: 'added', entry };
 }
 
@@ -138,10 +145,13 @@ export function getVocabEntry(root: string | undefined, arabic: string): VocabEn
 export function updateVocab(id: string, patch: Partial<VocabEntry>): void {
   const list = getVocab().map((e) => (e.id === id ? { ...e, ...patch } : e));
   writeVocab(list);
+  const updated = list.find((e) => e.id === id);
+  if (updated) pushVocabEntry(getCurrentUser(), updated);
 }
 
 export function removeVocab(id: string): void {
   writeVocab(getVocab().filter((e) => e.id !== id));
+  deleteVocabRemote(getCurrentUser(), id);
 }
 
 // ---- Sauvegarde / restauration ----
@@ -262,6 +272,8 @@ export function recordReview(id: string, correct: boolean): void {
     };
   });
   writeVocab(list);
+  const updated = list.find((e) => e.id === id);
+  if (updated) pushVocabEntry(getCurrentUser(), updated);
 }
 
 // ---- Seed du lexique personnel ----
@@ -337,6 +349,7 @@ export async function seedVocabIfNeeded(): Promise<number> {
       count++;
     }
     writeVocab(kept);
+    pushVocabBulk(getCurrentUser(), kept); // le lexique du compte inclut le seed
     window.localStorage.setItem(flagKey, SEED_VERSION);
     return count;
   } catch {

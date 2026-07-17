@@ -13,6 +13,7 @@ import {
   pushVerseResult,
 } from './progressSync';
 import { hydrateSetupsLocal } from './exerciseMemory';
+import { hydrateVocab } from '@/utils/vocab/vocabSync';
 
 export type MistakeType = 'oubli' | 'inversion' | 'harakat' | 'mot';
 
@@ -98,9 +99,13 @@ function validateCredentials(
   };
 }
 
-/** Hydrate le cache local (stats + réglages) depuis Supabase après connexion. */
+/** Hydrate le cache local (stats + réglages + vocabulaire) depuis Supabase après connexion. */
 async function hydrateFromRemote(username: string): Promise<void> {
-  const [stats, setups] = await Promise.all([fetchStats(username), fetchSetups(username)]);
+  const [stats, setups] = await Promise.all([
+    fetchStats(username),
+    fetchSetups(username),
+    hydrateVocab(username), // vocabulaire par compte (fusion distant/local)
+  ]);
   if (stats) saveStats(username, stats);
   if (setups) hydrateSetupsLocal(setups);
 }
