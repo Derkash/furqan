@@ -8,7 +8,7 @@ const audioCache = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
 
 /** Récupère (ou synthétise) l'audio d'un texte, avec cache et déduplication. */
-function fetchTTS(text: string): Promise<string | null> {
+export function fetchTTS(text: string): Promise<string | null> {
   const cached = audioCache.get(text);
   if (cached) return Promise.resolve(cached);
   if (!pending.has(text)) {

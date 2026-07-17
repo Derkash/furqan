@@ -186,15 +186,32 @@ export default function PlaybackConfig({ initial, chapters, onLaunch, onClose }:
             </div>
           </div>
 
-          {/* Français entre chaque verset */}
+          {/* Français entre chaque verset (désactivé en lecture par thème) */}
           <button
             onClick={() => set({ french: !cfg.french })}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
-              cfg.french ? 'bg-[#4a7c23]/10 border-[#4a7c23]' : 'bg-white border-[#c9a959]/30'
+            disabled={cfg.byTheme}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all disabled:opacity-40 ${
+              cfg.french && !cfg.byTheme ? 'bg-[#4a7c23]/10 border-[#4a7c23]' : 'bg-white border-[#c9a959]/30'
             }`}
           >
             <span className="text-sm font-bold text-[#2d5016]">🎧 Réciter le français après chaque verset</span>
-            <span className={`w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${cfg.french ? 'bg-[#4a7c23] justify-end' : 'bg-gray-300 justify-start'}`}>
+            <span className={`w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${cfg.french && !cfg.byTheme ? 'bg-[#4a7c23] justify-end' : 'bg-gray-300 justify-start'}`}>
+              <span className="w-5 h-5 rounded-full bg-white shadow" />
+            </span>
+          </button>
+
+          {/* Lecture par thème + tafsir Ibn Kathir lu */}
+          <button
+            onClick={() => set({ byTheme: !cfg.byTheme })}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
+              cfg.byTheme ? 'bg-[#4a7c23]/10 border-[#4a7c23]' : 'bg-white border-[#c9a959]/30'
+            }`}
+          >
+            <span className="text-sm font-bold text-[#2d5016] text-left">
+              📖 Lecture par thème
+              <span className="block text-[11px] font-normal text-gray-500">versets du thème, puis tafsir Ibn Kathir lu à voix haute</span>
+            </span>
+            <span className={`shrink-0 w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${cfg.byTheme ? 'bg-[#4a7c23] justify-end' : 'bg-gray-300 justify-start'}`}>
               <span className="w-5 h-5 rounded-full bg-white shadow" />
             </span>
           </button>

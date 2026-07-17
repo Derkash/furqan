@@ -13,10 +13,13 @@ import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
 import {
   buildSelection,
   describeSelection,
+  groupByTheme,
   DEFAULT_CONFIG,
   type PlayConfig,
   type SelVerse,
 } from '@/utils/exercises/lecturePlaylist';
+import { fetchIbnKathir } from '@/hooks/exercises/useIbnKathir';
+import { fetchTTS } from '@/hooks/exercises/useSpeech';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
@@ -35,6 +38,24 @@ function vocabRootSet(): Set<string> {
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+
+// Étape d'une lecture par thème : un verset (audio arabe) ou le tafsir Ibn Kathir
+// d'un thème (synthèse vocale française).
+type Step =
+  | { type: 'ayah'; verseKey: string; page: number; globalNumber: number }
+  | { type: 'tafsir'; verseKey: string; page: number };
+
+// Cache de la carte verset → id de groupe/thème (Ibn Kathir).
+let themeGroups: Record<string, number> | null = null;
+async function loadThemeGroups(): Promise<Record<string, number>> {
+  if (themeGroups) return themeGroups;
+  try {
+    themeGroups = await fetch('/ibn-kathir-groups.json').then((r) => r.json());
+  } catch {
+    themeGroups = {};
+  }
+  return themeGroups ?? {};
+}
 
 /**
  * Mode LECTURE : lire le Mushaf sur une plage, écouter la récitation Husary avec
@@ -76,6 +97,7 @@ export default function LecturePractice() {
   });
   const [sessionActive, setSessionActive] = useState(false);
   const [frAvailable, setFrAvailable] = useState<boolean | null>(null);
+  const [tafsirLoading, setTafsirLoading] = useState(false); // synthèse Ibn Kathir en préparation
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
@@ -87,6 +109,9 @@ export default function LecturePractice() {
   const vIdxRef = useRef(0); // index du verset dans la sélection
   const repRef = useRef(0); // répétition courante du verset (0-based)
   const passRef = useRef(0); // passage courant sur toute la sélection (0-based)
+  // Session PAR THÈME : suite d'étapes (versets puis tafsir Ibn Kathir lu).
+  const stepsRef = useRef<Step[]>([]);
+  const sIdxRef = useRef(0);
 
   const pair = pairOf(page);
   const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -262,14 +287,80 @@ export default function LecturePractice() {
     stop();
   }
 
+  // ---- Moteur PAR THÈME (versets + tafsir Ibn Kathir lu) ----
+
+  function playStep() {
+    const step = stepsRef.current[sIdxRef.current];
+    if (!step) {
+      stop();
+      return;
+    }
+    followPage(step.page);
+    setCurrentVerse(step.verseKey);
+    const a = ensureAudio();
+    if (step.type === 'ayah') {
+      phaseRef.current = 'ar';
+      setTafsirLoading(false);
+      a.src = getAudioUrl(step.globalNumber);
+      a.playbackRate = rateRef.current;
+      a.onended = nextStep;
+      a.onerror = nextStep;
+      a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      return;
+    }
+    // Tafsir Ibn Kathir du thème → synthèse vocale française.
+    phaseRef.current = 'fr';
+    setTafsirLoading(true);
+    const stepKey = step.verseKey;
+    fetchIbnKathir(stepKey)
+      .then((text) => (text ? fetchTTS(text) : null))
+      .then((url) => {
+        // Une étape plus récente a pu prendre la main entre-temps.
+        if (stepsRef.current[sIdxRef.current] !== step) return;
+        setTafsirLoading(false);
+        if (!url) {
+          nextStep();
+          return;
+        }
+        a.src = url;
+        a.playbackRate = 1;
+        a.onended = nextStep;
+        a.onerror = nextStep;
+        a.play().then(() => setPlaying(true)).catch(() => nextStep());
+      })
+      .catch(() => {
+        setTafsirLoading(false);
+        nextStep();
+      });
+  }
+
+  function nextStep() {
+    const cfg = cfgRef.current;
+    if (sIdxRef.current + 1 < stepsRef.current.length) {
+      sIdxRef.current += 1;
+      playStep();
+      return;
+    }
+    passRef.current += 1;
+    if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
+      sIdxRef.current = 0;
+      playStep();
+      return;
+    }
+    stop();
+  }
+
   function stop() {
     audioRef.current?.pause();
     setPlaying(false);
     setCurrentVerse(null);
     setSessionActive(false);
+    setTafsirLoading(false);
     vIdxRef.current = 0;
     repRef.current = 0;
     passRef.current = 0;
+    sIdxRef.current = 0;
+    stepsRef.current = [];
   }
 
   async function launch(cfg: PlayConfig) {
@@ -282,9 +373,26 @@ export default function LecturePractice() {
     vIdxRef.current = 0;
     repRef.current = 0;
     passRef.current = 0;
+    sIdxRef.current = 0;
     phaseRef.current = 'ar';
     setSessionActive(true);
     setShowConfig(false);
+
+    // Lecture PAR THÈME : versets d'un thème puis tafsir Ibn Kathir lu.
+    if (cfg.byTheme) {
+      const groups = await loadThemeGroups();
+      const themes = groupByTheme(sel, groups);
+      const steps: Step[] = [];
+      for (const t of themes) {
+        for (const v of t) steps.push({ type: 'ayah', verseKey: v.verseKey, page: v.page, globalNumber: v.globalNumber });
+        steps.push({ type: 'tafsir', verseKey: t[0].verseKey, page: t[0].page });
+      }
+      stepsRef.current = steps;
+      followPage(sel[0].page);
+      playStep();
+      return;
+    }
+
     if (cfg.french) {
       resolveFrenchEdition().then((id) => {
         frEditionRef.current = id;
@@ -438,6 +546,7 @@ export default function LecturePractice() {
           {config.french && frAvailable === false && (
             <span className="text-[#e7b7b7]"> · récitation FR indisponible</span>
           )}
+          {tafsirLoading && <span className="text-[#c9a959]"> · 📖 préparation du tafsir…</span>}
         </div>
       )}
 

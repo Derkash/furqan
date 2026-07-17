@@ -22,6 +22,9 @@ export interface PlayConfig {
   selectionRepeat: number; // toute la sélection jouée M fois (≥ 1 ; 0 = infini)
   // Récitation française (Leclerc) après chaque verset.
   french: boolean;
+  // Lecture PAR THÈME : versets d'un thème (groupe Ibn Kathir) puis tafsir Ibn
+  // Kathir lu (synthèse vocale), thème après thème.
+  byTheme: boolean;
 }
 
 export interface SelVerse {
@@ -41,6 +44,7 @@ export const DEFAULT_CONFIG: PlayConfig = {
   verseRepeat: 1,
   selectionRepeat: 1,
   french: false,
+  byTheme: false,
 };
 
 /** Liste ordonnée des versets couverts par la configuration. */
@@ -81,6 +85,27 @@ export function buildSelection(
   return out;
 }
 
+/** Regroupe les versets par thème (groupe de tafsir Ibn Kathir consécutif). */
+export function groupByTheme(
+  sel: SelVerse[],
+  groups: Record<string, number>
+): SelVerse[][] {
+  const out: SelVerse[][] = [];
+  let cur: SelVerse[] = [];
+  let curId: number | undefined;
+  for (const v of sel) {
+    const id = groups[v.verseKey];
+    if (cur.length && id !== curId) {
+      out.push(cur);
+      cur = [];
+    }
+    curId = id;
+    cur.push(v);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
 /** Résumé lisible de la sélection (pour l'en-tête). */
 export function describeSelection(cfg: PlayConfig, count: number): string {
   const rep =
@@ -92,5 +117,6 @@ export function describeSelection(cfg: PlayConfig, count: number): string {
         ? ` · sélection ×${cfg.selectionRepeat}`
         : '';
   const fr = cfg.french ? ' · + français' : '';
-  return `${count} verset${count > 1 ? 's' : ''}${rep}${loop}${fr}`;
+  const th = cfg.byTheme ? ' · par thème + tafsir Ibn Kathir' : '';
+  return `${count} verset${count > 1 ? 's' : ''}${rep}${loop}${fr}${th}`;
 }

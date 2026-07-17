@@ -23,7 +23,7 @@ async function fetchStatic(surah: string, ayah: string): Promise<string | null |
   return (data.text as string | null) ?? null;
 }
 
-function fetchIbnKathir(verseKey: string): Promise<string | null> {
+export function fetchIbnKathir(verseKey: string): Promise<string | null> {
   if (!cache.has(verseKey)) {
     const [surah, ayah] = verseKey.split(':');
     cache.set(
