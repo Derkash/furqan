@@ -42,7 +42,7 @@ const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 // Étape d'une lecture par thème : un verset (audio arabe) ou le tafsir Ibn Kathir
 // d'un thème (synthèse vocale française).
 type Step =
-  | { type: 'ayah'; verseKey: string; page: number; globalNumber: number }
+  | { type: 'ayah'; verseKey: string; page: number; globalNumber: number; themeKey: string }
   | { type: 'tafsir'; verseKey: string; page: number };
 
 // Cache de la carte verset → id de groupe/thème (Ibn Kathir).
@@ -289,6 +289,14 @@ export default function LecturePractice() {
 
   // ---- Moteur PAR THÈME (versets + tafsir Ibn Kathir lu) ----
 
+  // Précharge (tafsir + synthèse vocale) EN TÂCHE DE FOND pendant la récitation
+  // arabe → l'enchaînement est fluide quand on arrive à l'étape tafsir (cache).
+  function prefetchTafsir(verseKey: string) {
+    fetchIbnKathir(verseKey)
+      .then((t) => (t ? fetchTTS(t) : null))
+      .catch(() => {});
+  }
+
   function playStep() {
     const step = stepsRef.current[sIdxRef.current];
     if (!step) {
@@ -301,6 +309,7 @@ export default function LecturePractice() {
     if (step.type === 'ayah') {
       phaseRef.current = 'ar';
       setTafsirLoading(false);
+      prefetchTafsir(step.themeKey); // prépare la synthèse du thème pendant les versets
       a.src = getAudioUrl(step.globalNumber);
       a.playbackRate = rateRef.current;
       a.onended = nextStep;
@@ -384,8 +393,9 @@ export default function LecturePractice() {
       const themes = groupByTheme(sel, groups);
       const steps: Step[] = [];
       for (const t of themes) {
-        for (const v of t) steps.push({ type: 'ayah', verseKey: v.verseKey, page: v.page, globalNumber: v.globalNumber });
-        steps.push({ type: 'tafsir', verseKey: t[0].verseKey, page: t[0].page });
+        const themeKey = t[0].verseKey;
+        for (const v of t) steps.push({ type: 'ayah', verseKey: v.verseKey, page: v.page, globalNumber: v.globalNumber, themeKey });
+        steps.push({ type: 'tafsir', verseKey: themeKey, page: t[0].page });
       }
       stepsRef.current = steps;
       followPage(sel[0].page);
