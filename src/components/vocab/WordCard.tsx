@@ -8,6 +8,7 @@ import {
   type WordMorphology,
 } from '@/utils/vocab/morphology';
 import { addVocab, getVocabEntry, removeVocab, type VocabEntry } from '@/utils/vocab/vocabStore';
+import { getCurrentUser } from '@/utils/exercises/userStats';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 
 interface WordCardProps {
@@ -99,6 +100,7 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
             morphology: describeMorphology(m),
             verseKey,
             verseText,
+            user: getCurrentUser() ?? undefined,
           }),
         });
         const data = await res.json();

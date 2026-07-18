@@ -19,6 +19,16 @@ export const maxDuration = 30;
 
 const MODEL = 'claude-haiku-4-5';
 
+// Accès à Claude RÉSERVÉ à certains comptes (par défaut : derkash) pour éviter
+// que l'ouverture au public ne génère des coûts. Les autres → mode gratuit.
+const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+function claudeAllowed(user?: string): boolean {
+  return !!process.env.ANTHROPIC_API_KEY && !!user && CLAUDE_USERS.includes(user.toLowerCase());
+}
+
 // Table verbe (racine|forme) → { madi, mudari3 } pour la forme de base classique.
 let verbs: Record<string, { madi?: string; mudari3?: string }> | null = null;
 async function getVerbs(): Promise<Record<string, { madi?: string; mudari3?: string }>> {
@@ -175,6 +185,7 @@ export async function POST(req: NextRequest) {
     verseKey?: string;
     verseText?: string;
     position?: number;
+    user?: string;
   };
   try {
     body = await req.json();
@@ -184,8 +195,8 @@ export async function POST(req: NextRequest) {
   if (!body.form) return new Response('form requis', { status: 400 });
   const input = { ...body, form: body.form };
 
-  // Claude si une clé est présente, sinon repli automatique sur le gratuit.
-  if (process.env.ANTHROPIC_API_KEY) {
+  // Claude UNIQUEMENT pour les comptes autorisés (sinon repli sur le gratuit).
+  if (claudeAllowed(body.user)) {
     try {
       return Response.json(await claudeAnalyze(input));
     } catch {

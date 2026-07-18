@@ -12,6 +12,15 @@ import { frenchWordGloss } from '@/lib/quranWords';
 export const runtime = 'nodejs';
 export const maxDuration = 45;
 
+// Accès à Claude réservé à certains comptes (par défaut : derkash) — voir vocab-analyze.
+const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+function claudeAllowed(user?: string): boolean {
+  return !!process.env.ANTHROPIC_API_KEY && !!user && CLAUDE_USERS.includes(user.toLowerCase());
+}
+
 interface Item {
   key: string; // clé stable (ex. forme fléchie)
   form?: string;
@@ -99,7 +108,7 @@ async function claudeBatch(items: Item[]): Promise<Record<string, { gloss: strin
 }
 
 export async function POST(req: NextRequest) {
-  let body: { items?: Item[] };
+  let body: { items?: Item[]; user?: string };
   try {
     body = await req.json();
   } catch {
@@ -115,7 +124,7 @@ export async function POST(req: NextRequest) {
   }
   if (todo.length === 0) return Response.json({ info: result });
 
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (claudeAllowed(body.user)) {
     try {
       const got = await claudeBatch(todo);
       for (const it of todo) {

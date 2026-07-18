@@ -11,6 +11,7 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
 import { loadSharedRange } from '@/utils/exercises/sharedRange';
+import { getCurrentUser } from '@/utils/exercises/userStats';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 interface Props {
@@ -120,7 +121,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         const r = await fetch('/api/occurrence-info', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
+          body: JSON.stringify({ items, user: getCurrentUser() ?? undefined }),
         });
         const data = await r.json();
         if (!cancelled && data?.info) {
