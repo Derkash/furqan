@@ -22,7 +22,6 @@ import { fetchIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { fetchTTS } from '@/hooks/exercises/useSpeech';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
-import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
@@ -84,7 +83,6 @@ export default function LecturePractice() {
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState(false);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
-  const [occRoot, setOccRoot] = useState<{ root: string; beforePage: number } | null>(null);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   // Configurateur de lecture.
@@ -439,9 +437,10 @@ export default function LecturePractice() {
     });
   }
 
-  // Tap sur un mot en mode « Ajouter » → ouvrir sa fiche (racine + ajout + occurrences).
+  // Tap sur un mot → fiche complète (traduction + occurrences + ajout/retrait).
+  // En mode « Ajouter » : n'importe quel mot. Sinon : seuls les mots du lexique
+  // (surlignés) s'ouvrent — pour ne pas gêner la lecture.
   const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!captureMode) return;
     const el = (e.target as HTMLElement).closest('[data-verse]');
     const verseKey = el?.getAttribute('data-verse');
     if (!verseKey || el?.classList.contains('ayah-marker')) {
@@ -451,6 +450,8 @@ export default function LecturePractice() {
     const position = Number(el?.getAttribute('data-pos'));
     const p = Number(el?.getAttribute('data-page'));
     if (!Number.isFinite(position)) return;
+    const isLexiconWord = marks.get(`${verseKey}#${position}`) === 'lexicon';
+    if (!captureMode && !isLexiconWord) return;
     audioRef.current?.pause();
     setPlaying(false);
     setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right', page: p });
@@ -609,17 +610,13 @@ export default function LecturePractice() {
             verseKey={selected.verseKey}
             position={selected.position}
             side={selected.side}
+            variant="sheet"
             onClose={() => setSelected(null)}
             onAdded={onAdded}
-            onOccurrences={(root) => setOccRoot({ root, beforePage: selected.page })}
-          />
-        )}
-
-        {occRoot && (
-          <OccurrencesExplorer
-            root={occRoot.root}
-            beforePage={occRoot.beforePage}
-            onClose={() => setOccRoot(null)}
+            onRemoved={() => {
+              setVocabRoots(vocabRootSet()); // le mot retiré n'est plus surligné
+              setSelected(null);
+            }}
           />
         )}
 

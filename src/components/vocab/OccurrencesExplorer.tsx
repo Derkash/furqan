@@ -24,6 +24,10 @@ interface Props {
    * 1..beforePage-1 (avant la page courante), sans sélecteur de plage.
    */
   beforePage?: number;
+  /** Toutes les occurrences du Coran (Baqara → An-Nās), sans sélecteur de plage. */
+  fullQuran?: boolean;
+  /** Rendu intégré (sans overlay ni bouton fermer) pour l'embarquer dans un autre panneau. */
+  embedded?: boolean;
 }
 
 /** Clé d'info par forme/wazn : le lemme (chaque dérivation = un sens). */
@@ -34,8 +38,8 @@ function infoKey(o: RootOccurrence): string {
 /** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
  *  (une même racine peut couvrir plusieurs sens : فَتَاة « jeune fille » vs
  *   اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي mais pas le sens). */
-export default function OccurrencesExplorer({ root, gloss, onClose, beforePage }: Props) {
-  const locked = typeof beforePage === 'number';
+export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, fullQuran, embedded }: Props) {
+  const locked = typeof beforePage === 'number' || !!fullQuran;
   const { data: units } = useQuranUnits();
   // Par défaut, on se limite à la plage GLOBALE définie en entrant dans le
   // vocabulaire (modifiable via le sélecteur ci-dessous).
@@ -52,10 +56,10 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage }
     () => unitToPageRange(range.mode, range.start, range.end, units),
     [range, units]
   );
-  // Plage effective : en mode « déjà vu », pages 1..beforePage-1 ; sinon la
-  // sélection, sinon tout le Coran.
+  // Plage effective : tout le Coran (fullQuran) ; « déjà vu » (1..beforePage-1) ;
+  // sinon la sélection, sinon tout le Coran.
   const start = locked ? 1 : (startPage ?? 1);
-  const end = locked ? Math.max(0, (beforePage ?? 1) - 1) : (endPage ?? 604);
+  const end = fullQuran ? 604 : locked ? Math.max(0, (beforePage ?? 1) - 1) : (endPage ?? 604);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   // Se cale sur la plage globale (celle définie en entrant dans le vocabulaire).
@@ -157,93 +161,96 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage }
     );
   }, [occ]);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={onClose}>
-      <div
-        className="bg-[#fdfaf3] rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border-2 border-[#c9a959]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* En-tête */}
-        <div className="flex-none p-4 border-b border-[#c9a959]/30">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
-                Occurrences de la racine
-              </p>
-              <p dir="rtl" className="text-2xl font-bold text-[#2d5016]" style={{ fontFamily: "'Amiri',serif" }}>
-                {root.split('').join(' ')}
-              </p>
-              {gloss && <p className="text-sm text-gray-500">{gloss}</p>}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fermer"
-              className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] flex items-center justify-center hover:bg-[#2d5016]/20"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+  // Sur tout le Coran, une racine fréquente peut avoir des centaines
+  // d'occurrences → on plafonne l'affichage pour rester fluide.
+  const MAX_SHOWN = 150;
+  const shown = fullQuran ? ordered.slice(0, MAX_SHOWN) : ordered;
+  const hiddenCount = ordered.length - shown.length;
 
-          {/* Plage : mode « déjà vu » figé, sinon sélecteur page/hizb/juz/sourate */}
-          <div className="mt-3">
-            {locked ? (
-              <div className="flex items-center justify-between text-xs bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5">
-                <span className="text-[#2d5016] font-semibold">
-                  {end >= start
-                    ? `Déjà rencontré avant la page ${toArabicNumbers(beforePage!)} (pages ${toArabicNumbers(start)}–${toArabicNumbers(end)})`
-                    : `Aucune page avant la page ${toArabicNumbers(beforePage!)}`}
-                </span>
-                <span className="text-[#4a7c23] font-bold whitespace-nowrap ml-2">
-                  {occ ? `${toArabicNumbers(occ.length)} fois` : ''}
-                </span>
-              </div>
-            ) : (
-              <>
-                <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
-                <div className="flex items-center justify-between mt-2 text-xs">
-                  <span className="text-[#7a5d2c]">
-                    {startPage != null
-                      ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
-                      : 'tout le Coran'}
-                  </span>
-                  <span className="text-[#4a7c23] font-bold">
-                    {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Formes distinctes */}
-          {distinctForms.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap mt-2">
-              {distinctForms.slice(0, 12).map((f) => (
-                <span
-                  key={f}
-                  dir="rtl"
-                  className="text-[#2d5016] bg-white/70 border border-[#c9a959]/30 rounded-lg px-2 py-0.5"
-                  style={{ fontFamily: "'Amiri',serif", fontSize: '1.2em' }}
-                >
-                  {f}
-                </span>
-              ))}
-            </div>
-          )}
+  const header = (
+    <div className={embedded ? 'px-1 pt-1 pb-2' : 'flex-none p-4 border-b border-[#c9a959]/30'}>
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
+            Occurrences de la racine
+          </p>
+          <p dir="rtl" className="text-2xl font-bold text-[#2d5016]" style={{ fontFamily: "'Amiri',serif" }}>
+            {root.split('').join(' ')}
+          </p>
+          {gloss && <p className="text-sm text-gray-500">{gloss}</p>}
         </div>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] flex items-center justify-center hover:bg-[#2d5016]/20"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
 
-        {/* Liste — ordre d'apparition dans le Mushaf, une traduction par occurrence */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {loading && <p className="text-center text-gray-400 py-6 text-sm">Recherche…</p>}
-          {!loading && occ?.length === 0 && (
-            <p className="text-center text-gray-500 py-6 text-sm">
-              Aucune occurrence sur cette plage.
-            </p>
-          )}
-          {!loading &&
-            ordered.map((o) => {
+      {/* Plage : tout le Coran / « déjà vu » figé, sinon sélecteur */}
+      <div className="mt-3">
+        {locked ? (
+          <div className="flex items-center justify-between text-xs bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5">
+            <span className="text-[#2d5016] font-semibold">
+              {fullQuran
+                ? 'Toutes les occurrences (البقرة → الناس)'
+                : end >= start
+                  ? `Déjà rencontré avant la page ${toArabicNumbers(beforePage!)} (pages ${toArabicNumbers(start)}–${toArabicNumbers(end)})`
+                  : `Aucune page avant la page ${toArabicNumbers(beforePage!)}`}
+            </span>
+            <span className="text-[#4a7c23] font-bold whitespace-nowrap ml-2">
+              {occ ? `${toArabicNumbers(occ.length)} fois` : ''}
+            </span>
+          </div>
+        ) : (
+          <>
+            <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
+            <div className="flex items-center justify-between mt-2 text-xs">
+              <span className="text-[#7a5d2c]">
+                {startPage != null
+                  ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
+                  : 'tout le Coran'}
+              </span>
+              <span className="text-[#4a7c23] font-bold">
+                {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Formes distinctes */}
+      {distinctForms.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap mt-2">
+          {distinctForms.slice(0, 12).map((f) => (
+            <span
+              key={f}
+              dir="rtl"
+              className="text-[#2d5016] bg-white/70 border border-[#c9a959]/30 rounded-lg px-2 py-0.5"
+              style={{ fontFamily: "'Amiri',serif", fontSize: '1.2em' }}
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const list = (
+    <div className={embedded ? 'px-1 space-y-2' : 'flex-1 overflow-y-auto p-3 space-y-2'}>
+      {loading && <p className="text-center text-gray-400 py-6 text-sm">Recherche…</p>}
+      {!loading && occ?.length === 0 && (
+        <p className="text-center text-gray-500 py-6 text-sm">Aucune occurrence sur cette plage.</p>
+      )}
+      {!loading &&
+        shown.map((o) => {
               const inf = info[infoKey(o)];
               const occGloss = inf?.gloss;
               return (
@@ -294,7 +301,32 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage }
                 </div>
               );
             })}
-        </div>
+      {!loading && hiddenCount > 0 && (
+        <p className="text-center text-[11px] text-gray-400 py-2">
+          … et {toArabicNumbers(hiddenCount)} autres occurrences (racine fréquente)
+        </p>
+      )}
+    </div>
+  );
+
+  // Rendu intégré (dans un autre panneau) : pas d'overlay ni de carte.
+  if (embedded) {
+    return (
+      <div>
+        {header}
+        {list}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={onClose}>
+      <div
+        className="bg-[#fdfaf3] rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border-2 border-[#c9a959]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {header}
+        {list}
       </div>
     </div>
   );

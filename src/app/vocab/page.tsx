@@ -253,6 +253,7 @@ function ReadMode() {
           verseKey={selected.verseKey}
           position={selected.position}
           side={selected.side}
+          variant="sheet"
           onClose={() => setSelected(null)}
         />
       )}

@@ -7,7 +7,8 @@ import {
   describeMorphology,
   type WordMorphology,
 } from '@/utils/vocab/morphology';
-import { addVocab, getVocabEntry, type VocabEntry } from '@/utils/vocab/vocabStore';
+import { addVocab, getVocabEntry, removeVocab, type VocabEntry } from '@/utils/vocab/vocabStore';
+import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 
 interface WordCardProps {
   verseKey: string;
@@ -15,8 +16,14 @@ interface WordCardProps {
   side: 'left' | 'right';
   onClose: () => void;
   onAdded?: (entry: VocabEntry) => void;
+  onRemoved?: () => void;
   /** Si fourni : affiche un bouton « occurrences avant cette page » (mode Lecture). */
   onOccurrences?: (root: string) => void;
+  /**
+   * 'panel' = demi-écran latéral (capture /vocab) ; 'sheet' = panneau centré
+   * scrollable avec occurrences intégrées (toutes les apparitions dans le Coran).
+   */
+  variant?: 'panel' | 'sheet';
 }
 
 interface Analysis {
@@ -28,13 +35,14 @@ interface Analysis {
   stored?: boolean; // rechargé depuis le lexique (aucun appel API)
 }
 
-export default function WordCard({ verseKey, position, side, onClose, onAdded, onOccurrences }: WordCardProps) {
+export default function WordCard({ verseKey, position, side, onClose, onAdded, onRemoved, onOccurrences, variant = 'panel' }: WordCardProps) {
   const [morph, setMorph] = useState<WordMorphology | null>(null);
   const [loadingMorph, setLoadingMorph] = useState(true);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loadingLLM, setLoadingLLM] = useState(false);
   const [gloss, setGloss] = useState('');
   const [already, setAlready] = useState(false);
+  const [existingId, setExistingId] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState<'added' | 'duplicate' | null>(null);
   const reqId = useRef(0);
 
@@ -59,6 +67,7 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       // Déjà dans le lexique → on réutilise l'analyse stockée, AUCUN appel API.
       const existing = getVocabEntry(m.root, m.form);
       setAlready(!!existing);
+      setExistingId(existing?.id ?? null);
       if (existing && existing.baseForm) {
         setAnalysis({
           baseForm: existing.baseForm,
@@ -122,17 +131,36 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
     });
     setJustAdded(res.status);
     setAlready(true);
+    setExistingId(res.entry.id);
     if (res.status === 'added') onAdded?.(res.entry);
   };
 
+  const handleRemove = () => {
+    if (!existingId) return;
+    removeVocab(existingId);
+    setAlready(false);
+    setExistingId(null);
+    setJustAdded(null);
+    onRemoved?.();
+  };
+
+  const isSheet = variant === 'sheet';
+
   return (
     <div
-      className={`absolute inset-y-0 z-30 w-1/2 flex items-center justify-center p-3 ${
-        side === 'left' ? 'left-0' : 'right-0'
-      }`}
-      onClick={(e) => e.stopPropagation()}
+      className={
+        isSheet
+          ? 'fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-3'
+          : `absolute inset-y-0 z-30 w-1/2 flex items-center justify-center p-3 ${side === 'left' ? 'left-0' : 'right-0'}`
+      }
+      onClick={isSheet ? onClose : (e) => e.stopPropagation()}
     >
-      <div className="bg-[#fdfaf3] border-2 border-[#c9a959] rounded-3xl shadow-2xl w-full max-w-md max-h-full overflow-y-auto p-5">
+      <div
+        className={`bg-[#fdfaf3] border-2 border-[#c9a959] rounded-3xl shadow-2xl w-full overflow-y-auto p-5 ${
+          isSheet ? 'max-w-lg max-h-[92vh]' : 'max-w-md max-h-full'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Fermer */}
         <div className="flex justify-between items-start mb-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
@@ -259,6 +287,30 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
               >
                 ➕ Ajouter à mon vocabulaire
               </button>
+            )}
+
+            {/* Retirer du lexique (quand le mot y est déjà) */}
+            {existingId && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="w-full mt-2 py-2.5 text-sm font-bold text-[#7a3030] border-2 border-[#7a3030]/25 rounded-xl hover:bg-[#7a3030]/5 active:scale-[0.98] transition-all"
+              >
+                🗑️ Je connais ce mot — le retirer du lexique
+              </button>
+            )}
+
+            {/* Toutes les occurrences dans le Coran (Baqara → An-Nās) */}
+            {isSheet && morph.root && (
+              <div className="mt-4 pt-3 border-t border-[#c9a959]/30">
+                <OccurrencesExplorer
+                  root={morph.root}
+                  gloss={gloss || analysis?.frenchGloss}
+                  fullQuran
+                  embedded
+                  onClose={() => {}}
+                />
+              </div>
             )}
           </>
         )}
