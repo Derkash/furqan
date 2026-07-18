@@ -28,6 +28,8 @@ function cleanForSpeech(text: string): string {
     .replace(/\b(\d{1,3}):(\d{1,3})\b/g, 'sourate $1 verset $2')
     // Émoticônes (« ;) » lu « émoticône clin d'œil ») : on les retire.
     .replace(/[;:]-?[)(]/g, ' ')
+    // Marqueurs éditoriaux / markup (crochets, accolades, etc.) lus à voix haute.
+    .replace(/[[\]{}<>*_#]+/g, ' ')
     .replace(/[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]+/g, ' ')
     .replace(/[`ـ]+/g, '')
     .replace(/\s{2,}/g, ' ')
