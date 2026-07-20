@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
-import { getAudioUrl } from '@/utils/ayahMapping';
+import { getAudioUrl, fromGlobalAyahNumber, SURAH_START_AYAH, TOTAL_AYAHS } from '@/utils/ayahMapping';
 import { getVerseRoots, getVersePageMap } from '@/utils/vocab/morphology';
 import { getVocab } from '@/utils/vocab/vocabStore';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
@@ -18,7 +18,7 @@ import {
   type PlayConfig,
   type SelVerse,
 } from '@/utils/exercises/lecturePlaylist';
-import { fetchIbnKathir } from '@/hooks/exercises/useIbnKathir';
+import { fetchIbnKathir, useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { fetchTTS } from '@/hooks/exercises/useSpeech';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
@@ -85,6 +85,14 @@ export default function LecturePractice() {
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
+  // Menu d'actions au clic sur un verset (hors mode « Ajouter ») + coordonnées.
+  const [verseMenu, setVerseMenu] = useState<{ verseKey: string; x: number; y: number } | null>(null);
+  // Layer d'info verset : traduction ou tafsir Ibn Kathir.
+  const [verseLayer, setVerseLayer] = useState<{ verseKey: string; tab: 'trans' | 'tafsir' } | null>(null);
+  const [tafsirPlaying, setTafsirPlaying] = useState(false);
+  const [isFs, setIsFs] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const tafsirAudioRef = useRef<HTMLAudioElement | null>(null);
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<PlayConfig>({
@@ -174,17 +182,31 @@ export default function LecturePractice() {
   // Traduction Hamidullah (chargée à la 1re activation).
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!showTrans || trans) return;
+    const needTrans = showTrans || verseLayer?.tab === 'trans';
+    if (!needTrans || trans) return;
     fetch('/qcf-data/translation-hamidullah.fr.json')
       .then((r) => r.json())
       .then((d) => setTrans(d))
       .catch(() => {});
-  }, [showTrans, trans]);
+  }, [showTrans, verseLayer, trans]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Suivi de l'état plein écran (bouton ⛶ + touche Échap du navigateur).
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  // Tafsir du layer (Ibn Kathir français) — chargé à l'ouverture de l'onglet.
+  const { text: tafsirText, loading: tafsirTextLoading } = useIbnKathir(
+    verseLayer?.tab === 'tafsir' ? verseLayer.verseKey : null
+  );
 
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
+      tafsirAudioRef.current?.pause();
     };
   }, []);
 
@@ -411,6 +433,65 @@ export default function LecturePractice() {
     playVerseArabic();
   }
 
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      rootRef.current?.requestFullscreen().catch(() => {});
+    }
+  }
+
+  // Lance la récitation depuis le verset choisi jusqu'à la fin de sa sourate.
+  function readFromVerse(verseKey: string) {
+    const [s, v] = verseKey.split(':').map(Number);
+    const endGlobal = (s < 114 ? SURAH_START_AYAH[s + 1] : TOTAL_AYAHS + 1) - 1;
+    const { verse: lastVerse } = fromGlobalAyahNumber(endGlobal);
+    setVerseMenu(null);
+    setVerseLayer(null);
+    launch({
+      ...cfgRef.current,
+      selMode: 'verse',
+      surahStart: s,
+      verseStart: v,
+      surahEnd: s,
+      verseEnd: lastVerse,
+      byTheme: false,
+      french: false,
+    });
+  }
+
+  // Lecture/pause de la synthèse vocale du tafsir dans le layer.
+  function toggleTafsirAudio() {
+    if (tafsirPlaying) {
+      tafsirAudioRef.current?.pause();
+      setTafsirPlaying(false);
+      return;
+    }
+    if (!tafsirText) return;
+    // Met en pause la récitation en cours pour ne pas superposer les audios.
+    audioRef.current?.pause();
+    setPlaying(false);
+    if (!tafsirAudioRef.current) tafsirAudioRef.current = new Audio();
+    const a = tafsirAudioRef.current;
+    setTafsirPlaying(true);
+    fetchTTS(tafsirText).then((url) => {
+      if (!url) {
+        setTafsirPlaying(false);
+        return;
+      }
+      a.src = url;
+      a.onended = () => setTafsirPlaying(false);
+      a.onerror = () => setTafsirPlaying(false);
+      a.play().catch(() => setTafsirPlaying(false));
+    });
+  }
+
+  function closeVerseLayer() {
+    tafsirAudioRef.current?.pause();
+    setTafsirPlaying(false);
+    setVerseLayer(null);
+  }
+
   function togglePlay() {
     if (playing) {
       audioRef.current?.pause();
@@ -429,6 +510,8 @@ export default function LecturePractice() {
   function flip(dir: 'prev' | 'next') {
     stop();
     setSelected(null);
+    setVerseMenu(null);
+    closeVerseLayer();
     setPage((p) => {
       const cur = p % 2 === 1 ? p : p - 1;
       let t = cur + (dir === 'next' ? 2 : -2);
@@ -443,18 +526,38 @@ export default function LecturePractice() {
   const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = (e.target as HTMLElement).closest('[data-verse]');
     const verseKey = el?.getAttribute('data-verse');
-    if (!verseKey || el?.classList.contains('ayah-marker')) {
+    if (!verseKey) {
       setSelected(null);
+      setVerseMenu(null);
       return;
     }
     const position = Number(el?.getAttribute('data-pos'));
     const p = Number(el?.getAttribute('data-page'));
-    if (!Number.isFinite(position)) return;
-    const isLexiconWord = marks.get(`${verseKey}#${position}`) === 'lexicon';
-    if (!captureMode && !isLexiconWord) return;
-    audioRef.current?.pause();
-    setPlaying(false);
-    setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right', page: p });
+    const isMarker = el?.classList.contains('ayah-marker');
+    const isLexiconWord = !isMarker && marks.get(`${verseKey}#${position}`) === 'lexicon';
+
+    // Mode « Ajouter un mot » : fiche mot (comportement historique).
+    if (captureMode && !isMarker && Number.isFinite(position)) {
+      audioRef.current?.pause();
+      setPlaying(false);
+      setVerseMenu(null);
+      setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right', page: p });
+      return;
+    }
+    // Mode normal : un mot du lexique surligné → fiche mot.
+    if (isLexiconWord) {
+      audioRef.current?.pause();
+      setPlaying(false);
+      setVerseMenu(null);
+      setSelected({ verseKey, position, side: p % 2 === 1 ? 'left' : 'right', page: p });
+      return;
+    }
+    // Sinon (mot normal ou numéro de verset) : menu d'actions du verset.
+    setSelected(null);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(Math.max(e.clientX - rect.left, 90), rect.width - 90);
+    const y = Math.min(Math.max(e.clientY - rect.top, 10), rect.height - 20);
+    setVerseMenu((m) => (m?.verseKey === verseKey ? null : { verseKey, x, y }));
   };
 
   const onAdded = useCallback(() => {
@@ -469,7 +572,7 @@ export default function LecturePractice() {
   const selCount = selRef.current.length;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
+    <div ref={rootRef} className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
       {/* Barre */}
       <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
         <Link href="/exercises/lecture/setup" className="text-sm hover:underline whitespace-nowrap">
@@ -478,6 +581,14 @@ export default function LecturePractice() {
         <span className="text-sm font-medium">
           Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
         </span>
+        <div className="flex items-center gap-2">
+        <button
+          onClick={toggleFullscreen}
+          title={isFs ? 'Quitter le plein écran' : 'Plein écran'}
+          className="text-xs font-bold rounded-full px-2.5 py-1 border text-[#c9a959] border-[#4a7c23] hover:bg-[#1f3a0f]"
+        >
+          {isFs ? '⛶ Quitter' : '⛶ Plein écran'}
+        </button>
         <button
           onClick={() => {
             setCaptureMode((m) => !m);
@@ -489,6 +600,7 @@ export default function LecturePractice() {
         >
           ➕ Ajouter un mot
         </button>
+        </div>
       </div>
 
       {/* Contrôles : lecture + vitesse + réglages */}
@@ -620,6 +732,41 @@ export default function LecturePractice() {
           />
         )}
 
+        {/* Menu d'actions au clic sur un verset */}
+        {verseMenu && (
+          <div
+            className="absolute z-30 -translate-x-1/2 -translate-y-full -mt-2"
+            style={{ left: verseMenu.x, top: verseMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#2d5016] text-[#fdfaf3] rounded-xl shadow-2xl border border-[#c9a959]/50 overflow-hidden min-w-[190px]">
+              <div className="px-3 py-1.5 text-[11px] font-bold text-[#c9a959] border-b border-[#4a7c23] flex items-center justify-between">
+                <span>Verset {verseMenu.verseKey}</span>
+                <button onClick={() => setVerseMenu(null)} className="text-[#c9a959] hover:text-white px-1">✕</button>
+              </div>
+              <button
+                onClick={() => readFromVerse(verseMenu.verseKey)}
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                Lire depuis ce verset
+              </button>
+              <button
+                onClick={() => { setVerseLayer({ verseKey: verseMenu.verseKey, tab: 'trans' }); setVerseMenu(null); }}
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2 border-t border-[#4a7c23]"
+              >
+                📖 Voir la traduction
+              </button>
+              <button
+                onClick={() => { setVerseLayer({ verseKey: verseMenu.verseKey, tab: 'tafsir' }); setVerseMenu(null); }}
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2 border-t border-[#4a7c23]"
+              >
+                📚 Afficher le tafsir
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Feuilletage (RTL : avancer = gauche) */}
         <button
           type="button"
@@ -650,6 +797,78 @@ export default function LecturePractice() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
         </button>
       </div>
+
+      {/* Layer verset : traduction ou tafsir Ibn Kathir */}
+      {verseLayer && (
+        <div className="fixed inset-0 z-40 flex flex-col justify-end" onClick={closeVerseLayer}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-[#fdfaf3] rounded-t-2xl shadow-2xl border-t-2 border-[#c9a959] max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* En-tête + onglets */}
+            <div className="flex-none px-4 pt-3 pb-2 border-b border-[#c9a959]/40">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-[#2d5016]">Verset {verseLayer.verseKey}</span>
+                <button onClick={closeVerseLayer} className="text-[#2d5016] text-lg leading-none px-2">✕</button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setVerseLayer((l) => (l ? { ...l, tab: 'trans' } : l))}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                    verseLayer.tab === 'trans' ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016]' : 'text-[#2d5016] border-[#c9a959]'
+                  }`}
+                >
+                  📖 Traduction
+                </button>
+                <button
+                  onClick={() => setVerseLayer((l) => (l ? { ...l, tab: 'tafsir' } : l))}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                    verseLayer.tab === 'tafsir' ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016]' : 'text-[#2d5016] border-[#c9a959]'
+                  }`}
+                >
+                  📚 Tafsir
+                </button>
+                <button
+                  onClick={() => readFromVerse(verseLayer.verseKey)}
+                  className="ml-auto flex items-center gap-1.5 bg-[#c9a959] text-[#2d5016] font-bold rounded-full px-3 py-1 text-xs active:scale-95"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  Lire
+                </button>
+              </div>
+            </div>
+
+            {/* Contenu */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+              {verseLayer.tab === 'trans' ? (
+                <p className="text-[15px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
+                  {trans?.[verseLayer.verseKey] ?? (
+                    <span className="text-gray-400 text-sm">Chargement de la traduction…</span>
+                  )}
+                </p>
+              ) : (
+                <div className="max-w-3xl mx-auto">
+                  <button
+                    onClick={toggleTafsirAudio}
+                    disabled={!tafsirText}
+                    className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border border-[#2d5016] text-[#2d5016] disabled:opacity-40"
+                  >
+                    {tafsirPlaying ? '⏸ Pause' : '🔊 Écouter le tafsir'}
+                  </button>
+                  {tafsirTextLoading ? (
+                    <p className="text-gray-400 text-sm">Chargement du tafsir Ibn Kathir…</p>
+                  ) : tafsirText ? (
+                    <p className="text-[14px] text-[#2d3a1a] leading-relaxed whitespace-pre-line">{tafsirText}</p>
+                  ) : (
+                    <p className="text-gray-400 text-sm">Tafsir indisponible pour ce verset.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfig && (
         <PlaybackConfig
