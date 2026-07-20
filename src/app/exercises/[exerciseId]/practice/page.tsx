@@ -28,7 +28,7 @@ import { useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { prefetchSpeech, useSpeech } from '@/hooks/exercises/useSpeech';
 import { getVerseRoots } from '@/utils/vocab/morphology';
-import { getVocab } from '@/utils/vocab/vocabStore';
+import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
 import Link from 'next/link';
 
 export default function PracticePage() {
@@ -300,14 +300,15 @@ function MushafPractice() {
     return marks;
   }, [isHifz, showMistakes, mistakeWords, selWords]);
 
-  // Lexique perso : surlignage des mots dont la racine est dans le vocabulaire,
+  // Lexique perso : surlignage des mots dont le LEMME est dans le vocabulaire,
   // dans TOUS les exercices — SAUF en Hifz quand la vision « Thèmes » est active.
-  const [vocabRoots, setVocabRoots] = useState<Set<string>>(new Set());
+  // (Le lemme, pas la racine : deux lexèmes d'une même racine ont des sens
+  //  différents et ne doivent pas se surligner l'un l'autre.)
+  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
+  const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    const s = new Set<string>();
-    for (const e of getVocab()) if (e.root) s.add(e.root);
-    setVocabRoots(s);
+    setLexicon(lexiconMatchSets());
   }, []);
 
   const [lexiconMarks, setLexiconMarks] = useState<Map<string, string>>(new Map());
@@ -317,7 +318,7 @@ function MushafPractice() {
       ...(rightPageVerses?.verses ?? []),
       ...(leftPageVerses?.verses ?? []),
     ].map((v) => v.verseKey);
-    if (vocabRoots.size === 0 || verseKeys.length === 0) {
+    if (lexSize === 0 || verseKeys.length === 0) {
       setLexiconMarks(new Map());
       return;
     }
@@ -327,7 +328,7 @@ function MushafPractice() {
         verseKeys.map(async (vk) => {
           const words = await getVerseRoots(vk);
           for (const w of words) {
-            if (w.root && vocabRoots.has(w.root)) m.set(`${vk}#${w.position}`, 'lexicon');
+            if (matchesLexicon(lexicon, w)) m.set(`${vk}#${w.position}`, 'lexicon');
           }
         })
       );
@@ -336,7 +337,7 @@ function MushafPractice() {
     return () => {
       cancelled = true;
     };
-  }, [rightPageVerses, leftPageVerses, vocabRoots]);
+  }, [rightPageVerses, leftPageVerses, lexicon, lexSize]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Marques combinées : lexique (sauf Hifz+Thèmes) + fautes/sélection Hifz (prioritaires).

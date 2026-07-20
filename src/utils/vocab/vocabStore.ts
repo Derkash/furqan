@@ -31,7 +31,10 @@ const PREFIX = 'almuraja3a:vocab:';
 const SEEDED_PREFIX = 'almuraja3a:vocab-seeded:';
 // Version du seed : bump → resynchronise les formes affichées (baseForm…) des
 // entrées « seed » existantes, SANS toucher à la progression Leitner.
-const SEED_VERSION = '4';
+const SEED_VERSION = '5';
+// Migration des ancres racine → lemme (une fois par utilisateur).
+const ANCHOR_MIG_PREFIX = 'almuraja3a:vocab-anchor-mig:';
+const ANCHOR_MIG_VERSION = '1';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && !!window.localStorage;
@@ -54,8 +57,61 @@ export function bareForm(s: string): string {
     .replace(/\s+/g, '');
 }
 
-export function anchorOf(root: string | undefined, arabic: string): string {
-  return root ? `r:${root}` : `f:${bareForm(arabic)}`;
+/**
+ * Ancre (identité) d'un mot de vocabulaire.
+ *
+ * L'unité de mémorisation est le LEMME (mot de dictionnaire), pas la racine :
+ * une même racine couvre souvent des lexèmes de sens différents
+ * (ح‑ج‑ر → حَجَر « pierre », حِجْر « giron/tutelle », حُجُرَة « chambre » ;
+ *  ك‑ل‑ل → كُلّ « tout » vs كَلالَة « sans héritier »). Ancrer sur la racine
+ * fusionnerait ces mots à tort. On retombe sur la racine puis sur la forme nue
+ * uniquement quand le lemme est absent.
+ */
+export function anchorOf(
+  lemma: string | undefined,
+  root: string | undefined,
+  arabic: string
+): string {
+  if (lemma) return `l:${lemma.normalize('NFC')}`;
+  if (root) return `r:${root}`;
+  return `f:${bareForm(arabic)}`;
+}
+
+// ---- Correspondance mot ↔ lexique (surlignage du Mushaf) ----
+
+export interface LexiconMatch {
+  lemmas: Set<string>; // lemmes des entrées qui en ont un
+  roots: Set<string>; // racines des entrées SANS lemme (fallback historique)
+  forms: Set<string>; // formes nues des entrées sans lemme ni racine
+}
+
+/** Construit les ensembles de correspondance à partir du lexique courant. */
+export function lexiconMatchSets(): LexiconMatch {
+  const lemmas = new Set<string>();
+  const roots = new Set<string>();
+  const forms = new Set<string>();
+  for (const e of getVocab()) {
+    if (e.lemma) lemmas.add(e.lemma.normalize('NFC'));
+    else if (e.root) roots.add(e.root);
+    else forms.add(bareForm(e.arabic));
+  }
+  return { lemmas, roots, forms };
+}
+
+/**
+ * Vrai si un mot du Mushaf correspond à une entrée du lexique. On compare par
+ * LEMME en priorité (jamais par racine quand le lemme est connu) → deux lexèmes
+ * d'une même racine ne se surlignent pas l'un l'autre.
+ */
+export function matchesLexicon(
+  sets: LexiconMatch,
+  word: { lemma?: string; root?: string; form?: string }
+): boolean {
+  if (word.lemma && sets.lemmas.has(word.lemma.normalize('NFC'))) return true;
+  // Fallback racine : uniquement pour les entrées sans lemme.
+  if (word.root && sets.roots.has(word.root)) return true;
+  if (word.form && sets.forms.has(bareForm(word.form))) return true;
+  return false;
 }
 
 // ---- Lecture / écriture ----
@@ -105,7 +161,7 @@ export type AddResult =
 /** Ajoute un mot. Si sa racine (ou sa forme) existe déjà → "duplicate". */
 export function addVocab(input: AddInput): AddResult {
   const list = getVocab();
-  const id = anchorOf(input.root, input.arabic);
+  const id = anchorOf(input.lemma, input.root, input.arabic);
   const existing = list.find((e) => e.id === id);
   if (existing) return { status: 'duplicate', entry: existing };
 
@@ -130,15 +186,23 @@ export function addVocab(input: AddInput): AddResult {
   return { status: 'added', entry };
 }
 
-/** Vrai si la racine (ou forme) est déjà dans la liste. */
-export function hasVocab(root: string | undefined, arabic: string): boolean {
-  const id = anchorOf(root, arabic);
+/** Vrai si le lemme (ou racine/forme) est déjà dans la liste. */
+export function hasVocab(
+  lemma: string | undefined,
+  root: string | undefined,
+  arabic: string
+): boolean {
+  const id = anchorOf(lemma, root, arabic);
   return getVocab().some((e) => e.id === id);
 }
 
-/** L'entrée du lexique pour cette racine (ou forme), sinon null. */
-export function getVocabEntry(root: string | undefined, arabic: string): VocabEntry | null {
-  const id = anchorOf(root, arabic);
+/** L'entrée du lexique pour ce lemme (ou racine/forme), sinon null. */
+export function getVocabEntry(
+  lemma: string | undefined,
+  root: string | undefined,
+  arabic: string
+): VocabEntry | null {
+  const id = anchorOf(lemma, root, arabic);
   return getVocab().find((e) => e.id === id) ?? null;
 }
 
@@ -276,6 +340,62 @@ export function recordReview(id: string, correct: boolean): void {
   if (updated) pushVocabEntry(getCurrentUser(), updated);
 }
 
+/**
+ * Migration : ré-ancre les entrées existantes sur le LEMME (ancienne clé =
+ * racine). Idempotente (flag de version par utilisateur), sans perte : en cas
+ * de collision (deux entrées retombant sur le même lemme), on fusionne en
+ * gardant la meilleure progression Leitner.
+ */
+export function migrateVocabAnchors(): void {
+  if (!isBrowser()) return;
+  const flag = ANCHOR_MIG_PREFIX + userKey();
+  if (window.localStorage.getItem(flag) === ANCHOR_MIG_VERSION) return;
+
+  const list = getVocab();
+  if (!list.length) {
+    window.localStorage.setItem(flag, ANCHOR_MIG_VERSION);
+    return;
+  }
+  const byId = new Map<string, VocabEntry>();
+  const oldIds = new Set(list.map((e) => e.id));
+  let changed = false;
+  for (const e of list) {
+    const newId = anchorOf(e.lemma, e.root, e.arabic);
+    if (newId !== e.id) changed = true;
+    const migrated: VocabEntry = { ...e, id: newId };
+    const prev = byId.get(newId);
+    if (!prev) {
+      byId.set(newId, migrated);
+    } else {
+      // Fusion : on conserve la progression la plus avancée.
+      byId.set(newId, {
+        ...prev,
+        box: Math.max(prev.box, migrated.box),
+        seen: Math.max(prev.seen, migrated.seen),
+        correct: Math.max(prev.correct, migrated.correct),
+        lastReviewed:
+          [prev.lastReviewed, migrated.lastReviewed]
+            .filter(Boolean)
+            .sort()
+            .pop() ?? undefined,
+        addedAt: [prev.addedAt, migrated.addedAt].filter(Boolean).sort()[0] ?? prev.addedAt,
+      });
+    }
+  }
+  if (changed || byId.size !== list.length) {
+    const merged = [...byId.values()];
+    writeVocab(merged);
+    const user = getCurrentUser();
+    pushVocabBulk(user, merged);
+    // Supprime à distance les anciennes ancres (racine) devenues obsolètes,
+    // sinon elles réapparaîtraient sur les autres appareils à l'hydratation.
+    for (const oldId of oldIds) {
+      if (!byId.has(oldId)) deleteVocabRemote(user, oldId);
+    }
+  }
+  window.localStorage.setItem(flag, ANCHOR_MIG_VERSION);
+}
+
 // ---- Seed du lexique personnel ----
 
 interface SeedRow {
@@ -295,6 +415,7 @@ interface SeedRow {
  */
 export async function seedVocabIfNeeded(): Promise<number> {
   if (!isBrowser()) return 0;
+  migrateVocabAnchors(); // ré-ancre l'existant sur le lemme avant toute chose
   const flagKey = SEEDED_PREFIX + userKey();
   // Déjà à la bonne version → rien à faire.
   if (window.localStorage.getItem(flagKey) === SEED_VERSION) return 0;
@@ -327,8 +448,8 @@ export async function seedVocabIfNeeded(): Promise<number> {
     const now = new Date().toISOString();
     let count = 0;
     for (const row of rows) {
-      const id = anchorOf(row.root, row.arabic);
-      if (ids.has(id)) continue; // même racine qu'un mot déjà capturé
+      const id = anchorOf(row.lemma, row.root, row.arabic);
+      if (ids.has(id)) continue; // même lemme qu'un mot déjà capturé
       ids.add(id);
       const p = prog.get(row.french);
       kept.push({
@@ -367,7 +488,7 @@ export async function importSeed(): Promise<number> {
     const now = new Date().toISOString();
     let added = 0;
     for (const row of rows) {
-      const id = anchorOf(row.root, row.arabic);
+      const id = anchorOf(row.lemma, row.root, row.arabic);
       if (have.has(id)) continue;
       have.add(id);
       list.push({

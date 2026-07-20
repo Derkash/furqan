@@ -222,15 +222,24 @@ export async function getVersePageMap(): Promise<Record<string, number>> {
   return loadVersePage();
 }
 
-/** Position + racine de chaque mot d'un verset (pour surligner le lexique). */
+/**
+ * Position + lemme + racine + forme de chaque mot d'un verset (pour surligner le
+ * lexique). Le lemme est l'unité de correspondance ; racine/forme servent de
+ * repli quand le lemme est absent.
+ */
 export async function getVerseRoots(
   verseKey: string
-): Promise<{ position: number; root?: string }[]> {
+): Promise<{ position: number; root?: string; lemma?: string; form?: string }[]> {
   const [s, v] = verseKey.split(':').map(Number);
   const surah = await loadSurah(s);
   return Object.keys(surah)
     .filter((k) => Number(k.split(':')[0]) === v)
-    .map((k) => ({ position: Number(k.split(':')[1]), root: surah[k].root }));
+    .map((k) => ({
+      position: Number(k.split(':')[1]),
+      root: surah[k].root,
+      lemma: surah[k].lemma,
+      form: surah[k].form,
+    }));
 }
 
 /** Mots (position + forme) d'un verset, pour surligner un mot précis. */

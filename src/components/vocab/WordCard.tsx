@@ -66,7 +66,7 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       if (!m) return;
 
       // Déjà dans le lexique → on réutilise l'analyse stockée, AUCUN appel API.
-      const existing = getVocabEntry(m.root, m.form);
+      const existing = getVocabEntry(m.lemma, m.root, m.form);
       setAlready(!!existing);
       setExistingId(existing?.id ?? null);
       if (existing && existing.baseForm) {

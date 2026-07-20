@@ -7,7 +7,7 @@ import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import { getAudioUrl, fromGlobalAyahNumber, SURAH_START_AYAH, TOTAL_AYAHS } from '@/utils/ayahMapping';
 import { getVerseRoots, getVersePageMap } from '@/utils/vocab/morphology';
-import { getVocab } from '@/utils/vocab/vocabStore';
+import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
 import {
@@ -28,12 +28,6 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
-}
-
-function vocabRootSet(): Set<string> {
-  const s = new Set<string>();
-  for (const e of getVocab()) if (e.root) s.add(e.root);
-  return s;
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
@@ -77,7 +71,8 @@ export default function LecturePractice() {
   const [right, setRight] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
   const [marks, setMarks] = useState<Map<string, string>>(new Map());
-  const [vocabRoots, setVocabRoots] = useState<Set<string>>(new Set());
+  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
+  const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
@@ -128,7 +123,7 @@ export default function LecturePractice() {
   /* eslint-disable react-hooks/set-state-in-effect */
   // Racines du lexique (rechargeable après ajout d'un mot).
   useEffect(() => {
-    setVocabRoots(vocabRootSet());
+    setLexicon(lexiconMatchSets());
   }, []);
 
   // Charge les pages quand la double page change.
@@ -151,7 +146,7 @@ export default function LecturePractice() {
   useEffect(() => {
     let cancelled = false;
     const verseKeys = [...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey);
-    if (vocabRoots.size === 0 || verseKeys.length === 0) {
+    if (lexSize === 0 || verseKeys.length === 0) {
       setMarks(new Map());
       return;
     }
@@ -161,7 +156,7 @@ export default function LecturePractice() {
         verseKeys.map(async (vk) => {
           const words = await getVerseRoots(vk);
           for (const w of words) {
-            if (w.root && vocabRoots.has(w.root)) m.set(`${vk}#${w.position}`, 'lexicon');
+            if (matchesLexicon(lexicon, w)) m.set(`${vk}#${w.position}`, 'lexicon');
           }
         })
       );
@@ -170,7 +165,7 @@ export default function LecturePractice() {
     return () => {
       cancelled = true;
     };
-  }, [right, left, vocabRoots]);
+  }, [right, left, lexicon, lexSize]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -561,7 +556,7 @@ export default function LecturePractice() {
   };
 
   const onAdded = useCallback(() => {
-    setVocabRoots(vocabRootSet()); // le nouveau mot se surligne aussitôt
+    setLexicon(lexiconMatchSets()); // le nouveau mot se surligne aussitôt
   }, []);
 
   const orientation: Orientation = 'landscape';
@@ -691,7 +686,7 @@ export default function LecturePractice() {
 
       {/* Légende / mode */}
       <div className="flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2">
-        {vocabRoots.size > 0 && (
+        {lexSize > 0 && (
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(74,124,35,0.35)', boxShadow: '0 0 0 1.5px rgba(74,124,35,0.5)' }} />
             mots de ton lexique
@@ -726,7 +721,7 @@ export default function LecturePractice() {
             onClose={() => setSelected(null)}
             onAdded={onAdded}
             onRemoved={() => {
-              setVocabRoots(vocabRootSet()); // le mot retiré n'est plus surligné
+              setLexicon(lexiconMatchSets()); // le mot retiré n'est plus surligné
               setSelected(null);
             }}
           />
