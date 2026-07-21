@@ -9,6 +9,8 @@ import { getAudioUrl, fromGlobalAyahNumber, SURAH_START_AYAH, TOTAL_AYAHS } from
 import { getVerseRoots, getVersePageMap } from '@/utils/vocab/morphology';
 import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
+import { useVerseMap } from '@/hooks/useVerseMap';
+import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
 import {
   buildSelection,
@@ -65,6 +67,7 @@ export default function LecturePractice() {
   const hi = Math.max(startPage, endPage);
 
   const { data: units } = useQuranUnits();
+  const { verseMap } = useVerseMap();
 
   const [page, setPage] = useState(lo % 2 === 0 ? lo + 1 : lo);
   const [left, setLeft] = useState<PageVerses | null>(null);
@@ -564,6 +567,23 @@ export default function LecturePractice() {
     () => new Set([...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey)),
     [right, left]
   );
+
+  // Sur CHAQUE page : entoure en rouge le numéro du verset PRÉCÉDANT le verset
+  // du milieu (même règle « verset du milieu » que les exercices).
+  const circledMarkerVerseKeys = useMemo(() => {
+    const set = new Set<string>();
+    const addFor = (pv: PageVerses | null, pageNum: number) => {
+      const middle = getMiddleVerse(pv, verseMap?.pages[pageNum] ?? null);
+      if (!middle) return;
+      const precedingGlobal = middle.globalNumber - 1;
+      if (precedingGlobal < 1) return;
+      const { surah, verse } = fromGlobalAyahNumber(precedingGlobal);
+      set.add(`${surah}:${verse}`);
+    };
+    addFor(right, pair.rightPage);
+    addFor(left, pair.leftPage);
+    return set;
+  }, [right, left, pair.rightPage, pair.leftPage, verseMap]);
   const selCount = selRef.current.length;
 
   return (
@@ -708,6 +728,7 @@ export default function LecturePractice() {
           isBlurred={false}
           maskAll={false}
           wordMarks={marks}
+          circledMarkerVerseKeys={circledMarkerVerseKeys}
           loading={loading}
           onTap={() => {}}
         />

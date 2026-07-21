@@ -48,6 +48,12 @@ interface MushafPageProps {
    */
   wordMarks?: Map<string, string>;
   /**
+   * Marqueurs de fin de verset (numéros) à entourer en rouge, par verseKey.
+   * Utilisé en mode Lecture pour cercler le numéro du verset précédant le
+   * verset du milieu de chaque page.
+   */
+  circledMarkerVerseKeys?: Set<string>;
+  /**
    * Thèmes de tafsir : verseKey → numéro de groupe. Les versets d'un même
    * groupe (même tafsir Ibn Kathir) partagent la même teinte (opacité 20 %),
    * alternée entre groupes voisins.
@@ -298,6 +304,7 @@ export default function MushafPage({
   maskAll = false,
   loading = false,
   wordMarks,
+  circledMarkerVerseKeys,
   verseThemes,
   frameConfig,
   hifzLevel,
@@ -530,6 +537,14 @@ export default function MushafPage({
         .verse-word.ayah-marker {
           color: #2d5016;
         }
+        /* Numéro de verset entouré en rouge (verset précédant le verset du
+           milieu de la page). Anneau peint en box-shadow → n'altère pas la
+           largeur du mot, donc pas de débordement de la ligne justifiée. */
+        .verse-word.ayah-marker-circled {
+          color: #c62828;
+          box-shadow: 0 0 0 2px #d32f2f;
+          border-radius: 50%;
+        }
         .verse-word.highlighted {
           /* Halo peint en box-shadow : ne modifie PAS la largeur des mots,
              sinon les lignes justifiées débordent du cadre de la page. */
@@ -720,6 +735,8 @@ export default function MushafPage({
                       if (isHighlighted && !mark) classes.push('highlighted');
                       if (mark) classes.push(`mark-${mark}`);
                       if (w.isAyahMarker) classes.push('ayah-marker');
+                      if (w.isAyahMarker && circledMarkerVerseKeys?.has(w.verseKey))
+                        classes.push('ayah-marker-circled');
                       return (
                         <span
                           key={`${line.line}-${i}`}

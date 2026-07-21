@@ -16,6 +16,8 @@ interface MushafDoublePageProps {
   loading?: boolean;
   /** Marques par mot, clés "verseKey#position" → 'selected' ou type de faute. */
   wordMarks?: Map<string, string>;
+  /** Numéros de fin de verset à entourer en rouge (par verseKey). */
+  circledMarkerVerseKeys?: Set<string>;
   /** Thèmes de tafsir : verseKey → n° de groupe (teinte partagée par groupe). */
   verseThemes?: Record<string, number> | null;
   singlePage?: boolean; // Afficher une seule page (la page courante)
@@ -43,6 +45,7 @@ export default function MushafDoublePage({
   maskAll = false,
   loading = false,
   wordMarks,
+  circledMarkerVerseKeys,
   verseThemes,
   singlePage = false,
   currentPage,
@@ -79,6 +82,7 @@ export default function MushafDoublePage({
             isBlurred={isBlurred}
             maskAll={maskAll}
               wordMarks={wordMarks}
+              circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
             hifzLevel={hifzLevel}
             revealFraction={revealFraction}
@@ -121,6 +125,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               revealFraction={revealFraction}
@@ -139,6 +144,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               revealFraction={revealFraction}
@@ -159,6 +165,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               revealFraction={revealFraction}
@@ -177,6 +184,7 @@ export default function MushafDoublePage({
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
+              circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
               hifzLevel={hifzLevel}
               revealFraction={revealFraction}
