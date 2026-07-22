@@ -11,6 +11,8 @@ interface MushafDoublePageProps {
   revealedVerses: Set<string>;
   visibleVerses?: Set<string>;
   highlightedVerseKey?: string;
+  /** Versets à surligner en jaune (en plus de highlightedVerseKey) — demi-page. */
+  extraHighlightVerseKeys?: Set<string>;
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
@@ -41,6 +43,7 @@ export default function MushafDoublePage({
   revealedVerses,
   visibleVerses = new Set(),
   highlightedVerseKey,
+  extraHighlightVerseKeys,
   isBlurred = false,
   maskAll = false,
   loading = false,
@@ -79,6 +82,7 @@ export default function MushafDoublePage({
             revealedVerses={revealedVerses}
             visibleVerses={visibleVerses}
             highlightedVerseKey={highlightedVerseKey}
+            extraHighlightVerseKeys={extraHighlightVerseKeys}
             isBlurred={isBlurred}
             maskAll={maskAll}
               wordMarks={wordMarks}
@@ -122,6 +126,7 @@ export default function MushafDoublePage({
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
               highlightedVerseKey={highlightedVerseKey}
+              extraHighlightVerseKeys={extraHighlightVerseKeys}
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
@@ -141,6 +146,7 @@ export default function MushafDoublePage({
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
               highlightedVerseKey={highlightedVerseKey}
+              extraHighlightVerseKeys={extraHighlightVerseKeys}
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
@@ -162,6 +168,7 @@ export default function MushafDoublePage({
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
               highlightedVerseKey={highlightedVerseKey}
+              extraHighlightVerseKeys={extraHighlightVerseKeys}
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}
@@ -181,6 +188,7 @@ export default function MushafDoublePage({
               revealedVerses={revealedVerses}
               visibleVerses={visibleVerses}
               highlightedVerseKey={highlightedVerseKey}
+              extraHighlightVerseKeys={extraHighlightVerseKeys}
               isBlurred={isBlurred}
               maskAll={maskAll}
               wordMarks={wordMarks}

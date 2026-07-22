@@ -77,8 +77,10 @@ export default function LecturePractice() {
   const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
   const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
   const [playing, setPlaying] = useState(false);
-  const [rate, setRate] = useState(1);
+  const [rate, setRate] = useState(2);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
+  // Appui long : surligne en jaune tous les versets de la demi-page en cours d'écoute.
+  const [halfPageHighlight, setHalfPageHighlight] = useState<Set<string>>(new Set());
   const [captureMode, setCaptureMode] = useState(false);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [showTrans, setShowTrans] = useState(false);
@@ -104,7 +106,11 @@ export default function LecturePractice() {
   const [tafsirLoading, setTafsirLoading] = useState(false); // synthèse Ibn Kathir en préparation
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const rateRef = useRef(1); // vitesse courante lue dans les callbacks audio
+  const rateRef = useRef(2); // vitesse courante lue dans les callbacks audio
+  // Détection de l'appui long sur un verset (écoute de la demi-page).
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef<{ x: number; y: number; page: number } | null>(null);
+  const longPressFired = useRef(false);
   const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant
   const frEditionRef = useRef<string | null>(null); // édition audio FR découverte
   // Session de lecture en cours.
@@ -383,6 +389,7 @@ export default function LecturePractice() {
     setCurrentVerse(null);
     setSessionActive(false);
     setTafsirLoading(false);
+    setHalfPageHighlight(new Set());
     vIdxRef.current = 0;
     repRef.current = 0;
     passRef.current = 0;
@@ -458,6 +465,40 @@ export default function LecturePractice() {
     });
   }
 
+  // Appui long sur un verset : écoute ×2 de la DEMI-PAGE (la page où se trouve
+  // le verset), tous ses versets surlignés en jaune ; s'arrête à la fin.
+  function readHalfPage(pageNum: number) {
+    const pv = pageNum === pair.leftPage ? left : pageNum === pair.rightPage ? right : null;
+    if (!pv || pv.verses.length === 0) return;
+    stop();
+    const sel: SelVerse[] = pv.verses.map((v) => ({
+      verseKey: v.verseKey,
+      globalNumber: v.globalNumber,
+      page: pageNum,
+    }));
+    const cfg: PlayConfig = {
+      ...cfgRef.current,
+      verseRepeat: 1,
+      selectionRepeat: 1,
+      french: false,
+      byTheme: false,
+    };
+    cfgRef.current = cfg;
+    selRef.current = sel;
+    stepsRef.current = [];
+    vIdxRef.current = 0;
+    repRef.current = 0;
+    passRef.current = 0;
+    phaseRef.current = 'ar';
+    setRate(2);
+    rateRef.current = 2;
+    setHalfPageHighlight(new Set(sel.map((s) => s.verseKey)));
+    setSessionActive(true);
+    setVerseMenu(null);
+    setSelected(null);
+    playVerseArabic();
+  }
+
   // Lecture/pause de la synthèse vocale du tafsir dans le layer.
   function toggleTafsirAudio() {
     if (tafsirPlaying) {
@@ -518,10 +559,44 @@ export default function LecturePractice() {
     });
   }
 
+  // ---- Appui long → écoute de la demi-page ----
+  function clearPress() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+    pressStart.current = null;
+  }
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (captureMode) return; // en mode Ajouter, l'appui long ne s'applique pas
+    const el = (e.target as HTMLElement).closest('[data-verse]');
+    const page = Number(el?.getAttribute('data-page'));
+    if (!el || !Number.isFinite(page)) return;
+    longPressFired.current = false;
+    pressStart.current = { x: e.clientX, y: e.clientY, page };
+    pressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      pressTimer.current = null;
+      readHalfPage(page);
+    }, 450);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = pressStart.current;
+    if (!s) return;
+    if (Math.abs(e.clientX - s.x) > 12 || Math.abs(e.clientY - s.y) > 12) clearPress();
+  };
+
   // Tap sur un mot → fiche complète (traduction + occurrences + ajout/retrait).
   // En mode « Ajouter » : n'importe quel mot. Sinon : seuls les mots du lexique
   // (surlignés) s'ouvrent — pour ne pas gêner la lecture.
   const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Un appui long vient de déclencher l'écoute de la demi-page → pas de clic.
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
     const el = (e.target as HTMLElement).closest('[data-verse]');
     const verseKey = el?.getAttribute('data-verse');
     if (!verseKey) {
@@ -589,7 +664,7 @@ export default function LecturePractice() {
   return (
     <div ref={rootRef} className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
       {/* Barre */}
-      <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+      <div className={`flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2 ${isFs ? 'hidden' : ''}`}>
         <Link href="/exercises/lecture/setup" className="text-sm hover:underline whitespace-nowrap">
           ← Retour
         </Link>
@@ -619,7 +694,7 @@ export default function LecturePractice() {
       </div>
 
       {/* Contrôles : lecture + vitesse + réglages */}
-      <div className="flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
+      <div className={`flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3 flex-wrap ${isFs ? 'hidden' : ''}`}>
         <button
           onClick={togglePlay}
           className="flex items-center gap-2 bg-[#c9a959] text-[#2d5016] font-bold rounded-full px-4 py-1.5 active:scale-95 transition-all"
@@ -678,7 +753,7 @@ export default function LecturePractice() {
       </div>
 
       {/* Récap sélection en cours */}
-      {sessionActive && (
+      {sessionActive && !isFs && (
         <div className="flex-none bg-[#1f3a0f] text-[#c9a959] text-[11px] px-3 py-1 text-center">
           🎧 {describeSelection(config, selCount)}
           {config.french && frAvailable === false && (
@@ -689,7 +764,7 @@ export default function LecturePractice() {
       )}
 
       {/* Traduction française du verset en cours (Hamidullah) */}
-      {showTrans && (
+      {showTrans && !isFs && (
         <div className="flex-none bg-[#fdfaf3] border-b border-[#c9a959]/40 px-4 py-2 text-center">
           <p className="text-[13px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
             {currentVerse && trans?.[currentVerse] ? (
@@ -705,7 +780,7 @@ export default function LecturePractice() {
       )}
 
       {/* Légende / mode */}
-      <div className="flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2">
+      <div className={`flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2 ${isFs ? 'hidden' : ''}`}>
         {lexSize > 0 && (
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(74,124,35,0.35)', boxShadow: '0 0 0 1.5px rgba(74,124,35,0.5)' }} />
@@ -716,7 +791,16 @@ export default function LecturePractice() {
       </div>
 
       {/* Mushaf */}
-      <div className="flex-1 min-h-0 relative" onClick={onMushafClick}>
+      <div
+        className="flex-1 min-h-0 relative select-none"
+        style={{ WebkitTouchCallout: 'none' }}
+        onClick={onMushafClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={clearPress}
+        onPointerCancel={clearPress}
+        onPointerLeave={clearPress}
+      >
         <MushafDoublePage
           leftPageVerses={left}
           rightPageVerses={right}
@@ -725,6 +809,7 @@ export default function LecturePractice() {
           revealedVerses={visibleVerses}
           visibleVerses={visibleVerses}
           highlightedVerseKey={currentVerse ?? undefined}
+          extraHighlightVerseKeys={halfPageHighlight}
           isBlurred={false}
           maskAll={false}
           wordMarks={marks}
@@ -732,6 +817,32 @@ export default function LecturePractice() {
           loading={loading}
           onTap={() => {}}
         />
+
+        {/* Plein écran : bouton flottant pour sortir + play/pause */}
+        {isFs && (
+          <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
+            {(playing || sessionActive) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                className="w-10 h-10 rounded-full bg-[#2d5016]/90 text-[#c9a959] flex items-center justify-center shadow-lg border border-[#c9a959]/40"
+                aria-label={playing ? 'Pause' : 'Lecture'}
+              >
+                {playing ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                )}
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+              className="w-10 h-10 rounded-full bg-[#2d5016]/90 text-[#c9a959] flex items-center justify-center shadow-lg border border-[#c9a959]/40"
+              aria-label="Quitter le plein écran"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9 4 4m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4M15 15l5 5m0 0v-4m0 4h-4" /></svg>
+            </button>
+          </div>
+        )}
 
         {selected && (
           <WordCard

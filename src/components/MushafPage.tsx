@@ -39,6 +39,8 @@ interface MushafPageProps {
   revealedVerses?: Set<string>;
   visibleVerses?: Set<string>;
   highlightedVerseKey?: string;
+  /** Versets à surligner en jaune (en plus de highlightedVerseKey). */
+  extraHighlightVerseKeys?: Set<string>;
   isBlurred?: boolean;
   maskAll?: boolean;
   loading?: boolean;
@@ -300,6 +302,7 @@ export default function MushafPage({
   pageNumber,
   visibleVerses = new Set(),
   highlightedVerseKey,
+  extraHighlightVerseKeys,
   isBlurred = false,
   maskAll = false,
   loading = false,
@@ -722,7 +725,9 @@ export default function MushafPage({
                           : false;
                       const shouldHide = verseMaskHide || hifzHide || fractionHide;
                       const isHighlighted =
-                        highlightedVerseKey === w.verseKey && visibleVerses.has(w.verseKey);
+                        (highlightedVerseKey === w.verseKey ||
+                          (extraHighlightVerseKeys?.has(w.verseKey) ?? false)) &&
+                        visibleVerses.has(w.verseKey);
                       const mark = w.isAyahMarker
                         ? undefined
                         : wordMarks?.get(`${w.verseKey}#${w.position}`);
