@@ -111,6 +111,10 @@ export default function LecturePractice() {
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStart = useRef<{ x: number; y: number; page: number } | null>(null);
   const longPressFired = useRef(false);
+  // Feuilletage par glissement horizontal (drag suivant le doigt + transition).
+  const flipWrapRef = useRef<HTMLDivElement | null>(null); // conteneur translaté (impératif)
+  const swipe = useRef({ startX: 0, startY: 0, dx: 0, active: false, dragging: false, w: 0, animating: false });
+  const swipedFired = useRef(false); // un glissement vient d'avoir lieu → pas de clic
   const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant
   const frEditionRef = useRef<string | null>(null); // édition audio FR découverte
   // Session de lecture en cours.
@@ -568,9 +572,72 @@ export default function LecturePractice() {
     pressStart.current = null;
   }
 
+  // ---- Feuilletage par glissement ----
+  function setWrapTransform(x: number, transition: string) {
+    const el = flipWrapRef.current;
+    if (!el) return;
+    el.style.transition = transition;
+    el.style.transform = `translateX(${x}px)`;
+  }
+
+  function snapBack() {
+    setWrapTransform(0, 'transform 0.2s ease-out');
+  }
+
+  // Glisse la page courante hors écran, change de page, puis fait entrer la
+  // nouvelle depuis le bord opposé (effet feuilletage). dir 'next' = vers la gauche.
+  function animatedFlip(dir: 'prev' | 'next') {
+    const el = flipWrapRef.current;
+    const w = swipe.current.w || el?.offsetWidth || window.innerWidth;
+    const allowed = dir === 'next' ? canNext : canPrev;
+    if (!el || !allowed) {
+      snapBack();
+      return;
+    }
+    swipe.current.animating = true;
+    const outX = dir === 'next' ? -w : w;
+    setWrapTransform(outX, 'transform 0.2s ease-out');
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.removeEventListener('transitionend', onEnd);
+      flip(dir); // change de page (stop lecture + reset overlays)
+      // Place la nouvelle page du côté opposé, sans transition…
+      setWrapTransform(dir === 'next' ? w : -w, 'none');
+      // …puis la fait glisser jusqu'au centre.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setWrapTransform(0, 'transform 0.2s ease-out');
+          swipe.current.animating = false;
+        });
+      });
+    };
+    const onEnd = () => finish();
+    el.addEventListener('transitionend', onEnd, { once: true });
+    setTimeout(finish, 260); // filet de sécurité si transitionend n'arrive pas
+  }
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (captureMode) return; // en mode Ajouter, l'appui long ne s'applique pas
+    if (captureMode || swipe.current.animating) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* certains navigateurs peuvent refuser — le glissement reste fonctionnel */
+    }
     const el = (e.target as HTMLElement).closest('[data-verse]');
+    // Glissement : autorisé partout sur le Mushaf (même hors d'un mot).
+    swipe.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      dx: 0,
+      active: true,
+      dragging: false,
+      w: flipWrapRef.current?.offsetWidth || window.innerWidth,
+      animating: false,
+    };
+    swipedFired.current = false;
+    // Appui long : seulement sur un verset.
     const page = Number(el?.getAttribute('data-page'));
     if (!el || !Number.isFinite(page)) return;
     longPressFired.current = false;
@@ -583,18 +650,52 @@ export default function LecturePractice() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const s = pressStart.current;
-    if (!s) return;
-    if (Math.abs(e.clientX - s.x) > 12 || Math.abs(e.clientY - s.y) > 12) clearPress();
+    const s = swipe.current;
+    if (s.active && !s.animating) {
+      const dx = e.clientX - s.startX;
+      const dy = e.clientY - s.startY;
+      if (!s.dragging && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        // Bascule en mode glissement : annule l'appui long et ferme les overlays.
+        s.dragging = true;
+        clearPress();
+        setVerseMenu(null);
+      }
+      if (s.dragging) {
+        s.dx = dx;
+        // Résistance quand le glissement va vers une page indisponible.
+        const disallowed = (dx < 0 && !canNext) || (dx > 0 && !canPrev);
+        setWrapTransform(disallowed ? dx / 4 : dx, 'none');
+        return;
+      }
+    }
+    // Sinon : annule l'appui long si le doigt bouge trop.
+    const p = pressStart.current;
+    if (p && (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12)) clearPress();
+  };
+
+  const onPointerUp = () => {
+    clearPress();
+    const s = swipe.current;
+    if (s.active && s.dragging) {
+      swipedFired.current = true; // neutralise le clic qui suit
+      const dx = s.dx;
+      const threshold = s.w * 0.2;
+      if (dx <= -threshold) animatedFlip('next');
+      else if (dx >= threshold) animatedFlip('prev');
+      else snapBack();
+    }
+    s.active = false;
+    s.dragging = false;
   };
 
   // Tap sur un mot → fiche complète (traduction + occurrences + ajout/retrait).
   // En mode « Ajouter » : n'importe quel mot. Sinon : seuls les mots du lexique
   // (surlignés) s'ouvrent — pour ne pas gêner la lecture.
   const onMushafClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Un appui long vient de déclencher l'écoute de la demi-page → pas de clic.
-    if (longPressFired.current) {
+    // Un appui long ou un glissement vient d'avoir lieu → pas de clic.
+    if (longPressFired.current || swipedFired.current) {
       longPressFired.current = false;
+      swipedFired.current = false;
       return;
     }
     const el = (e.target as HTMLElement).closest('[data-verse]');
@@ -792,31 +893,33 @@ export default function LecturePractice() {
 
       {/* Mushaf */}
       <div
-        className="flex-1 min-h-0 relative select-none"
-        style={{ WebkitTouchCallout: 'none' }}
+        className="flex-1 min-h-0 relative select-none overflow-hidden"
+        style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={clearPress}
-        onPointerCancel={clearPress}
-        onPointerLeave={clearPress}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
       >
-        <MushafDoublePage
-          leftPageVerses={left}
-          rightPageVerses={right}
-          pagePair={pair}
-          orientation={orientation}
-          revealedVerses={visibleVerses}
-          visibleVerses={visibleVerses}
-          highlightedVerseKey={currentVerse ?? undefined}
-          extraHighlightVerseKeys={halfPageHighlight}
-          isBlurred={false}
-          maskAll={false}
-          wordMarks={marks}
-          circledMarkerVerseKeys={circledMarkerVerseKeys}
-          loading={loading}
-          onTap={() => {}}
-        />
+        <div ref={flipWrapRef} className="w-full h-full will-change-transform">
+          <MushafDoublePage
+            leftPageVerses={left}
+            rightPageVerses={right}
+            pagePair={pair}
+            orientation={orientation}
+            revealedVerses={visibleVerses}
+            visibleVerses={visibleVerses}
+            highlightedVerseKey={currentVerse ?? undefined}
+            extraHighlightVerseKeys={halfPageHighlight}
+            isBlurred={false}
+            maskAll={false}
+            wordMarks={marks}
+            circledMarkerVerseKeys={circledMarkerVerseKeys}
+            loading={loading}
+            onTap={() => {}}
+          />
+        </div>
 
         {/* Plein écran : bouton flottant pour sortir + play/pause */}
         {isFs && (
@@ -901,7 +1004,7 @@ export default function LecturePractice() {
           disabled={!canPrev}
           onClick={(e) => {
             e.stopPropagation();
-            flip('prev');
+            animatedFlip('prev');
           }}
           className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
@@ -915,7 +1018,7 @@ export default function LecturePractice() {
           disabled={!canNext}
           onClick={(e) => {
             e.stopPropagation();
-            flip('next');
+            animatedFlip('next');
           }}
           className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
