@@ -113,8 +113,14 @@ export default function LecturePractice() {
   const longPressFired = useRef(false);
   // Feuilletage par glissement horizontal (drag suivant le doigt + transition).
   const flipWrapRef = useRef<HTMLDivElement | null>(null); // conteneur translaté (impératif)
+  const mushafAreaRef = useRef<HTMLDivElement | null>(null); // zone Mushaf (écoute du wheel trackpad)
   const swipe = useRef({ startX: 0, startY: 0, dx: 0, active: false, dragging: false, w: 0, animating: false });
   const swipedFired = useRef(false); // un glissement vient d'avoir lieu → pas de clic
+  // Feuilletage au trackpad (deux doigts = événements wheel horizontaux).
+  const wheelAccum = useRef(0);
+  const wheelCooldown = useRef(false);
+  const wheelClear = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onWheelRef = useRef<(e: WheelEvent) => void>(() => {});
   const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant
   const frEditionRef = useRef<string | null>(null); // édition audio FR découverte
   // Session de lecture en cours.
@@ -204,6 +210,16 @@ export default function LecturePractice() {
     const onFs = () => setIsFs(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFs);
     return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  // Feuilletage au trackpad : écouteur wheel NON passif (pour pouvoir bloquer la
+  // navigation arrière du navigateur). Le handler à jour est lu via onWheelRef.
+  useEffect(() => {
+    const el = mushafAreaRef.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => onWheelRef.current(e);
+    el.addEventListener('wheel', h, { passive: false });
+    return () => el.removeEventListener('wheel', h);
   }, []);
 
   // Tafsir du layer (Ibn Kathir français) — chargé à l'ouverture de l'onglet.
@@ -688,6 +704,28 @@ export default function LecturePractice() {
     s.dragging = false;
   };
 
+  // Feuilletage au trackpad : swipe horizontal à deux doigts (événements wheel).
+  onWheelRef.current = (e: WheelEvent) => {
+    if (captureMode) return;
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // intention verticale → on ignore
+    e.preventDefault(); // empêche la navigation arrière/avant du navigateur
+    if (swipe.current.animating || wheelCooldown.current) return;
+    wheelAccum.current += e.deltaX;
+    if (wheelClear.current) clearTimeout(wheelClear.current);
+    wheelClear.current = setTimeout(() => {
+      wheelAccum.current = 0;
+    }, 140);
+    if (Math.abs(wheelAccum.current) > 45) {
+      const dir = wheelAccum.current > 0 ? 'next' : 'prev';
+      wheelAccum.current = 0;
+      wheelCooldown.current = true;
+      setTimeout(() => {
+        wheelCooldown.current = false;
+      }, 520);
+      animatedFlip(dir);
+    }
+  };
+
   // Tap sur un mot → fiche complète (traduction + occurrences + ajout/retrait).
   // En mode « Ajouter » : n'importe quel mot. Sinon : seuls les mots du lexique
   // (surlignés) s'ouvrent — pour ne pas gêner la lecture.
@@ -893,6 +931,7 @@ export default function LecturePractice() {
 
       {/* Mushaf */}
       <div
+        ref={mushafAreaRef}
         className="flex-1 min-h-0 relative select-none overflow-hidden"
         style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
