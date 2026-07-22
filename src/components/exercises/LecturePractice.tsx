@@ -22,6 +22,7 @@ import {
 } from '@/utils/exercises/lecturePlaylist';
 import { fetchIbnKathir, useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { fetchTTS } from '@/hooks/exercises/useSpeech';
+import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
@@ -68,6 +69,7 @@ export default function LecturePractice() {
 
   const { data: units } = useQuranUnits();
   const { verseMap } = useVerseMap();
+  const recorder = useAudioRecorder(); // enregistrement micro + réécoute
 
   const [page, setPage] = useState(lo % 2 === 0 ? lo + 1 : lo);
   const [left, setLeft] = useState<PageVerses | null>(null);
@@ -560,6 +562,20 @@ export default function LecturePractice() {
     setVerseLayer(null);
   }
 
+  // Enregistrement micro : démarrer/arrêter. On coupe toute lecture pour ne pas
+  // s'enregistrer par-dessus la récitation.
+  function toggleRecord() {
+    if (recorder.recording) {
+      recorder.stop();
+      return;
+    }
+    audioRef.current?.pause();
+    tafsirAudioRef.current?.pause();
+    setPlaying(false);
+    setTafsirPlaying(false);
+    recorder.start();
+  }
+
   function togglePlay() {
     if (playing) {
       audioRef.current?.pause();
@@ -903,7 +919,54 @@ export default function LecturePractice() {
         >
           FR texte
         </button>
+        <button
+          onClick={toggleRecord}
+          title="M'enregistrer au micro puis me réécouter"
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
+            recorder.recording
+              ? 'bg-[#7a3030] text-white border-[#7a3030] animate-pulse'
+              : 'text-[#c9a959] border-[#4a7c23] hover:bg-[#1f3a0f]'
+          }`}
+        >
+          {recorder.recording ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-white" /> Arrêter
+            </>
+          ) : (
+            <>🎤 M&apos;enregistrer</>
+          )}
+        </button>
       </div>
+
+      {/* Enregistrement micro : état + réécoute */}
+      {(recorder.recording || recorder.audioUrl || recorder.error) && !isFs && (
+        <div className="flex-none bg-[#1f3a0f] px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
+          {recorder.recording ? (
+            <span className="flex items-center gap-2 text-[#e7b7b7] text-sm font-semibold">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+              Enregistrement en cours… parle puis appuie sur « Arrêter »
+            </span>
+          ) : recorder.audioUrl ? (
+            <>
+              <span className="text-[11px] font-bold text-[#c9a959] whitespace-nowrap">🎧 Ta récitation</span>
+              <audio controls src={recorder.audioUrl} className="h-9 max-w-full" />
+              <button
+                onClick={toggleRecord}
+                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#c9a959] text-[#c9a959] hover:bg-[#2d5016]"
+              >
+                🎤 Réenregistrer
+              </button>
+              <button
+                onClick={() => recorder.clear()}
+                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#7a3030] text-[#e7b7b7] hover:bg-[#2d5016]"
+              >
+                🗑️ Effacer
+              </button>
+            </>
+          ) : null}
+          {recorder.error && <span className="text-[#e7b7b7] text-xs">{recorder.error}</span>}
+        </div>
+      )}
 
       {/* Récap sélection en cours */}
       {sessionActive && !isFs && (
