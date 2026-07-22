@@ -109,7 +109,7 @@ export default function LecturePractice() {
   const rateRef = useRef(2); // vitesse courante lue dans les callbacks audio
   // Détection de l'appui long sur un verset (écoute de la demi-page).
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressStart = useRef<{ x: number; y: number; page: number } | null>(null);
+  const pressStart = useRef<{ x: number; y: number; page: number; verseKey: string } | null>(null);
   const longPressFired = useRef(false);
   // Feuilletage par glissement horizontal (drag suivant le doigt + transition).
   const flipWrapRef = useRef<HTMLDivElement | null>(null); // conteneur translaté (impératif)
@@ -485,13 +485,22 @@ export default function LecturePractice() {
     });
   }
 
-  // Appui long sur un verset : écoute ×2 de la DEMI-PAGE (la page où se trouve
-  // le verset), tous ses versets surlignés en jaune ; s'arrête à la fin.
-  function readHalfPage(pageNum: number) {
+  // Appui long sur un verset : écoute ×2 de la DEMI-PAGE délimitée par le signet
+  // rouge (le verset du milieu). Selon que le verset pressé est AVANT ou APRÈS
+  // ce milieu, on lit la moitié haute ou la moitié basse ; versets surlignés en
+  // jaune ; s'arrête à la fin.
+  function readHalfPage(pageNum: number, pressedVerseKey: string) {
     const pv = pageNum === pair.leftPage ? left : pageNum === pair.rightPage ? right : null;
     if (!pv || pv.verses.length === 0) return;
+    // Verset du milieu = frontière entre les deux moitiés (comme le signet rouge).
+    const middle = getMiddleVerse(pv, verseMap?.pages[pageNum] ?? null);
+    const midGlobal = middle?.globalNumber ?? Infinity;
+    const pressedGlobal = pv.verses.find((v) => v.verseKey === pressedVerseKey)?.globalNumber ?? 0;
+    const upper = pressedGlobal < midGlobal; // clic au-dessus du signet → moitié haute
+    const half = pv.verses.filter((v) => (upper ? v.globalNumber < midGlobal : v.globalNumber >= midGlobal));
+    if (half.length === 0) return;
     stop();
-    const sel: SelVerse[] = pv.verses.map((v) => ({
+    const sel: SelVerse[] = half.map((v) => ({
       verseKey: v.verseKey,
       globalNumber: v.globalNumber,
       page: pageNum,
@@ -611,7 +620,8 @@ export default function LecturePractice() {
       return;
     }
     swipe.current.animating = true;
-    const outX = dir === 'next' ? -w : w;
+    // RTL : « suivante » sort vers la DROITE (+w), « précédente » vers la gauche.
+    const outX = dir === 'next' ? w : -w;
     setWrapTransform(outX, 'transform 0.2s ease-out');
     let done = false;
     const finish = () => {
@@ -620,7 +630,7 @@ export default function LecturePractice() {
       el.removeEventListener('transitionend', onEnd);
       flip(dir); // change de page (stop lecture + reset overlays)
       // Place la nouvelle page du côté opposé, sans transition…
-      setWrapTransform(dir === 'next' ? w : -w, 'none');
+      setWrapTransform(dir === 'next' ? -w : w, 'none');
       // …puis la fait glisser jusqu'au centre.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -655,13 +665,14 @@ export default function LecturePractice() {
     swipedFired.current = false;
     // Appui long : seulement sur un verset.
     const page = Number(el?.getAttribute('data-page'));
-    if (!el || !Number.isFinite(page)) return;
+    const verseKey = el?.getAttribute('data-verse');
+    if (!el || !verseKey || !Number.isFinite(page)) return;
     longPressFired.current = false;
-    pressStart.current = { x: e.clientX, y: e.clientY, page };
+    pressStart.current = { x: e.clientX, y: e.clientY, page, verseKey };
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       pressTimer.current = null;
-      readHalfPage(page);
+      readHalfPage(page, verseKey);
     }, 450);
   };
 
@@ -678,8 +689,9 @@ export default function LecturePractice() {
       }
       if (s.dragging) {
         s.dx = dx;
-        // Résistance quand le glissement va vers une page indisponible.
-        const disallowed = (dx < 0 && !canNext) || (dx > 0 && !canPrev);
+        // Résistance quand le glissement va vers une page indisponible (RTL :
+        // droite = suivante, gauche = précédente).
+        const disallowed = (dx > 0 && !canNext) || (dx < 0 && !canPrev);
         setWrapTransform(disallowed ? dx / 4 : dx, 'none');
         return;
       }
@@ -696,8 +708,9 @@ export default function LecturePractice() {
       swipedFired.current = true; // neutralise le clic qui suit
       const dx = s.dx;
       const threshold = s.w * 0.2;
-      if (dx <= -threshold) animatedFlip('next');
-      else if (dx >= threshold) animatedFlip('prev');
+      // RTL : glisser vers la DROITE (dx > 0) = page suivante ; gauche = précédente.
+      if (dx >= threshold) animatedFlip('next');
+      else if (dx <= -threshold) animatedFlip('prev');
       else snapBack();
     }
     s.active = false;
@@ -716,7 +729,8 @@ export default function LecturePractice() {
       wheelAccum.current = 0;
     }, 140);
     if (Math.abs(wheelAccum.current) > 45) {
-      const dir = wheelAccum.current > 0 ? 'next' : 'prev';
+      // RTL : swipe vers la droite = suivante. (deltaX < 0 ≈ geste vers la droite.)
+      const dir = wheelAccum.current < 0 ? 'next' : 'prev';
       wheelAccum.current = 0;
       wheelCooldown.current = true;
       setTimeout(() => {
@@ -1036,21 +1050,7 @@ export default function LecturePractice() {
           </div>
         )}
 
-        {/* Feuilletage (RTL : avancer = gauche) */}
-        <button
-          type="button"
-          aria-label="Pages précédentes"
-          disabled={!canPrev}
-          onClick={(e) => {
-            e.stopPropagation();
-            animatedFlip('prev');
-          }}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
-            canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
-          }`}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-        </button>
+        {/* Feuilletage (RTL : suivante = vers la droite) */}
         <button
           type="button"
           aria-label="Pages suivantes"
@@ -1059,8 +1059,22 @@ export default function LecturePractice() {
             e.stopPropagation();
             animatedFlip('next');
           }}
-          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
+          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+          }`}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+        <button
+          type="button"
+          aria-label="Pages précédentes"
+          disabled={!canPrev}
+          onClick={(e) => {
+            e.stopPropagation();
+            animatedFlip('prev');
+          }}
+          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
+            canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
           }`}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
