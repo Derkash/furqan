@@ -35,6 +35,29 @@ function pairOf(page: number): PagePair {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
+// Réglages du comportement de l'appui long (persistés dans localStorage).
+const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+type LongPressScope = 'verse' | 'half' | 'page';
+interface LongPressConfig {
+  rate: number;
+  scope: LongPressScope;
+  french: boolean; // réciter aussi la traduction française
+  tafsir: boolean; // réciter aussi le tafsir Ibn Kathir
+}
+const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', french: false, tafsir: false };
+const LP_KEY = 'almuraja3a:lecture:longpress';
+
+function loadLongPressConfig(): LongPressConfig {
+  if (typeof window === 'undefined') return LP_DEFAULT;
+  try {
+    const raw = window.localStorage.getItem(LP_KEY);
+    if (!raw) return LP_DEFAULT;
+    return { ...LP_DEFAULT, ...JSON.parse(raw) };
+  } catch {
+    return LP_DEFAULT;
+  }
+}
+
 // Étape d'une lecture par thème : un verset (audio arabe) ou le tafsir Ibn Kathir
 // d'un thème (synthèse vocale française).
 type Step =
@@ -81,8 +104,13 @@ export default function LecturePractice() {
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(2);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
-  // Appui long : surligne en jaune tous les versets de la demi-page en cours d'écoute.
+  // Appui long : surligne en jaune tous les versets de la portée en cours d'écoute.
   const [halfPageHighlight, setHalfPageHighlight] = useState<Set<string>>(new Set());
+  // Réglages de l'appui long (vitesse, portée, traduction, tafsir).
+  const [lpConfig, setLpConfig] = useState<LongPressConfig>(LP_DEFAULT);
+  const [showLpConfig, setShowLpConfig] = useState(false);
+  const lpConfigRef = useRef<LongPressConfig>(LP_DEFAULT);
+  lpConfigRef.current = lpConfig;
   const [captureMode, setCaptureMode] = useState(false);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [showTrans, setShowTrans] = useState(false);
@@ -145,7 +173,17 @@ export default function LecturePractice() {
   // Racines du lexique (rechargeable après ajout d'un mot).
   useEffect(() => {
     setLexicon(lexiconMatchSets());
+    setLpConfig(loadLongPressConfig());
   }, []);
+
+  // Persiste les réglages d'appui long.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LP_KEY, JSON.stringify(lpConfig));
+    } catch {
+      /* quota — silencieux */
+    }
+  }, [lpConfig]);
 
   // Charge les pages quand la double page change.
   useEffect(() => {
@@ -358,8 +396,8 @@ export default function LecturePractice() {
       prefetchTafsir(step.themeKey); // prépare la synthèse du thème pendant les versets
       a.src = getAudioUrl(step.globalNumber);
       a.playbackRate = rateRef.current;
-      a.onended = nextStep;
-      a.onerror = nextStep;
+      a.onended = onStepArabicEnded;
+      a.onerror = onStepArabicEnded;
       a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
       return;
     }
@@ -387,6 +425,41 @@ export default function LecturePractice() {
         setTafsirLoading(false);
         nextStep();
       });
+  }
+
+  // Après l'arabe d'une étape 'ayah' : joue la traduction FR si demandée.
+  function onStepArabicEnded() {
+    const cfg = cfgRef.current;
+    const step = stepsRef.current[sIdxRef.current];
+    if (cfg.french && frEditionRef.current && step && step.type === 'ayah') {
+      playStepFrench(step.globalNumber);
+      return;
+    }
+    nextStep();
+  }
+
+  function playStepFrench(globalNumber: number) {
+    const edition = frEditionRef.current;
+    if (!edition) {
+      nextStep();
+      return;
+    }
+    phaseRef.current = 'fr';
+    const a = ensureAudio();
+    a.playbackRate = 1;
+    const urls = frenchAyahUrls(edition, globalNumber);
+    let tried = 0;
+    const attempt = () => {
+      if (tried >= urls.length) {
+        nextStep();
+        return;
+      }
+      a.src = urls[tried++];
+      a.play().catch(() => attempt());
+    };
+    a.onended = () => nextStep();
+    a.onerror = () => attempt();
+    attempt();
   }
 
   function nextStep() {
@@ -419,11 +492,9 @@ export default function LecturePractice() {
     stepsRef.current = [];
   }
 
-  async function launch(cfg: PlayConfig) {
-    const vpMap = await getVersePageMap();
-    const sel = buildSelection(cfg, units, vpMap);
-    if (sel.length === 0) return;
-    setConfig(cfg);
+  // Démarre la lecture d'une sélection explicite selon cfg (arabe, +français,
+  // +tafsir par thème). Réutilisé par la config de lecture ET l'appui long.
+  async function startPlayback(sel: SelVerse[], cfg: PlayConfig) {
     cfgRef.current = cfg;
     selRef.current = sel;
     vIdxRef.current = 0;
@@ -433,6 +504,14 @@ export default function LecturePractice() {
     phaseRef.current = 'ar';
     setSessionActive(true);
     setShowConfig(false);
+
+    // Résout l'édition FR avant de démarrer → la traduction du 1er verset n'est
+    // jamais sautée (utile pour l'appui long qui ne contient parfois qu'un verset).
+    if (cfg.french) {
+      const id = await resolveFrenchEdition();
+      frEditionRef.current = id;
+      setFrAvailable(id !== null);
+    }
 
     // Lecture PAR THÈME : versets d'un thème puis tafsir Ibn Kathir lu.
     if (cfg.byTheme) {
@@ -449,15 +528,16 @@ export default function LecturePractice() {
       playStep();
       return;
     }
-
-    if (cfg.french) {
-      resolveFrenchEdition().then((id) => {
-        frEditionRef.current = id;
-        setFrAvailable(id !== null);
-      });
-    }
     followPage(sel[0].page);
     playVerseArabic();
+  }
+
+  async function launch(cfg: PlayConfig) {
+    const vpMap = await getVersePageMap();
+    const sel = buildSelection(cfg, units, vpMap);
+    if (sel.length === 0) return;
+    setConfig(cfg);
+    await startPlayback(sel, cfg);
   }
 
   function toggleFullscreen() {
@@ -487,47 +567,51 @@ export default function LecturePractice() {
     });
   }
 
-  // Appui long sur un verset : écoute ×2 de la DEMI-PAGE délimitée par le signet
-  // rouge (le verset du milieu). Selon que le verset pressé est AVANT ou APRÈS
-  // ce milieu, on lit la moitié haute ou la moitié basse ; versets surlignés en
-  // jaune ; s'arrête à la fin.
-  function readHalfPage(pageNum: number, pressedVerseKey: string) {
+  // Appui long sur un verset : écoute selon les réglages (vitesse, portée,
+  // traduction, tafsir). Portée = verset seul / demi-page (coupée au verset du
+  // milieu, le signet rouge) / page entière. Versets lus surlignés en jaune.
+  function readLongPress(pageNum: number, pressedVerseKey: string) {
     const pv = pageNum === pair.leftPage ? left : pageNum === pair.rightPage ? right : null;
     if (!pv || pv.verses.length === 0) return;
-    // Verset du milieu = frontière entre les deux moitiés (comme le signet rouge).
-    const middle = getMiddleVerse(pv, verseMap?.pages[pageNum] ?? null);
-    const midGlobal = middle?.globalNumber ?? Infinity;
-    const pressedGlobal = pv.verses.find((v) => v.verseKey === pressedVerseKey)?.globalNumber ?? 0;
-    const upper = pressedGlobal < midGlobal; // clic au-dessus du signet → moitié haute
-    const half = pv.verses.filter((v) => (upper ? v.globalNumber < midGlobal : v.globalNumber >= midGlobal));
-    if (half.length === 0) return;
+    const lpc = lpConfigRef.current;
+
+    let scope: typeof pv.verses;
+    if (lpc.scope === 'verse') {
+      const v = pv.verses.find((x) => x.verseKey === pressedVerseKey);
+      scope = v ? [v] : [];
+    } else if (lpc.scope === 'page') {
+      scope = pv.verses;
+    } else {
+      // Demi-page : coupée au verset du milieu (signet rouge). Clic au-dessus →
+      // moitié haute ; au niveau/après → moitié basse.
+      const middle = getMiddleVerse(pv, verseMap?.pages[pageNum] ?? null);
+      const midGlobal = middle?.globalNumber ?? Infinity;
+      const pressedGlobal = pv.verses.find((v) => v.verseKey === pressedVerseKey)?.globalNumber ?? 0;
+      const upper = pressedGlobal < midGlobal;
+      scope = pv.verses.filter((v) => (upper ? v.globalNumber < midGlobal : v.globalNumber >= midGlobal));
+    }
+    if (scope.length === 0) return;
+
     stop();
-    const sel: SelVerse[] = half.map((v) => ({
+    const sel: SelVerse[] = scope.map((v) => ({
       verseKey: v.verseKey,
       globalNumber: v.globalNumber,
       page: pageNum,
     }));
     const cfg: PlayConfig = {
-      ...cfgRef.current,
+      ...DEFAULT_CONFIG,
+      selMode: 'verse',
       verseRepeat: 1,
       selectionRepeat: 1,
-      french: false,
-      byTheme: false,
+      french: lpc.french,
+      byTheme: lpc.tafsir,
     };
-    cfgRef.current = cfg;
-    selRef.current = sel;
-    stepsRef.current = [];
-    vIdxRef.current = 0;
-    repRef.current = 0;
-    passRef.current = 0;
-    phaseRef.current = 'ar';
-    setRate(2);
-    rateRef.current = 2;
+    setRate(lpc.rate);
+    rateRef.current = lpc.rate;
     setHalfPageHighlight(new Set(sel.map((s) => s.verseKey)));
-    setSessionActive(true);
     setVerseMenu(null);
     setSelected(null);
-    playVerseArabic();
+    void startPlayback(sel, cfg);
   }
 
   // Lecture/pause de la synthèse vocale du tafsir dans le layer.
@@ -688,7 +772,7 @@ export default function LecturePractice() {
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       pressTimer.current = null;
-      readHalfPage(page, verseKey);
+      readLongPress(page, verseKey);
     }, 450);
   };
 
@@ -886,6 +970,13 @@ export default function LecturePractice() {
           className="flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#c9a959] text-[#c9a959] hover:bg-[#1f3a0f]"
         >
           ⚙️ Réglages
+        </button>
+        <button
+          onClick={() => setShowLpConfig(true)}
+          title="Régler le comportement de l'appui long (vitesse, portée, traduction, tafsir)"
+          className="flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#c9a959] text-[#c9a959] hover:bg-[#1f3a0f]"
+        >
+          👆 Appui long
         </button>
         {sessionActive && (
           <button
@@ -1212,6 +1303,92 @@ export default function LecturePractice() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Réglages de l'appui long */}
+      {showLpConfig && (
+        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center" onClick={() => setShowLpConfig(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-[#fdfaf3] rounded-t-2xl sm:rounded-2xl shadow-2xl border-2 border-[#c9a959] w-full sm:max-w-md max-h-[85vh] overflow-y-auto p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-[#2d5016]">👆 Comportement de l&apos;appui long</h2>
+              <button onClick={() => setShowLpConfig(false)} className="text-[#2d5016] text-lg leading-none px-2">✕</button>
+            </div>
+            <p className="text-[12px] text-gray-500 mb-4">Maintiens le doigt sur un verset pour lancer l&apos;écoute avec ces réglages.</p>
+
+            {/* Vitesse */}
+            <div className="mb-4">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Vitesse de lecture</div>
+              <div className="flex flex-wrap gap-1.5">
+                {LP_SPEEDS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setLpConfig((c) => ({ ...c, rate: s }))}
+                    className={`px-3 py-1 rounded-md text-sm font-bold border ${
+                      lpConfig.rate === s ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/40'
+                    }`}
+                  >
+                    ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 1.75 ? '1,75' : s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Portée */}
+            <div className="mb-4">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Portée récitée</div>
+              <div className="flex flex-col gap-1.5">
+                {([
+                  ['verse', 'Le verset uniquement'],
+                  ['half', 'La demi-page (coupée au signet rouge)'],
+                  ['page', 'La page entière'],
+                ] as [LongPressScope, string][]).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLpConfig((c) => ({ ...c, scope: val }))}
+                    className={`text-left px-3 py-2 rounded-lg text-sm font-semibold border ${
+                      lpConfig.scope === val ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#2d5016] border-[#c9a959]/40'
+                    }`}
+                  >
+                    {lpConfig.scope === val ? '● ' : '○ '}{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Options traduction / tafsir */}
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[#2d5016]">📖 Réciter aussi la traduction (français)</span>
+                <input
+                  type="checkbox"
+                  checked={lpConfig.french}
+                  onChange={(e) => setLpConfig((c) => ({ ...c, french: e.target.checked }))}
+                  className="w-5 h-5 accent-[#2d5016]"
+                />
+              </label>
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[#2d5016]">📚 Réciter aussi le tafsir (Ibn Kathir)</span>
+                <input
+                  type="checkbox"
+                  checked={lpConfig.tafsir}
+                  onChange={(e) => setLpConfig((c) => ({ ...c, tafsir: e.target.checked }))}
+                  className="w-5 h-5 accent-[#2d5016]"
+                />
+              </label>
+            </div>
+
+            <button
+              onClick={() => setShowLpConfig(false)}
+              className="w-full mt-5 py-2.5 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl active:scale-[0.98] transition-all"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
