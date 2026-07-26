@@ -124,6 +124,9 @@ export default function LecturePractice() {
   const [isFs, setIsFs] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const tafsirAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Réécoute de l'enregistrement micro : lecteur + vitesse.
+  const recPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [recRate, setRecRate] = useState(1);
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<PlayConfig>({
@@ -1085,7 +1088,32 @@ export default function LecturePractice() {
           ) : recorder.audioUrl ? (
             <>
               <span className="text-[11px] font-bold text-[#c9a959] whitespace-nowrap">🎧 Ta récitation</span>
-              <audio controls src={recorder.audioUrl} className="h-9 max-w-full" />
+              <audio
+                ref={recPlayerRef}
+                controls
+                src={recorder.audioUrl}
+                className="h-9 max-w-full"
+                onLoadedMetadata={(e) => {
+                  e.currentTarget.playbackRate = recRate;
+                }}
+              />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-[#c9a959] font-bold mr-0.5">Vitesse</span>
+                {[0.75, 1, 1.5, 2].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setRecRate(r);
+                      if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                      recRate === r ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#2d5016] text-[#c9a959] border border-[#c9a959]/40'
+                    }`}
+                  >
+                    ×{r === 0.75 ? '0,75' : r === 1.5 ? '1,5' : r}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={toggleRecord}
                 className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#c9a959] text-[#c9a959] hover:bg-[#2d5016]"
