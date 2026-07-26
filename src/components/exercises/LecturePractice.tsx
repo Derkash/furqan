@@ -126,7 +126,7 @@ export default function LecturePractice() {
   const tafsirAudioRef = useRef<HTMLAudioElement | null>(null);
   // Réécoute de l'enregistrement micro : lecteur + vitesse.
   const recPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const [recRate, setRecRate] = useState(1);
+  const [recRate, setRecRate] = useState(2);
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<PlayConfig>({
