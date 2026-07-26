@@ -43,8 +43,9 @@ interface LongPressConfig {
   scope: LongPressScope;
   french: boolean; // réciter aussi la traduction française
   tafsir: boolean; // réciter aussi le tafsir Ibn Kathir
+  loop: boolean; // écouter la sélection en boucle
 }
-const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', french: false, tafsir: false };
+const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', french: false, tafsir: false, loop: false };
 const LP_KEY = 'almuraja3a:lecture:longpress';
 
 function loadLongPressConfig(): LongPressConfig {
@@ -261,6 +262,50 @@ export default function LecturePractice() {
     el.addEventListener('wheel', h, { passive: false });
     return () => el.removeEventListener('wheel', h);
   }, []);
+
+  // Media Session : indique au navigateur qu'une lecture média est en cours →
+  // l'audio continue quand l'app passe en arrière-plan (mobile) + contrôles sur
+  // l'écran verrouillé. Les handlers sont enregistrés une fois.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try {
+        ms.setActionHandler(action, handler);
+      } catch {
+        /* action non supportée */
+      }
+    };
+    set('play', () => {
+      audioRef.current?.play().then(() => setPlaying(true)).catch(() => {});
+    });
+    set('pause', () => {
+      audioRef.current?.pause();
+      setPlaying(false);
+    });
+    set('stop', () => stop());
+    return () => {
+      (['play', 'pause', 'stop'] as MediaSessionAction[]).forEach((a) => set(a, null));
+    };
+  }, []);
+
+  // Métadonnées + état de lecture (pour l'écran verrouillé / centre de contrôle).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    if (currentVerse && typeof MediaMetadata !== 'undefined') {
+      try {
+        ms.metadata = new MediaMetadata({
+          title: `Verset ${currentVerse}`,
+          artist: 'Mahmoud Al-Husary',
+          album: 'almuraja3a — Lecture',
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    ms.playbackState = playing ? 'playing' : sessionActive ? 'paused' : 'none';
+  }, [currentVerse, playing, sessionActive]);
 
   // Tafsir du layer (Ibn Kathir français) — chargé à l'ouverture de l'onglet.
   const { text: tafsirText, loading: tafsirTextLoading } = useIbnKathir(
@@ -602,7 +647,7 @@ export default function LecturePractice() {
       ...DEFAULT_CONFIG,
       selMode: 'verse',
       verseRepeat: 1,
-      selectionRepeat: 1,
+      selectionRepeat: lpc.loop ? 0 : 1, // 0 = boucle infinie
       french: lpc.french,
       byTheme: lpc.tafsir,
     };
@@ -1378,6 +1423,15 @@ export default function LecturePractice() {
                   type="checkbox"
                   checked={lpConfig.tafsir}
                   onChange={(e) => setLpConfig((c) => ({ ...c, tafsir: e.target.checked }))}
+                  className="w-5 h-5 accent-[#2d5016]"
+                />
+              </label>
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[#2d5016]">🔁 Écouter en boucle la sélection</span>
+                <input
+                  type="checkbox"
+                  checked={lpConfig.loop}
+                  onChange={(e) => setLpConfig((c) => ({ ...c, loop: e.target.checked }))}
                   className="w-5 h-5 accent-[#2d5016]"
                 />
               </label>
