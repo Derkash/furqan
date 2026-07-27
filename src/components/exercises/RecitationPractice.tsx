@@ -14,6 +14,7 @@ import {
   getMistakeWordMarks,
   MISTAKE_TYPE_META,
   getPriorityVerses,
+  loadStats,
   logout,
   pickPriorityVerse,
   recordVerseResult,
@@ -89,7 +90,30 @@ export default function RecitationPractice() {
     if (playerRef.current) playerRef.current.playbackRate = playbackRate;
   }, [playbackRate, recorder.audioUrl]);
 
+  // Fin d'enregistrement → réécoute automatique à ×2.
+  const lastRecUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    const url = recorder.audioUrl;
+    if (!url) {
+      lastRecUrlRef.current = null;
+      return;
+    }
+    if (url === lastRecUrlRef.current) return;
+    lastRecUrlRef.current = url;
+    setPlaybackRate(2);
+    const t = setTimeout(() => {
+      const el = playerRef.current;
+      if (el) {
+        el.playbackRate = 2;
+        el.play().catch(() => {});
+      }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [recorder.audioUrl]);
+
   const lastVerseKeyRef = useRef<string | null>(null);
+  // Versets déjà demandés dans la session en cours → jamais deux fois le même.
+  const askedVersesRef = useRef<Set<string>>(new Set());
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Panneau résultat déplaçable (pour ne pas cacher un verset en bas de page).
@@ -129,28 +153,41 @@ export default function RecitationPractice() {
     setLoadError(null);
     try {
       let verse: VersePosition | null = null;
+      const asked = askedVersesRef.current;
 
-      // ~50 % du temps : tirage pondéré parmi les versets en erreur de la plage.
+      // ~50 % du temps : tirage pondéré parmi les versets en erreur de la plage
+      // (en excluant ceux déjà demandés cette session).
       const priorities = getPriorityVerses(getCurrentUser(), startPage, endPage);
+      for (const k of [...priorities.keys()]) if (asked.has(k)) priorities.delete(k);
       if (priorities.size > 0 && Math.random() < 0.5) {
         const pick = pickPriorityVerse(priorities);
-        if (pick && pick.verseKey !== lastVerseKeyRef.current) {
+        if (pick) {
           const pv = await fetchPageVerses(pick.page);
           verse = pv.verses.find((v) => v.verseKey === pick.verseKey) ?? null;
         }
       }
 
-      // Sinon : page aléatoire → verset aléatoire (tirage uniforme).
+      // Sinon : page aléatoire → verset aléatoire NON déjà demandé (plusieurs essais).
       if (!verse) {
-        const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
-        const pageVerses = await fetchPageVerses(page);
-        if (pageVerses.verses.length === 0) throw new Error('page vide');
-        verse = pageVerses.verses[Math.floor(Math.random() * pageVerses.verses.length)];
-        if (verse.verseKey === lastVerseKeyRef.current && pageVerses.verses.length > 1) {
-          const others = pageVerses.verses.filter((v) => v.verseKey !== verse!.verseKey);
-          verse = others[Math.floor(Math.random() * others.length)];
+        for (let attempt = 0; attempt < 40 && !verse; attempt++) {
+          const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
+          const pv = await fetchPageVerses(page);
+          const candidates = pv.verses.filter((v) => !asked.has(v.verseKey));
+          if (candidates.length === 0) continue;
+          verse = candidates[Math.floor(Math.random() * candidates.length)];
         }
       }
+
+      // Plage entièrement parcourue → on repart à zéro pour pouvoir continuer.
+      if (!verse) {
+        asked.clear();
+        const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
+        const pv = await fetchPageVerses(page);
+        if (pv.verses.length === 0) throw new Error('page vide');
+        verse = pv.verses[Math.floor(Math.random() * pv.verses.length)];
+      }
+
+      asked.add(verse.verseKey);
       lastVerseKeyRef.current = verse.verseKey;
 
       const pair = getPagePair(verse.page);
@@ -248,6 +285,7 @@ export default function RecitationPractice() {
     setFoundCount(0);
     setCompleted(false);
     lastVerseKeyRef.current = null;
+    askedVersesRef.current = new Set();
     newRound();
   };
 
@@ -307,6 +345,44 @@ export default function RecitationPractice() {
     if (phase === 'listening') playSnippet();
   };
 
+  // Versets où l'utilisateur se trompe souvent (toutes sessions + celle-ci) :
+  // agrégés par verset (mots fautés + « ratés »), triés par fréquence.
+  const habitualVerses = useMemo(() => {
+    if (!user || !completed) return [];
+    const stats = loadStats(user);
+    type Row = {
+      verseKey: string;
+      page: number;
+      words: number;
+      notFound: number;
+      types: Record<MistakeType, number>;
+      lastAt: string;
+    };
+    const map = new Map<string, Row>();
+    const get = (verseKey: string, page: number, at: string): Row => {
+      let e = map.get(verseKey);
+      if (!e) {
+        e = { verseKey, page, words: 0, notFound: 0, types: { oubli: 0, inversion: 0, harakat: 0, mot: 0 }, lastAt: at };
+        map.set(verseKey, e);
+      }
+      if (at > e.lastAt) e.lastAt = at;
+      return e;
+    };
+    for (const m of stats.wordMistakes) {
+      const e = get(m.verseKey, m.page, m.at);
+      e.words++;
+      e.types[m.type]++;
+    }
+    for (const r of stats.verseResults) {
+      if (!r.found) get(r.verseKey, r.page, r.at).notFound++;
+    }
+    return Array.from(map.values())
+      .map((e) => ({ ...e, score: e.words + e.notFound }))
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.score - a.score || (b.lastAt > a.lastAt ? 1 : -1))
+      .slice(0, 12);
+  }, [user, completed]);
+
   // ---------- Rendu ----------
 
   if (!userChecked) {
@@ -349,7 +425,52 @@ export default function RecitationPractice() {
           >
             {toArabicNumbers(foundCount)}/{toArabicNumbers(maxRounds)}
           </p>
-          <p className="text-[#4a7c23] mb-4 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
+          <p className="text-[#4a7c23] mb-3 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
+
+          {/* Versets où tu te trompes souvent (historique + session) */}
+          {habitualVerses.length > 0 ? (
+            <div className="mb-4 text-left">
+              <h3 className="text-sm font-bold text-[#2d5016] mb-2 text-center">
+                📌 Versets où tu te trompes souvent
+              </h3>
+              <div className="max-h-52 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                {habitualVerses.map((v) => (
+                  <div
+                    key={v.verseKey}
+                    className="flex items-center justify-between gap-2 bg-[#f0f7ea] rounded-lg px-3 py-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span dir="ltr" className="text-sm font-bold text-[#2d5016]">
+                        {v.verseKey}
+                      </span>
+                      <span className="text-[10px] text-gray-500">p.{toArabicNumbers(v.page)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {MISTAKE_TYPE_META.filter((t) => v.types[t.value] > 0).map((t) => (
+                        <span
+                          key={t.value}
+                          className="flex items-center gap-0.5 text-[10px] font-bold"
+                          style={{ color: t.color }}
+                          title={t.label}
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
+                          {toArabicNumbers(v.types[t.value])}
+                        </span>
+                      ))}
+                      {v.notFound > 0 && (
+                        <span className="text-[10px] font-bold text-red-600" title="Non trouvé">
+                          ✗{toArabicNumbers(v.notFound)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[#4a7c23] mb-4">Aucune faute récurrente enregistrée — excellent ! 🎉</p>
+          )}
+
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={restartSession}

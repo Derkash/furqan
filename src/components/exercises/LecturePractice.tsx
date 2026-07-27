@@ -23,6 +23,7 @@ import {
 import { fetchIbnKathir, useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { fetchTTS } from '@/hooks/exercises/useSpeech';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
+import { playBeep } from '@/utils/beep';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
@@ -431,6 +432,7 @@ export default function LecturePractice() {
     phaseRef.current = 'ar';
     if (vIdxRef.current + 1 < sel.length) {
       vIdxRef.current += 1;
+      playBeep(); // transition d'un verset à l'autre
       playVerseArabic();
       return;
     }
@@ -438,6 +440,7 @@ export default function LecturePractice() {
     passRef.current += 1;
     if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
       vIdxRef.current = 0;
+      playBeep();
       playVerseArabic();
       return;
     }
@@ -539,12 +542,15 @@ export default function LecturePractice() {
     const cfg = cfgRef.current;
     if (sIdxRef.current + 1 < stepsRef.current.length) {
       sIdxRef.current += 1;
+      // Bip uniquement à l'entrée dans un nouveau verset (pas avant le tafsir).
+      if (stepsRef.current[sIdxRef.current]?.type === 'ayah') playBeep();
       playStep();
       return;
     }
     passRef.current += 1;
     if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
       sIdxRef.current = 0;
+      if (stepsRef.current[0]?.type === 'ayah') playBeep();
       playStep();
       return;
     }

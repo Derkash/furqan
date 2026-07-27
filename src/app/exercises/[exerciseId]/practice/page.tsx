@@ -28,6 +28,7 @@ import { useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { prefetchSpeech, useSpeech } from '@/hooks/exercises/useSpeech';
 import { getVerseRoots } from '@/utils/vocab/morphology';
+import { playBeep } from '@/utils/beep';
 import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
 import Link from 'next/link';
 
@@ -505,9 +506,14 @@ function MushafPractice() {
     audioPlayRef.current = audio.play;
   }, [audio.play]);
 
+  // Bip à chaque transition d'un verset à l'autre (nouveau verset écouté).
+  const lastBeepVerseRef = useRef<string | null>(null);
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (currentStep?.type === 'listening' && currentStep.targetVerse) {
+      const vk = currentStep.targetVerse.verseKey;
+      if (lastBeepVerseRef.current !== null && lastBeepVerseRef.current !== vk) playBeep();
+      lastBeepVerseRef.current = vk;
       audioPlayRef.current(currentStep.targetVerse, audioSeconds > 0 ? audioSeconds : undefined);
       setLastAudioVerse(currentStep.targetVerse);
     }
