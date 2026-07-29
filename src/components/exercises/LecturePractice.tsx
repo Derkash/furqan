@@ -87,16 +87,15 @@ async function loadThemeGroups(): Promise<Record<string, number>> {
  */
 export default function LecturePractice() {
   const params = useSearchParams();
+  // Page de départ (page / sourate / hizb / juz résolus en page côté setup).
+  // La Lecture n'est PLUS bloquée à une plage : navigation libre sur tout le Mushaf.
   const startPage = Number(params.get('start')) || 2;
-  const endPage = Number(params.get('end')) || Math.min(604, startPage + 1);
-  const lo = Math.min(startPage, endPage);
-  const hi = Math.max(startPage, endPage);
 
   const { data: units } = useQuranUnits();
   const { verseMap } = useVerseMap();
   const recorder = useAudioRecorder(); // enregistrement micro + réécoute
 
-  const [page, setPage] = useState(lo % 2 === 0 ? lo + 1 : lo);
+  const [page, setPage] = useState(startPage % 2 === 0 ? startPage + 1 : startPage);
   const [left, setLeft] = useState<PageVerses | null>(null);
   const [right, setRight] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
@@ -138,8 +137,8 @@ export default function LecturePractice() {
   const [config, setConfig] = useState<PlayConfig>({
     ...DEFAULT_CONFIG,
     selMode: 'page',
-    unitStart: lo,
-    unitEnd: hi,
+    unitStart: startPage,
+    unitEnd: startPage,
   });
   const [sessionActive, setSessionActive] = useState(false);
   const [frAvailable, setFrAvailable] = useState<boolean | null>(null);
@@ -174,10 +173,9 @@ export default function LecturePractice() {
   const sIdxRef = useRef(0);
 
   const pair = pairOf(page);
-  const loP = lo % 2 === 1 ? lo : lo - 1;
-  const hiP = hi % 2 === 1 ? hi : hi - 1;
-  const canPrev = pair.rightPage > loP;
-  const canNext = pair.rightPage < hiP;
+  // Navigation libre sur tout le Mushaf (pages de droite : 1 → 603).
+  const canPrev = pair.rightPage > 1;
+  const canNext = pair.rightPage < 603;
 
   /* eslint-disable react-hooks/set-state-in-effect */
   // Racines du lexique (rechargeable après ajout d'un mot).
@@ -804,7 +802,7 @@ export default function LecturePractice() {
     setPage((p) => {
       const cur = p % 2 === 1 ? p : p - 1;
       let t = cur + (dir === 'next' ? 2 : -2);
-      t = Math.max(loP, Math.min(hiP, t));
+      t = Math.max(1, Math.min(603, t));
       return t;
     });
   }
@@ -1352,7 +1350,8 @@ export default function LecturePractice() {
           </div>
         )}
 
-        {/* Feuilletage (RTL : suivante = vers la droite) */}
+        {/* Feuilletage — l'arabe se lit de DROITE à GAUCHE :
+            flèche de GAUCHE (‹) = page SUIVANTE, flèche de DROITE (›) = précédente. */}
         <button
           type="button"
           aria-label="Pages suivantes"
@@ -1361,11 +1360,11 @@ export default function LecturePractice() {
             e.stopPropagation();
             animatedFlip('next');
           }}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
+          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
           }`}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
         </button>
         <button
           type="button"
@@ -1375,11 +1374,11 @@ export default function LecturePractice() {
             e.stopPropagation();
             animatedFlip('prev');
           }}
-          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
+          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
             canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
           }`}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
         </button>
       </div>
 

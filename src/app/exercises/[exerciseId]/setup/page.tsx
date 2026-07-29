@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exerciseRegistry';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
-import { unitToPageRange } from '@/utils/exercises/rangeToPages';
+import { unitToPageRange, MODE_LABELS, MODE_MAX, type RangeMode } from '@/utils/exercises/rangeToPages';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
@@ -174,6 +174,10 @@ export default function SetupPage() {
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
+  // Lecture : destination unique (aller à telle page / sourate / hizb / juz),
+  // sans blocage de plage — on peut ensuite feuilleter tout le Mushaf.
+  const [gotoMode, setGotoMode] = useState<RangeMode>('page');
+  const [gotoValue, setGotoValue] = useState<number | null>(null);
   // Choix spécifiques (avec des défauts sensés ; la mémoire les remplace au montage si présents).
   const [identifyPosition, setIdentifyPosition] = useState<VersePositionType>('random');
   const [revealAfter, setRevealAfter] = useState<VersePositionType[]>([]);
@@ -212,6 +216,9 @@ export default function SetupPage() {
       // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
       setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
+    // Lecture : dernière destination choisie (mode + valeur).
+    if (saved?.mode) setGotoMode(saved.mode as RangeMode);
+    if (saved?.start != null) setGotoValue(saved.start);
     if (!saved) return;
     if (saved.identifyPosition) setIdentifyPosition(saved.identifyPosition);
     if (saved.revealAfter) setRevealAfter(saved.revealAfter);
@@ -228,6 +235,12 @@ export default function SetupPage() {
   const { startPage, endPage } = useMemo(
     () => unitToPageRange(range.mode, range.start, range.end, units),
     [range, units]
+  );
+
+  // Lecture : la destination (mode + valeur unique) résolue en page de départ.
+  const gotoStartPage = useMemo(
+    () => unitToPageRange(gotoMode, gotoValue, gotoValue, units).startPage,
+    [gotoMode, gotoValue, units]
   );
 
   if (!isValidExerciseId(exerciseId)) {
@@ -256,6 +269,22 @@ export default function SetupPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Lecture : on va à une destination (page/sourate/hizb/juz) et on feuillette
+    // ensuite TOUT le Mushaf (pas de plage bloquante).
+    if (isLecture) {
+      if (gotoValue == null) {
+        setError('Choisissez une destination (page, sourate, hizb ou juz)');
+        return;
+      }
+      if (gotoStartPage == null) {
+        setError('Destination invalide');
+        return;
+      }
+      saveSetup('lecture', { mode: gotoMode, start: gotoValue, end: gotoValue });
+      router.push(`/exercises/lecture/practice?start=${gotoStartPage}`);
+      return;
+    }
 
     if (range.start == null || range.end == null) {
       setError('Veuillez saisir un début et une fin');
@@ -349,24 +378,93 @@ export default function SetupPage() {
           <p className="text-gray-500 text-sm mb-5">{exercise.description}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
+            {isLecture ? (
+              <>
+                {/* Lecture : aller à une destination, puis feuilletage libre. */}
+                <OptionGroup label="Aller à">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(['page', 'surah', 'hizb', 'juz'] as RangeMode[]).map((m) => {
+                      const active = gotoMode === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setGotoMode(m);
+                            setGotoValue(null);
+                          }}
+                          className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                            active
+                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
+                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                          }`}
+                        >
+                          {MODE_LABELS[m]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </OptionGroup>
 
-            {/* Récap de la plage en pages */}
-            <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
-              <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
-                Plage de pages
-              </div>
-              <div className="text-lg font-bold text-[#2d5016] mt-1">
-                {hasPageRange
-                  ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
-                  : '—'}
-              </div>
-              <div className="text-xs text-[#7a8b3e] mt-0.5">
-                {hasPageRange
-                  ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
-                  : 'Saisissez un début et une fin'}
-              </div>
-            </div>
+                {gotoMode === 'surah' ? (
+                  <select
+                    value={gotoValue ?? ''}
+                    onChange={(e) => setGotoValue(Number(e.target.value) || null)}
+                    className="w-full px-3 py-2.5 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-semibold text-[#2d5016] bg-white"
+                  >
+                    <option value="">— Choisir une sourate —</option>
+                    {(units?.chapters ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.id}. {c.name_simple}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    min={1}
+                    max={MODE_MAX[gotoMode]}
+                    value={gotoValue ?? ''}
+                    onChange={(e) => setGotoValue(Number(e.target.value) || null)}
+                    placeholder={`${MODE_LABELS[gotoMode]} (1–${MODE_MAX[gotoMode]})`}
+                    className="w-full text-center px-3 py-2.5 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                  />
+                )}
+
+                <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
+                    Page de départ
+                  </div>
+                  <div className="text-lg font-bold text-[#2d5016] mt-1">
+                    {gotoStartPage != null ? toArabicNumbers(gotoStartPage) : '—'}
+                  </div>
+                  <div className="text-xs text-[#7a8b3e] mt-0.5">
+                    Ensuite : feuilletage libre sur tout le Mushaf
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
+
+                {/* Récap de la plage en pages */}
+                <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
+                    Plage de pages
+                  </div>
+                  <div className="text-lg font-bold text-[#2d5016] mt-1">
+                    {hasPageRange
+                      ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
+                      : '—'}
+                  </div>
+                  <div className="text-xs text-[#7a8b3e] mt-0.5">
+                    {hasPageRange
+                      ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
+                      : 'Saisissez un début et une fin'}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Choix spécifiques : Quiz audio */}
             {isAudioQuiz && (
