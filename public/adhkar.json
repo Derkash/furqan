@@ -6,10 +6,31 @@
    "count": 1
   },
   {
-   "ar": "آية الكرسي — سورة الإخلاص — سورة الفلق — سورة الناس",
-   "fr": "Récite le Verset du Trône (Âyat al-Kursî) une fois, puis les sourates Al-Ikhlâs, Al-Falaq et An-Nâs, trois fois chacune.",
-   "count": 1,
-   "note": "Âyat al-Kursî ×1 · Al-Ikhlâs/Al-Falaq/An-Nâs ×3"
+   "label": "آية الكرسي",
+   "ar": "ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ لَا تَأْخُذُهُۥ سِنَةٌ وَلَا نَوْمٌ لَّهُۥ مَا فِى ٱلسَّمَٰوَٰتِ وَمَا فِى ٱلْأَرْضِ مَن ذَا ٱلَّذِى يَشْفَعُ عِندَهُۥٓ إِلَّا بِإِذْنِهِۦ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَىْءٍ مِّنْ عِلْمِهِۦٓ إِلَّا بِمَا شَآءَ وَسِعَ كُرْسِيُّهُ ٱلسَّمَٰوَٰتِ وَٱلْأَرْضَ وَلَا يَـُٔودُهُۥ حِفْظُهُمَا وَهُوَ ٱلْعَلِىُّ ٱلْعَظِيمُ",
+   "fr": "Allah! Point de divinité à part Lui, le Vivant, Celui qui subsiste par lui-même «Al-Qayyûm». Ni somnolence ni sommeil ne Le saisissent. A Lui appartient tout ce qui est dans les cieux et sur la terre. Qui peut intercéder auprès de Lui sans Sa permission? Il connaît leur passé et leur futur. Et, de Sa science, ils n'embrassent que ce qu'Il veut. Son Trône «Kursiy», déborde les cieux et la terre, dont la garde ne Lui coûte aucune peine. Et Il est le Très Haut, le Très Grand.",
+   "count": 1
+  },
+  {
+   "kind": "surahs",
+   "label": "Les trois sourates protectrices",
+   "surahs": [
+    {
+     "name": "سورة الإخلاص",
+     "fr": "Al-Ikhlâs",
+     "count": 3
+    },
+    {
+     "name": "سورة الفلق",
+     "fr": "Al-Falaq",
+     "count": 3
+    },
+    {
+     "name": "سورة الناس",
+     "fr": "An-Nâs",
+     "count": 3
+    }
+   ]
   },
   {
    "ar": "أصْبَحْنَا وَأصْبَحَ المُلْكُ للهِ، وَالحَمْدُ لِلَّهِ، لا إلهَ إلاَّ اللهُ وَحْدَهُ لا شَرِيْكَ لَهُ، لَهُ المُلْكُ، ولَهُ الحَمْدُ، وهُوَ عَلَى كُلِّ شَيءٍ قَدِيرٌ، رَبِّ أسْألُكَ خَيْرَ مَا في هَذَا اليَوْمِ وَخَيْرَ مَا بَعْدَهُ، وأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا اليَوْمِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أعُوذُ بِكَ مِنَ الكَسَلِ، وسُوءِ الكِبَرِ، رَبِّ أعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وعَذَابٍ فِي القَبْرِ",
@@ -122,10 +143,31 @@
    "count": 1
   },
   {
-   "ar": "آية الكرسي — سورة الإخلاص — سورة الفلق — سورة الناس",
-   "fr": "Récite le Verset du Trône (Âyat al-Kursî) une fois, puis les sourates Al-Ikhlâs, Al-Falaq et An-Nâs, trois fois chacune.",
-   "count": 1,
-   "note": "Âyat al-Kursî ×1 · Al-Ikhlâs/Al-Falaq/An-Nâs ×3"
+   "label": "آية الكرسي",
+   "ar": "ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ لَا تَأْخُذُهُۥ سِنَةٌ وَلَا نَوْمٌ لَّهُۥ مَا فِى ٱلسَّمَٰوَٰتِ وَمَا فِى ٱلْأَرْضِ مَن ذَا ٱلَّذِى يَشْفَعُ عِندَهُۥٓ إِلَّا بِإِذْنِهِۦ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَىْءٍ مِّنْ عِلْمِهِۦٓ إِلَّا بِمَا شَآءَ وَسِعَ كُرْسِيُّهُ ٱلسَّمَٰوَٰتِ وَٱلْأَرْضَ وَلَا يَـُٔودُهُۥ حِفْظُهُمَا وَهُوَ ٱلْعَلِىُّ ٱلْعَظِيمُ",
+   "fr": "Allah! Point de divinité à part Lui, le Vivant, Celui qui subsiste par lui-même «Al-Qayyûm». Ni somnolence ni sommeil ne Le saisissent. A Lui appartient tout ce qui est dans les cieux et sur la terre. Qui peut intercéder auprès de Lui sans Sa permission? Il connaît leur passé et leur futur. Et, de Sa science, ils n'embrassent que ce qu'Il veut. Son Trône «Kursiy», déborde les cieux et la terre, dont la garde ne Lui coûte aucune peine. Et Il est le Très Haut, le Très Grand.",
+   "count": 1
+  },
+  {
+   "kind": "surahs",
+   "label": "Les trois sourates protectrices",
+   "surahs": [
+    {
+     "name": "سورة الإخلاص",
+     "fr": "Al-Ikhlâs",
+     "count": 3
+    },
+    {
+     "name": "سورة الفلق",
+     "fr": "Al-Falaq",
+     "count": 3
+    },
+    {
+     "name": "سورة الناس",
+     "fr": "An-Nâs",
+     "count": 3
+    }
+   ]
   },
   {
    "ar": "أَمْسَيْنا وَأَمْسى المُلْكُ للهِ، وَالحَمْدُ لِلَّهِ، لا إلهَ إلاَّ اللهُ وَحْدَهُ لا شَرِيْكَ لَهُ، لَهُ المُلْكُ، ولَهُ الحَمْدُ، وهُوَ عَلَى كُلِّ شَيءٍ قَدِيرٌ، رَبِّ أسْألُكَ خَيْرَ مَا في هَذَا اللَّيْلَةِ وَخَيْرَ مَا بَعْدَهُ، وأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا اللَّيْلَةِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أعُوذُ بِكَ مِنَ الكَسَلِ، وسُوءِ الكِبَرِ، رَبِّ أعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وعَذَابٍ فِي القَبْرِ",
