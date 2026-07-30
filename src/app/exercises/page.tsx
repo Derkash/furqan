@@ -59,6 +59,24 @@ export default function ExercisesPage() {
       {/* Liste des exercices */}
       <main className="px-4">
         <div className="max-w-2xl mx-auto space-y-3">
+          {/* Invocations du matin et du soir */}
+          <Link
+            href="/adhkar"
+            className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#2d5016] to-[#4a7c23] text-white shadow-lg active:scale-[0.99] transition-all"
+          >
+            <span className="text-4xl flex-none">🌅</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-lg">Invocations matin &amp; soir</h3>
+                <span className="text-lg" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
+                  أذكار
+                </span>
+              </div>
+              <p className="text-sm text-white/80 mt-0.5">Lecture &amp; révision des adhkâr, avec compteur et traduction</p>
+            </div>
+            <span className="text-2xl flex-none">🌙</span>
+          </Link>
+
           {exercises.map((exercise, idx) => (
             <ExerciseCard key={exercise.id} exercise={exercise} index={idx} />
           ))}
