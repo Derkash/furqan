@@ -234,18 +234,29 @@ function MushafPractice() {
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
 
-  // Séquentiel : l'exercice porte sur UNE page, mais le spread en affiche deux.
-  // On garde l'AUTRE page entièrement visible (non masquée) tout en révélant
-  // progressivement le verset cible sur sa page.
+  // Séquentiel : on ACCUMULE les versets révélés (début/milieu/fin) au fil des
+  // pages ; ainsi, en passant de 77 à 78, ce qui a été montré sur 77 reste
+  // affiché (seuls les versets de la double page courante sont visibles à l'écran).
+  const [seqRevealed, setSeqRevealed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (exerciseId !== 'sequential') return;
+    const vv = currentStep?.ui.visibleVerses;
+    if (!vv || vv.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeqRevealed((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const k of vv) if (!next.has(k)) { next.add(k); changed = true; }
+      return changed ? next : prev;
+    });
+  }, [currentStep, exerciseId]);
+
   const displayVisibleVerses = useMemo(() => {
     if (exerciseId !== 'sequential') return visibleVerses;
-    const targetPage = state.currentRound?.pageNumber ?? state.progress.currentPage;
-    const otherPv = targetPage === pagePair.rightPage ? leftPageVerses : rightPageVerses;
-    if (!otherPv || otherPv.verses.length === 0) return visibleVerses;
     const s = new Set(visibleVerses);
-    for (const v of otherPv.verses) s.add(v.verseKey);
+    for (const k of seqRevealed) s.add(k);
     return s;
-  }, [exerciseId, visibleVerses, state.currentRound, state.progress.currentPage, pagePair, leftPageVerses, rightPageVerses]);
+  }, [exerciseId, visibleVerses, seqRevealed]);
 
   // Hifz : fautes déclarées en Récitation, transférées ici (une couleur par type).
   const [showMistakes, setShowMistakes] = useState(true);
