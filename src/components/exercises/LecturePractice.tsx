@@ -34,19 +34,21 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 3, 4];
 
 // Réglages du comportement de l'appui long (persistés dans localStorage).
-const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2];
-type LongPressScope = 'verse' | 'half' | 'page';
+const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
+const LP_PAGES = [2, 3, 4, 5, 6]; // nombre de pages lues en portée « pages »
+type LongPressScope = 'verse' | 'half' | 'page' | 'pages';
 interface LongPressConfig {
   rate: number;
   scope: LongPressScope;
+  pages: number; // nombre de pages lues quand scope === 'pages'
   french: boolean; // réciter aussi la traduction française
   tafsir: boolean; // réciter aussi le tafsir Ibn Kathir
   loop: boolean; // écouter la sélection en boucle
 }
-const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', french: false, tafsir: false, loop: false };
+const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', pages: 2, french: false, tafsir: false, loop: false };
 const LP_KEY = 'almuraja3a:lecture:longpress';
 
 function loadLongPressConfig(): LongPressConfig {
@@ -645,36 +647,57 @@ export default function LecturePractice() {
   }
 
   // Appui long sur un verset : écoute selon les réglages (vitesse, portée,
-  // traduction, tafsir). Portée = verset seul / demi-page (coupée au verset du
-  // milieu, le signet rouge) / page entière. Versets lus surlignés en jaune.
-  function readLongPress(pageNum: number, pressedVerseKey: string) {
+  // traduction, tafsir, boucle). Portée = verset seul / demi-page (coupée au
+  // verset du milieu, le signet rouge) / page entière / N pages (2→6 à partir du
+  // verset). Les versets lus sont surlignés en jaune ; les pages tournent seules.
+  async function readLongPress(pageNum: number, pressedVerseKey: string) {
     const pv = pageNum === pair.leftPage ? left : pageNum === pair.rightPage ? right : null;
     if (!pv || pv.verses.length === 0) return;
     const lpc = lpConfigRef.current;
+    const pressedGlobal = pv.verses.find((v) => v.verseKey === pressedVerseKey)?.globalNumber ?? 0;
 
-    let scope: typeof pv.verses;
+    let sel: SelVerse[] = [];
+    const mapVerses = (verses: typeof pv.verses, p: number): SelVerse[] =>
+      verses.map((v) => ({ verseKey: v.verseKey, globalNumber: v.globalNumber, page: p }));
+
     if (lpc.scope === 'verse') {
       const v = pv.verses.find((x) => x.verseKey === pressedVerseKey);
-      scope = v ? [v] : [];
+      sel = v ? mapVerses([v], pageNum) : [];
     } else if (lpc.scope === 'page') {
-      scope = pv.verses;
+      sel = mapVerses(pv.verses, pageNum);
+    } else if (lpc.scope === 'pages') {
+      // Du verset pressé jusqu'à N pages après (incluses).
+      const n = Math.max(2, Math.min(6, lpc.pages || 2));
+      const endPage = Math.min(604, pageNum + n - 1);
+      const pageNums: number[] = [];
+      for (let p = pageNum; p <= endPage; p++) pageNums.push(p);
+      const pvs = await Promise.all(pageNums.map((p) => fetchPageVerses(p).catch(() => null)));
+      const byVerse = new Map<string, SelVerse>();
+      pvs.forEach((ppv, i) => {
+        if (!ppv) return;
+        for (const v of ppv.verses) {
+          if (!byVerse.has(v.verseKey)) {
+            byVerse.set(v.verseKey, { verseKey: v.verseKey, globalNumber: v.globalNumber, page: pageNums[i] });
+          }
+        }
+      });
+      sel = Array.from(byVerse.values())
+        .filter((v) => v.globalNumber >= pressedGlobal)
+        .sort((a, b) => a.globalNumber - b.globalNumber);
     } else {
       // Demi-page : coupée au verset du milieu (signet rouge). Clic au-dessus →
       // moitié haute ; au niveau/après → moitié basse.
       const middle = getMiddleVerse(pv, verseMap?.pages[pageNum] ?? null);
       const midGlobal = middle?.globalNumber ?? Infinity;
-      const pressedGlobal = pv.verses.find((v) => v.verseKey === pressedVerseKey)?.globalNumber ?? 0;
       const upper = pressedGlobal < midGlobal;
-      scope = pv.verses.filter((v) => (upper ? v.globalNumber < midGlobal : v.globalNumber >= midGlobal));
+      sel = mapVerses(
+        pv.verses.filter((v) => (upper ? v.globalNumber < midGlobal : v.globalNumber >= midGlobal)),
+        pageNum
+      );
     }
-    if (scope.length === 0) return;
+    if (sel.length === 0) return;
 
     stop();
-    const sel: SelVerse[] = scope.map((v) => ({
-      verseKey: v.verseKey,
-      globalNumber: v.globalNumber,
-      page: pageNum,
-    }));
     const cfg: PlayConfig = {
       ...DEFAULT_CONFIG,
       selMode: 'verse',
@@ -891,7 +914,7 @@ export default function LecturePractice() {
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       pressTimer.current = null;
-      readLongPress(page, verseKey);
+      void readLongPress(page, verseKey);
     }, 450);
   };
 
@@ -1480,7 +1503,7 @@ export default function LecturePractice() {
                       lpConfig.rate === s ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/40'
                     }`}
                   >
-                    ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 1.75 ? '1,75' : s}
+                    ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 1.75 ? '1,75' : s === 2.5 ? '2,5' : s}
                   </button>
                 ))}
               </div>
@@ -1494,6 +1517,7 @@ export default function LecturePractice() {
                   ['verse', 'Le verset uniquement'],
                   ['half', 'La demi-page (coupée au signet rouge)'],
                   ['page', 'La page entière'],
+                  ['pages', 'Plusieurs pages (à partir du verset)'],
                 ] as [LongPressScope, string][]).map(([val, label]) => (
                   <button
                     key={val}
@@ -1506,6 +1530,30 @@ export default function LecturePractice() {
                   </button>
                 ))}
               </div>
+              {/* Nombre de pages (portée « plusieurs pages ») */}
+              {lpConfig.scope === 'pages' && (
+                <div className="mt-2 pl-1">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">
+                    Nombre de pages
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LP_PAGES.map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setLpConfig((c) => ({ ...c, pages: n }))}
+                        className={`w-10 py-1 rounded-md text-sm font-bold border ${
+                          lpConfig.pages === n ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/40'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Lecture du verset touché jusqu&apos;à {toArabicNumbers(lpConfig.pages)} pages plus loin ; les pages tournent automatiquement.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Options traduction / tafsir */}
