@@ -22,6 +22,7 @@ import {
   type MistakeType,
   type WordMistake,
 } from '@/utils/exercises/userStats';
+import { getSelfAssess } from '@/utils/exercises/prefs';
 import type { PagePair, PageVerses, VersePosition } from '@/types';
 
 /** Durée de l'extrait audio joué au début de chaque tour. */
@@ -63,6 +64,12 @@ export default function RecitationPractice() {
 
   const [round, setRound] = useState(0);
   const [foundCount, setFoundCount] = useState(0);
+  // Auto-évaluation « Trouvé/Raté » (désactivée par défaut, réactivable en config).
+  const [selfAssess, setSelfAssess] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelfAssess(getSelfAssess());
+  }, []);
   const [completed, setCompleted] = useState(false);
   const [target, setTarget] = useState<VersePosition | null>(null);
   const [pagePair, setPagePair] = useState<PagePair | null>(null);
@@ -262,6 +269,14 @@ export default function RecitationPractice() {
     setPhase('result');
   };
 
+  /** Passe au tour suivant (ou termine), sans enregistrer de résultat. */
+  const advanceRound = () => {
+    audio.stop();
+    recorder.clear();
+    if (round >= maxRounds) setCompleted(true);
+    else newRound();
+  };
+
   /** Réponse Trouvé / Raté : mémorisée, puis tour suivant ou fin de session. */
   const answerRound = (found: boolean) => {
     if (target) {
@@ -274,10 +289,7 @@ export default function RecitationPractice() {
       });
     }
     if (found) setFoundCount((c) => c + 1);
-    audio.stop();
-    recorder.clear();
-    if (round >= maxRounds) setCompleted(true);
-    else newRound();
+    advanceRound();
   };
 
   const restartSession = () => {
@@ -412,20 +424,28 @@ export default function RecitationPractice() {
       <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[#2d5016] text-center">
           <h2 className="text-2xl font-bold text-[#2d5016] mb-2">Session terminée !</h2>
-          <p
-            className="text-4xl font-bold my-3"
-            style={{
-              color:
-                foundCount >= maxRounds * 0.9
-                  ? '#15803d'
-                  : foundCount >= maxRounds * 0.6
-                    ? '#b45309'
-                    : '#dc2626',
-            }}
-          >
-            {toArabicNumbers(foundCount)}/{toArabicNumbers(maxRounds)}
-          </p>
-          <p className="text-[#4a7c23] mb-3 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
+          {selfAssess ? (
+            <>
+              <p
+                className="text-4xl font-bold my-3"
+                style={{
+                  color:
+                    foundCount >= maxRounds * 0.9
+                      ? '#15803d'
+                      : foundCount >= maxRounds * 0.6
+                        ? '#b45309'
+                        : '#dc2626',
+                }}
+              >
+                {toArabicNumbers(foundCount)}/{toArabicNumbers(maxRounds)}
+              </p>
+              <p className="text-[#4a7c23] mb-3 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
+            </>
+          ) : (
+            <p className="text-[#4a7c23] my-3 text-sm">
+              {toArabicNumbers(maxRounds)} versets révisés — bien joué, {user} !
+            </p>
+          )}
 
           {/* Versets où tu te trompes souvent (historique + session) */}
           {habitualVerses.length > 0 ? (
@@ -860,20 +880,32 @@ export default function RecitationPractice() {
                   Verset (Husary)
                 </button>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => answerRound(true)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#2d5016] hover:bg-[#4a7c23] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
-                  >
-                    ✓ Trouvé
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => answerRound(false)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-md active:scale-95 transition-all"
-                  >
-                    ✗ Raté
-                  </button>
+                  {selfAssess ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => answerRound(true)}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#2d5016] hover:bg-[#4a7c23] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
+                      >
+                        ✓ Trouvé
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => answerRound(false)}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-md active:scale-95 transition-all"
+                      >
+                        ✗ Raté
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={advanceRound}
+                      className="flex items-center gap-1 px-5 py-2 rounded-lg bg-[#2d5016] hover:bg-[#4a7c23] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
+                    >
+                      Suivant ›
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

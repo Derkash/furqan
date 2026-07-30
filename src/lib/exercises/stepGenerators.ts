@@ -391,24 +391,46 @@ export const pageNumberSteps: StepGenerator = (
 export const verseStartSteps: StepGenerator = (
   pageVerses: PageVerses,
   _pageNumber: number,
-  _config: ExerciseConfig,
+  config: ExerciseConfig,
   verseMapData?: PageVerseMap | null
 ): ExerciseStep[] => {
   const verses = pageVerses.verses;
   if (verses.length === 0) return [];
 
-  // Versets « remarquables » de la page à éviter légèrement.
-  const notable = new Set(
-    [
-      pageVerses.firstVerse?.verseKey,
-      pageVerses.lastVerse?.verseKey,
-      getMiddleVerse(pageVerses, verseMapData)?.verseKey,
-    ].filter((k): k is string => Boolean(k))
-  );
-  const others = verses.filter((v) => !notable.has(v.verseKey));
-  // Préférence douce (~70 %) pour les autres versets, sinon tirage sur toute la page.
-  const pool = others.length > 0 && Math.random() < 0.7 ? others : verses;
-  const verse = pool[Math.floor(Math.random() * pool.length)];
+  let verse: VersePosition | null = null;
+
+  // Positions choisies par l'utilisateur (premier / milieu / dernier).
+  const chosen = config.showPositions ?? [];
+  if (chosen.length > 0) {
+    const candidates = chosen
+      .map((p) =>
+        p === 'first'
+          ? pageVerses.firstVerse
+          : p === 'last'
+            ? pageVerses.lastVerse
+            : p === 'middle'
+              ? getMiddleVerse(pageVerses, verseMapData)
+              : null
+      )
+      .filter((v): v is VersePosition => Boolean(v));
+    if (candidates.length > 0) verse = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  // Sinon : n'importe quel verset, en évitant légèrement les versets « remarquables ».
+  if (!verse) {
+    const notable = new Set(
+      [
+        pageVerses.firstVerse?.verseKey,
+        pageVerses.lastVerse?.verseKey,
+        getMiddleVerse(pageVerses, verseMapData)?.verseKey,
+      ].filter((k): k is string => Boolean(k))
+    );
+    const others = verses.filter((v) => !notable.has(v.verseKey));
+    const pool = others.length > 0 && Math.random() < 0.7 ? others : verses;
+    verse = pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  if (!verse) return [];
 
   return [
     {

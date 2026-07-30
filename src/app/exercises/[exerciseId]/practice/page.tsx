@@ -29,6 +29,7 @@ import { useAsbab } from '@/hooks/exercises/useAsbab';
 import { prefetchSpeech, useSpeech } from '@/hooks/exercises/useSpeech';
 import { getVerseRoots } from '@/utils/vocab/morphology';
 import { playBeep } from '@/utils/beep';
+import { getSelfAssess } from '@/utils/exercises/prefs';
 import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
 import Link from 'next/link';
 
@@ -601,11 +602,17 @@ function MushafPractice() {
   // « Avez-vous trouvé ? » : demandé en fin de tour pour les exercices de quiz,
   // et mémorisé pour orienter les prochaines interrogations vers les échecs.
   const [askFound, setAskFound] = useState(false);
+  const [selfAssess, setSelfAssessState] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelfAssessState(getSelfAssess());
+  }, []);
   const asksFeedback =
-    exerciseId === 'audio-quiz' ||
-    exerciseId === 'sequential' ||
-    exerciseId === 'page-number' ||
-    exerciseId === 'verse-start';
+    selfAssess &&
+    (exerciseId === 'audio-quiz' ||
+      exerciseId === 'sequential' ||
+      exerciseId === 'page-number' ||
+      exerciseId === 'verse-start');
   const roundTargets = useMemo(() => {
     const seen = new Map<string, number>();
     for (const step of state.currentRound?.steps ?? []) {

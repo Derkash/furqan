@@ -8,6 +8,7 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 import { unitToPageRange, MODE_LABELS, MODE_MAX, type RangeMode } from '@/utils/exercises/rangeToPages';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
+import { getSelfAssess, setSelfAssess } from '@/utils/exercises/prefs';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
 import type { VersePositionType } from '@/types/exercises';
 import Link from 'next/link';
@@ -171,6 +172,8 @@ export default function SetupPage() {
   const isAudioQuiz = exerciseId === 'audio-quiz';
   const isSequential = exerciseId === 'sequential';
   const isPageNumber = exerciseId === 'page-number';
+  const isVerseStart = exerciseId === 'verse-start';
+  const isRecitation = exerciseId === 'recitation';
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
@@ -186,8 +189,10 @@ export default function SetupPage() {
   const [answerMode, setAnswerMode] = useState<'tap' | 'recite'>('tap');
   const [revealTimeout, setRevealTimeout] = useState<number>(0);
   const [showPositions, setShowPositions] = useState<VersePositionType[]>(
-    isPageNumber ? ['first', 'middle', 'last'] : ['first']
+    isPageNumber ? ['first', 'middle', 'last'] : isVerseStart ? [] : ['first']
   );
+  // Auto-évaluation « Trouvé/Raté » : globale, réactivable (désactivée par défaut).
+  const [selfAssessOn, setSelfAssessOn] = useState(false);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
@@ -216,6 +221,7 @@ export default function SetupPage() {
       // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
       setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
+    setSelfAssessOn(getSelfAssess());
     // Lecture : dernière destination choisie (mode + valeur).
     if (saved?.mode) setGotoMode(saved.mode as RangeMode);
     if (saved?.start != null) setGotoValue(saved.start);
@@ -345,6 +351,10 @@ export default function SetupPage() {
       saveSetup(exerciseId, { ...base, showPositions, direction });
     } else if (isPageNumber) {
       query.set('show', showPositions.join(','));
+      saveSetup(exerciseId, { ...base, showPositions });
+    } else if (isVerseStart) {
+      // Positions choisies (premier/milieu/dernier) ; vide = n'importe quel verset.
+      if (showPositions.length > 0) query.set('show', showPositions.join(','));
       saveSetup(exerciseId, { ...base, showPositions });
     } else {
       saveSetup(exerciseId, base);
@@ -573,6 +583,38 @@ export default function SetupPage() {
                   </div>
                 </OptionGroup>
               </>
+            )}
+
+            {/* Choix spécifiques : Début verset — sur quel verset être interrogé */}
+            {isVerseStart && (
+              <OptionGroup label="Verset interrogé">
+                <MultiSelect options={POSITION_OPTIONS} selected={showPositions} onToggle={toggleShow} />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Choisis d&apos;être interrogé sur le premier verset de la page, celui du milieu
+                  et/ou le dernier. Laisse vide = n&apos;importe quel verset de la page.
+                </p>
+              </OptionGroup>
+            )}
+
+            {/* Auto-évaluation « Trouvé/Raté » — désactivée par défaut, réactivable */}
+            {(isAudioQuiz || isSequential || isPageNumber || isVerseStart || isRecitation) && (
+              <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 bg-[#fdfaf3] cursor-pointer">
+                <span className="text-sm font-semibold text-[#2d5016]">
+                  Me demander si j&apos;ai bien répondu
+                  <span className="block text-[11px] font-normal text-gray-400">
+                    Trouvé / Raté après chaque question (mémorise tes fautes)
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={selfAssessOn}
+                  onChange={(e) => {
+                    setSelfAssessOn(e.target.checked);
+                    setSelfAssess(e.target.checked);
+                  }}
+                  className="w-5 h-5 accent-[#2d5016] flex-none"
+                />
+              </label>
             )}
 
             {/* Nombre de questions (tous les exercices sauf Hifz) */}
