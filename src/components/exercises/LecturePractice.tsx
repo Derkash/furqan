@@ -34,10 +34,10 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 3, 4];
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
 // Réglages du comportement de l'appui long (persistés dans localStorage).
-const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
+const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const LP_PAGES = [2, 3, 4, 5, 6]; // nombre de pages lues en portée « pages »
 type LongPressScope = 'verse' | 'half' | 'page' | 'pages';
 interface LongPressConfig {
@@ -47,8 +47,9 @@ interface LongPressConfig {
   french: boolean; // réciter aussi la traduction française
   tafsir: boolean; // réciter aussi le tafsir Ibn Kathir
   loop: boolean; // écouter la sélection en boucle
+  loopDelay: number; // secondes d'attente avant de relancer la boucle (1..500)
 }
-const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', pages: 2, french: false, tafsir: false, loop: false };
+const LP_DEFAULT: LongPressConfig = { rate: 2, scope: 'half', pages: 2, french: false, tafsir: false, loop: false, loopDelay: 3 };
 const LP_KEY = 'almuraja3a:lecture:longpress';
 
 function loadLongPressConfig(): LongPressConfig {
@@ -163,6 +164,8 @@ export default function LecturePractice() {
   const wheelClear = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onWheelRef = useRef<(e: WheelEvent) => void>(() => {});
   const phaseRef = useRef<'ar' | 'fr'>('ar'); // phase du verset courant
+  const loopDelayRef = useRef(0); // secondes d'attente avant de relancer la boucle
+  const loopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frEditionRef = useRef<string | null>(null); // édition audio FR découverte
   // Session de lecture en cours.
   const selRef = useRef<SelVerse[]>([]);
@@ -345,6 +348,7 @@ export default function LecturePractice() {
     return () => {
       audioRef.current?.pause();
       tafsirAudioRef.current?.pause();
+      if (loopTimerRef.current) clearTimeout(loopTimerRef.current);
     };
   }, []);
 
@@ -425,6 +429,21 @@ export default function LecturePractice() {
     attempt();
   }
 
+  // Relance une boucle après le délai configuré (immédiat si délai = 0).
+  function restartLoop(play: () => void) {
+    const delay = loopDelayRef.current;
+    if (delay > 0) {
+      loopTimerRef.current = setTimeout(() => {
+        loopTimerRef.current = null;
+        playBeep();
+        play();
+      }, delay * 1000);
+    } else {
+      playBeep();
+      play();
+    }
+  }
+
   function advanceVerse() {
     const cfg = cfgRef.current;
     const sel = selRef.current;
@@ -440,8 +459,7 @@ export default function LecturePractice() {
     passRef.current += 1;
     if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
       vIdxRef.current = 0;
-      playBeep();
-      playVerseArabic();
+      restartLoop(playVerseArabic);
       return;
     }
     stop();
@@ -550,14 +568,17 @@ export default function LecturePractice() {
     passRef.current += 1;
     if (cfg.selectionRepeat === 0 || passRef.current < cfg.selectionRepeat) {
       sIdxRef.current = 0;
-      if (stepsRef.current[0]?.type === 'ayah') playBeep();
-      playStep();
+      restartLoop(playStep);
       return;
     }
     stop();
   }
 
   function stop() {
+    if (loopTimerRef.current) {
+      clearTimeout(loopTimerRef.current);
+      loopTimerRef.current = null;
+    }
     audioRef.current?.pause();
     setPlaying(false);
     setCurrentVerse(null);
@@ -615,6 +636,7 @@ export default function LecturePractice() {
     const vpMap = await getVersePageMap();
     const sel = buildSelection(cfg, units, vpMap);
     if (sel.length === 0) return;
+    loopDelayRef.current = 0; // la lecture principale boucle sans délai (comportement inchangé)
     setConfig(cfg);
     await startPlayback(sel, cfg);
   }
@@ -666,7 +688,7 @@ export default function LecturePractice() {
     } else if (lpc.scope === 'page') {
       sel = mapVerses(pv.verses, pageNum);
     } else if (lpc.scope === 'pages') {
-      // Du verset pressé jusqu'à N pages après (incluses).
+      // Depuis le DÉBUT de la page (peu importe où l'on clique) jusqu'à N pages après.
       const n = Math.max(2, Math.min(6, lpc.pages || 2));
       const endPage = Math.min(604, pageNum + n - 1);
       const pageNums: number[] = [];
@@ -681,9 +703,7 @@ export default function LecturePractice() {
           }
         }
       });
-      sel = Array.from(byVerse.values())
-        .filter((v) => v.globalNumber >= pressedGlobal)
-        .sort((a, b) => a.globalNumber - b.globalNumber);
+      sel = Array.from(byVerse.values()).sort((a, b) => a.globalNumber - b.globalNumber);
     } else {
       // Demi-page : coupée au verset du milieu (signet rouge). Clic au-dessus →
       // moitié haute ; au niveau/après → moitié basse.
@@ -708,6 +728,8 @@ export default function LecturePractice() {
     };
     setRate(lpc.rate);
     rateRef.current = lpc.rate;
+    // Délai avant de relancer la boucle (borné 1..500 s ; 0 = pas de boucle).
+    loopDelayRef.current = lpc.loop ? Math.max(1, Math.min(500, Math.round(lpc.loopDelay) || 1)) : 0;
     setHalfPageHighlight(new Set(sel.map((s) => s.verseKey)));
     setVerseMenu(null);
     setSelected(null);
@@ -804,6 +826,11 @@ export default function LecturePractice() {
 
   function togglePlay() {
     if (playing) {
+      // Annule aussi une relance de boucle en attente.
+      if (loopTimerRef.current) {
+        clearTimeout(loopTimerRef.current);
+        loopTimerRef.current = null;
+      }
       audioRef.current?.pause();
       setPlaying(false);
       return;
@@ -1123,7 +1150,7 @@ export default function LecturePractice() {
                 rate === s ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#1f3a0f] text-[#c9a959]'
               }`}
             >
-              ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s}
+              ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
             </button>
           ))}
         </div>
@@ -1585,6 +1612,25 @@ export default function LecturePractice() {
                   className="w-5 h-5 accent-[#2d5016]"
                 />
               </label>
+              {lpConfig.loop && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white">
+                  <span className="text-sm font-semibold text-[#2d5016]">
+                    ⏱ Délai avant de relancer
+                    <span className="block text-[11px] font-normal text-gray-500">en secondes (1 à 500)</span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={lpConfig.loopDelay}
+                    onChange={(e) => {
+                      const n = Math.max(1, Math.min(500, Math.round(Number(e.target.value)) || 1));
+                      setLpConfig((c) => ({ ...c, loopDelay: n }));
+                    }}
+                    className="w-20 text-center px-2 py-1.5 rounded-lg border-2 border-[#c9a959]/40 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                  />
+                </div>
+              )}
             </div>
 
             <button
