@@ -234,6 +234,19 @@ function MushafPractice() {
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
 
+  // Séquentiel : l'exercice porte sur UNE page, mais le spread en affiche deux.
+  // On garde l'AUTRE page entièrement visible (non masquée) tout en révélant
+  // progressivement le verset cible sur sa page.
+  const displayVisibleVerses = useMemo(() => {
+    if (exerciseId !== 'sequential') return visibleVerses;
+    const targetPage = state.currentRound?.pageNumber ?? state.progress.currentPage;
+    const otherPv = targetPage === pagePair.rightPage ? leftPageVerses : rightPageVerses;
+    if (!otherPv || otherPv.verses.length === 0) return visibleVerses;
+    const s = new Set(visibleVerses);
+    for (const v of otherPv.verses) s.add(v.verseKey);
+    return s;
+  }, [exerciseId, visibleVerses, state.currentRound, state.progress.currentPage, pagePair, leftPageVerses, rightPageVerses]);
+
   // Hifz : fautes déclarées en Récitation, transférées ici (une couleur par type).
   const [showMistakes, setShowMistakes] = useState(true);
   const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
@@ -919,8 +932,8 @@ function MushafPractice() {
           rightPageVerses={rightPageVerses}
           pagePair={pagePair}
           orientation={orientation}
-          revealedVerses={visibleVerses}
-          visibleVerses={visibleVerses}
+          revealedVerses={displayVisibleVerses}
+          visibleVerses={displayVisibleVerses}
           isBlurred={isBlurred}
           maskAll={maskAll}
           wordMarks={combinedWordMarks}
