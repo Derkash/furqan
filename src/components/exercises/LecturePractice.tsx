@@ -1647,6 +1647,8 @@ export default function LecturePractice() {
         <PlaybackConfig
           initial={config}
           chapters={units?.chapters ?? []}
+          units={units}
+          currentSurah={Number((right?.verses?.[0] ?? left?.verses?.[0])?.verseKey?.split(':')[0]) || 2}
           onLaunch={launch}
           onClose={() => setShowConfig(false)}
         />
