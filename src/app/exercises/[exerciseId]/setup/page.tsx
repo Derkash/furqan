@@ -199,7 +199,8 @@ export default function SetupPage() {
 
   const isHifz = exerciseId === 'hifz';
   const isLecture = exerciseId === 'lecture';
-  const noQuestions = isHifz || isLecture;
+  // Séquentiel : la plage de pages définit déjà le parcours → pas de nombre de questions.
+  const noQuestions = isHifz || isLecture || isSequential;
 
   // Restauration des derniers réglages pour cet exercice (proposés par défaut).
   // Lecture localStorage après montage → 1er rendu vide (pas de décalage d'hydratation).
