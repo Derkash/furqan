@@ -5,8 +5,11 @@ import type { AudioState, VersePosition } from '@/types';
 import { getAudioUrl } from '@/utils/ayahMapping';
 
 interface UseAudioReturn extends AudioState {
-  /** Joue le verset ; `maxSeconds` coupe l'extrait après N secondes (absent/0 = complet). */
-  play: (verse: VersePosition, maxSeconds?: number) => Promise<void>;
+  /**
+   * Joue le verset ; `maxSeconds` coupe l'extrait après N secondes (absent/0 =
+   * complet) ; `rate` = vitesse de lecture (absent/0 = ×1, hauteur préservée).
+   */
+  play: (verse: VersePosition, maxSeconds?: number, rate?: number) => Promise<void>;
   pause: () => void;
   stop: () => void;
 }
@@ -64,7 +67,7 @@ export function useAudio(): UseAudioReturn {
     };
   }, []);
 
-  const play = useCallback(async (verse: VersePosition, maxSeconds?: number) => {
+  const play = useCallback(async (verse: VersePosition, maxSeconds?: number, rate?: number) => {
     if (!audioRef.current) return;
 
     try {
@@ -78,6 +81,14 @@ export function useAudio(): UseAudioReturn {
 
       const audioUrl = getAudioUrl(verse.globalNumber);
       audioRef.current.src = audioUrl;
+      // Vitesse de lecture (hauteur de voix préservée).
+      const r = rate && rate > 0 ? rate : 1;
+      audioRef.current.preservesPitch = true;
+      (audioRef.current as HTMLAudioElement & { webkitPreservesPitch?: boolean }).webkitPreservesPitch = true;
+      audioRef.current.playbackRate = r;
+      audioRef.current.onloadedmetadata = () => {
+        if (audioRef.current) audioRef.current.playbackRate = r;
+      };
 
       await audioRef.current.play();
 

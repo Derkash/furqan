@@ -545,6 +545,14 @@ function MushafPractice() {
   }, [currentStep, audioSeconds]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Début de verset : à la révélation, réciter le verset à ×2 en même temps
+  // que son affichage.
+  useEffect(() => {
+    if (exerciseId === 'verse-start' && currentStep?.type === 'revealing' && currentStep.targetVerse) {
+      audioPlayRef.current(currentStep.targetVerse, undefined, 2);
+    }
+  }, [currentStep, exerciseId]);
+
   // ---- Quiz audio : question en grand sur la moitié opposée + réponse par récitation ----
   const isQuiz = exerciseId === 'audio-quiz';
   // « Numéro de page » : même panneau de question en grand (sans audio ni micro).
