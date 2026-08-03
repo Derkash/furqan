@@ -104,43 +104,6 @@ function pairRightPage(page: number): number {
   return Math.max(1, page % 2 === 1 ? page : page - 1);
 }
 
-/**
- * Tire une page aléatoire dans [startPage, endPage] en évitant les `avoidRecent`
- * dernières pages visitées. Réinitialise correctement si toute la fenêtre
- * récente couvre la plage.
- *
- * Adaptation aux fautes : ~50 % du temps, la page est tirée parmi celles
- * contenant des mots/versets en erreur (mémoire utilisateur), en mixant
- * avec le tirage uniforme pour ne pas tourner qu'autour des erreurs.
- */
-function pickRandomPage(
-  startPage: number,
-  endPage: number,
-  recent: number[],
-  avoidRecent = 5
-): number {
-  const rangeSize = endPage - startPage + 1;
-  if (rangeSize <= 1) return startPage;
-
-  const window = Math.min(avoidRecent, rangeSize - 1);
-  const blocked = new Set(recent.slice(-window));
-
-  const available: number[] = [];
-  for (let p = startPage; p <= endPage; p++) {
-    if (!blocked.has(p)) available.push(p);
-  }
-
-  const pool = available.length > 0 ? available : Array.from({ length: rangeSize }, (_, i) => startPage + i);
-
-  const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
-  if (priority.size > 0 && Math.random() < 0.5) {
-    const priorityPool = pool.filter((p) => priority.has(p));
-    if (priorityPool.length > 0) {
-      return priorityPool[Math.floor(Math.random() * priorityPool.length)];
-    }
-  }
-  return pool[Math.floor(Math.random() * pool.length)];
-}
 
 export function useExercise(): UseExerciseReturn {
   const [state, setState] = useState<ExerciseState>(initialState);
@@ -151,6 +114,33 @@ export function useExercise(): UseExerciseReturn {
 
   // Historique des pages récemment visitées (pour éviter les répétitions immédiates)
   const recentPagesRef = useRef<number[]>([]);
+  // Sac mélangé de pages : chaque page sort une fois avant de reboucler → on
+  // couvre au maximum toute la plage plutôt que de tourner autour des mêmes pages.
+  const pageBagRef = useRef<number[]>([]);
+
+  /** Tire une page en couvrant toute la plage (sac mélangé), avec un léger biais
+   *  vers les pages à retravailler (fautes mémorisées). */
+  const drawSpreadPage = useCallback((startPage: number, endPage: number): number => {
+    if (endPage <= startPage) return startPage;
+    const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
+    if (priority.size > 0 && Math.random() < 0.3) {
+      const arr = Array.from(priority);
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+    if (pageBagRef.current.length === 0) {
+      const last = recentPagesRef.current[recentPagesRef.current.length - 1];
+      const pages: number[] = [];
+      for (let p = startPage; p <= endPage; p++) pages.push(p);
+      for (let i = pages.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pages[i], pages[j]] = [pages[j], pages[i]];
+      }
+      // Évite d'enchaîner deux fois la même page à la jonction de deux sacs.
+      if (pages.length > 1 && pages[0] === last) [pages[0], pages[1]] = [pages[1], pages[0]];
+      pageBagRef.current = pages;
+    }
+    return pageBagRef.current.shift() as number;
+  }, []);
 
   // File de re-questionnement (fautes de la session en cours) : quand une réponse
   // est fausse, on ré-interroge la même page peu de tours plus tard, sans attendre
@@ -271,14 +261,19 @@ export function useExercise(): UseExerciseReturn {
         : Math.min(config.maxRounds, totalPages)
       : totalPages;
 
-    // Reset historique + file de re-questionnement pour le nouvel exercice
+    // Reset historique + sac de pages + file de re-questionnement pour la session
     recentPagesRef.current = [];
+    pageBagRef.current = [];
     requeueRef.current = [];
 
-    // Page de départ : aléatoire pour les exos random, sinon début/fin selon progression
+    // Page de départ : on évite de commencer systématiquement au début de la plage.
+    const rangeSize = config.endPage - config.startPage + 1;
     let startPage: number;
     if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(config.exerciseId)) {
-      startPage = pickRandomPage(config.startPage, config.endPage, []);
+      startPage = drawSpreadPage(config.startPage, config.endPage);
+    } else if (config.exerciseId === 'sequential') {
+      // Séquentiel : départ aléatoire dans la plage (puis progression avec bouclage).
+      startPage = config.startPage + Math.floor(Math.random() * rangeSize);
     } else if (isBackward(config.exerciseId, config, definition.progression)) {
       startPage = config.endPage;
     } else {
@@ -300,7 +295,7 @@ export function useExercise(): UseExerciseReturn {
       },
       status: 'idle',
     });
-  }, []);
+  }, [drawSpreadPage]);
 
   // Start
   const start = useCallback(() => {
@@ -353,14 +348,17 @@ export function useExercise(): UseExerciseReturn {
           nextPage = requeueRef.current[dueIdx].page;
           requeueRef.current.splice(dueIdx, 1);
         } else {
-          // Page aléatoire dans la plage en évitant les pages récemment vues
-          nextPage = pickRandomPage(startPage, endPage, recentPagesRef.current);
+          // Sac mélangé : couvre toute la plage avant de reboucler.
+          nextPage = drawSpreadPage(startPage, endPage);
         }
       } else {
-        // Progression normale page par page, sens selon la config (Séquentiel)
-        nextPage = isBackward(state.exerciseId, state.config, definition.progression)
-          ? currentPage - 1
-          : currentPage + 1;
+        // Progression page par page, sens selon la config (Séquentiel), avec
+        // BOUCLAGE aux bornes → couvre toute la plage même en partant du milieu.
+        const back = isBackward(state.exerciseId, state.config, definition.progression);
+        let np = back ? currentPage - 1 : currentPage + 1;
+        if (np > endPage) np = startPage;
+        if (np < startPage) np = endPage;
+        nextPage = np;
       }
 
       recentPagesRef.current.push(nextPage);
@@ -378,7 +376,7 @@ export function useExercise(): UseExerciseReturn {
         },
       }));
     }
-  }, [state.currentRound, state.exerciseId, state.config, state.progress, generateCurrentRound]);
+  }, [state.currentRound, state.exerciseId, state.config, state.progress, generateCurrentRound, drawSpreadPage]);
 
   // Generate round when status becomes running and no current round
   useEffect(() => {
