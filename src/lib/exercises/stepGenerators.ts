@@ -432,6 +432,15 @@ export const verseStartSteps: StepGenerator = (
 
   if (!verse) return [];
 
+  // Option : afficher aussi le 1er, le milieu et le dernier verset de la page à
+  // la révélation (contexte), en plus du verset cible.
+  const contextKeys = config.revealContext
+    ? [pageVerses.firstVerse, getMiddleVerse(pageVerses, verseMapData), pageVerses.lastVerse]
+        .filter((v): v is VersePosition => Boolean(v))
+        .map((v) => v.verseKey)
+    : [];
+  const revealVisible = Array.from(new Set([verse.verseKey, ...contextKeys]));
+
   return [
     {
       type: 'questioning',
@@ -459,7 +468,7 @@ export const verseStartSteps: StepGenerator = (
       ui: {
         isBlurred: false,
         maskAll: true,
-        visibleVerses: [verse.verseKey],
+        visibleVerses: revealVisible,
         highlightedVerse: verse.verseKey,
       },
     },

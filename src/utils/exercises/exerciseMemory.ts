@@ -29,6 +29,8 @@ export interface StoredSetup {
   revealTimeout?: number;
   /** Séquentiel : positions de versets à afficher. */
   showPositions?: VersePositionType[];
+  /** Début de verset : afficher aussi 1er/milieu/dernier verset à la révélation. */
+  revealContext?: boolean;
   /** Séquentiel : sens de progression. */
   direction?: 'forward' | 'backward';
   /** Nombre de questions souhaité (tous exercices sauf Hifz). */

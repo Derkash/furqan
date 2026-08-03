@@ -197,6 +197,8 @@ function MushafPractice() {
   const answerMode = searchParams.get('ans') === 'recite' ? 'recite' : 'tap';
   // Temps autorisé (mode taper) avant révélation auto. 0 = sans limite.
   const revealTimeout = Number(searchParams.get('to')) || 0;
+  // Début de verset : afficher aussi 1er/milieu/dernier verset à la révélation.
+  const ctxParam = searchParams.get('ctx') === '1';
 
   const {
     state,
@@ -512,10 +514,11 @@ function MushafPractice() {
       revealFraction: fracParam >= 1 && fracParam <= 6 ? fracParam : undefined,
       answerMode,
       revealTimeout: revealTimeout > 0 ? revealTimeout : undefined,
+      revealContext: ctxParam,
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, ctxParam, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {

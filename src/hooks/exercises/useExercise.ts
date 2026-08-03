@@ -114,32 +114,28 @@ export function useExercise(): UseExerciseReturn {
 
   // Historique des pages récemment visitées (pour éviter les répétitions immédiates)
   const recentPagesRef = useRef<number[]>([]);
-  // Sac mélangé de pages : chaque page sort une fois avant de reboucler → on
-  // couvre au maximum toute la plage plutôt que de tourner autour des mêmes pages.
-  const pageBagRef = useRef<number[]>([]);
+  // Pages déjà interrogées dans la session : GARANTIT qu'aucune page ne repasse
+  // tant que toute la plage n'a pas été couverte (couverture maximale).
+  const sessionUsedRef = useRef<Set<number>>(new Set());
 
-  /** Tire une page en couvrant toute la plage (sac mélangé), avec un léger biais
-   *  vers les pages à retravailler (fautes mémorisées). */
+  /** Tire une page NON encore vue cette session (repart pour un cycle quand tout
+   *  a été couvert), avec un léger biais vers les pages à retravailler. */
   const drawSpreadPage = useCallback((startPage: number, endPage: number): number => {
     if (endPage <= startPage) return startPage;
+    const used = sessionUsedRef.current;
+    const rangeSize = endPage - startPage + 1;
+    if (used.size >= rangeSize) used.clear(); // toute la plage vue → nouveau cycle
+
+    const unused: number[] = [];
+    for (let p = startPage; p <= endPage; p++) if (!used.has(p)) unused.push(p);
+
+    // Biais fautes (30 %) mais uniquement parmi les pages encore non vues.
     const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
-    if (priority.size > 0 && Math.random() < 0.3) {
-      const arr = Array.from(priority);
-      return arr[Math.floor(Math.random() * arr.length)];
-    }
-    if (pageBagRef.current.length === 0) {
-      const last = recentPagesRef.current[recentPagesRef.current.length - 1];
-      const pages: number[] = [];
-      for (let p = startPage; p <= endPage; p++) pages.push(p);
-      for (let i = pages.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pages[i], pages[j]] = [pages[j], pages[i]];
-      }
-      // Évite d'enchaîner deux fois la même page à la jonction de deux sacs.
-      if (pages.length > 1 && pages[0] === last) [pages[0], pages[1]] = [pages[1], pages[0]];
-      pageBagRef.current = pages;
-    }
-    return pageBagRef.current.shift() as number;
+    const prioUnused = unused.filter((p) => priority.has(p));
+    const pool = prioUnused.length > 0 && Math.random() < 0.3 ? prioUnused : unused;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    used.add(pick);
+    return pick;
   }, []);
 
   // File de re-questionnement (fautes de la session en cours) : quand une réponse
@@ -261,9 +257,9 @@ export function useExercise(): UseExerciseReturn {
         : Math.min(config.maxRounds, totalPages)
       : totalPages;
 
-    // Reset historique + sac de pages + file de re-questionnement pour la session
+    // Reset historique + pages vues + file de re-questionnement pour la session
     recentPagesRef.current = [];
-    pageBagRef.current = [];
+    sessionUsedRef.current = new Set();
     requeueRef.current = [];
 
     // Page de départ : on évite de commencer systématiquement au début de la plage.

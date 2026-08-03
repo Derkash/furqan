@@ -193,6 +193,8 @@ export default function SetupPage() {
   );
   // Auto-évaluation « Trouvé/Raté » : globale, réactivable (désactivée par défaut).
   const [selfAssessOn, setSelfAssessOn] = useState(false);
+  // Début de verset : afficher aussi 1er/milieu/dernier verset à la révélation.
+  const [revealContext, setRevealContext] = useState(false);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
@@ -234,6 +236,7 @@ export default function SetupPage() {
     if (saved.answerMode) setAnswerMode(saved.answerMode);
     if (saved.revealTimeout != null) setRevealTimeout(saved.revealTimeout);
     if (saved.showPositions) setShowPositions(saved.showPositions);
+    if (saved.revealContext != null) setRevealContext(!!saved.revealContext);
     if (saved.direction) setDirection(saved.direction);
     if (saved.questionCount) setQuestionCount(saved.questionCount);
   }, [exerciseId]);
@@ -356,7 +359,8 @@ export default function SetupPage() {
     } else if (isVerseStart) {
       // Positions choisies (premier/milieu/dernier) ; vide = n'importe quel verset.
       if (showPositions.length > 0) query.set('show', showPositions.join(','));
-      saveSetup(exerciseId, { ...base, showPositions });
+      if (revealContext) query.set('ctx', '1');
+      saveSetup(exerciseId, { ...base, showPositions, revealContext });
     } else {
       saveSetup(exerciseId, base);
     }
@@ -588,13 +592,29 @@ export default function SetupPage() {
 
             {/* Choix spécifiques : Début verset — sur quel verset être interrogé */}
             {isVerseStart && (
-              <OptionGroup label="Verset interrogé">
-                <MultiSelect options={POSITION_OPTIONS} selected={showPositions} onToggle={toggleShow} />
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Choisis d&apos;être interrogé sur le premier verset de la page, celui du milieu
-                  et/ou le dernier. Laisse vide = n&apos;importe quel verset de la page.
-                </p>
-              </OptionGroup>
+              <>
+                <OptionGroup label="Verset interrogé">
+                  <MultiSelect options={POSITION_OPTIONS} selected={showPositions} onToggle={toggleShow} />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Choisis d&apos;être interrogé sur le premier verset de la page, celui du milieu
+                    et/ou le dernier. Laisse vide = n&apos;importe quel verset de la page.
+                  </p>
+                </OptionGroup>
+                <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 bg-[#fdfaf3] cursor-pointer">
+                  <span className="text-sm font-semibold text-[#2d5016]">
+                    Afficher le contexte à la révélation
+                    <span className="block text-[11px] font-normal text-gray-400">
+                      Montre aussi le 1er, le milieu et le dernier verset de la page
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={revealContext}
+                    onChange={(e) => setRevealContext(e.target.checked)}
+                    className="w-5 h-5 accent-[#2d5016] flex-none"
+                  />
+                </label>
+              </>
             )}
 
             {/* Auto-évaluation « Trouvé/Raté » — désactivée par défaut, réactivable */}

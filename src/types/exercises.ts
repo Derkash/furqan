@@ -153,6 +153,8 @@ export interface ExerciseConfig extends QuizConfig {
   revealTimeout?: number;
   /** Séquentiel : positions de versets à afficher, ordre premier→milieu→dernier. */
   showPositions?: VersePositionType[];
+  /** Début de verset : à la révélation, afficher aussi le 1er, le milieu et le dernier verset de la page. */
+  revealContext?: boolean;
   /** Séquentiel : sens de progression dans la plage. */
   direction?: 'forward' | 'backward';
 }
