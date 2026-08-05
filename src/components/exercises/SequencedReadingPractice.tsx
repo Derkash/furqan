@@ -30,8 +30,11 @@ const UNITS: { id: Unit; label: string }[] = [
   { id: 'page', label: 'Une page' },
   { id: '2pages', label: 'Deux pages' },
 ];
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 const INTERVALS = [15, 30, 60, 120, 180];
+function speedLabel(s: number): string {
+  return `×${s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 0.75 ? '0,75' : s === 2.5 ? '2,5' : s}`;
+}
 // Petit WAV silencieux : joué dans le geste « Démarrer » pour débloquer la
 // lecture audio (sinon les navigateurs bloquent la lecture auto ensuite).
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=';
@@ -74,7 +77,9 @@ export default function SequencedReadingPractice() {
   const rateRef = useRef(1);
   const runningRef = useRef(false);
   const pausedRef = useRef(false);
-  const gapDoneRef = useRef<(() => void) | null>(null); // pour « Suivant » pendant le décompte
+  // Callback « passer à l'action suivante » de l'action en cours (récitation OU
+  // décompte). Appelé une seule fois (mis à null) → évite un double avancement.
+  const pendingRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -208,7 +213,6 @@ export default function SequencedReadingPractice() {
   function doGap(onDone: () => void) {
     setSub('gap');
     setCurrentVerse(null);
-    gapDoneRef.current = onDone;
     let rem = interval;
     setCountdown(rem);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -220,7 +224,6 @@ export default function SequencedReadingPractice() {
       if (rem <= 0) {
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
-        gapDoneRef.current = null;
         onDone();
       }
     }, 1000);
@@ -239,18 +242,6 @@ export default function SequencedReadingPractice() {
     }
   }
 
-  // Pendant le décompte : passer directement à la révélation + récitation.
-  function skipGap() {
-    if (sub !== 'gap') return;
-    const done = gapDoneRef.current;
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    gapDoneRef.current = null;
-    pausedRef.current = false;
-    setPaused(false);
-    if (done) done();
-  }
-
   function runAction(k: number) {
     if (!runningRef.current) return;
     const actions = actionsRef.current;
@@ -262,14 +253,40 @@ export default function SequencedReadingPractice() {
     const a = actions[k];
     const reciteIdx = actions.slice(0, k + 1).filter((x) => x.type === 'recite').length;
     setChunkPos({ i: Math.max(1, reciteIdx), total: actions.filter((x) => x.type === 'recite').length });
-    if (a.type === 'recite') reciteChunk(a.chunk, () => runAction(k + 1));
-    else doGap(() => runAction(k + 1));
+    pendingRef.current = () => runAction(k + 1);
+    if (a.type === 'recite') reciteChunk(a.chunk, goNext);
+    else doGap(goNext);
+  }
+
+  // Passe à l'action suivante (idempotent : ne s'exécute qu'une fois).
+  function goNext() {
+    const fn = pendingRef.current;
+    pendingRef.current = null;
+    if (fn) fn();
+  }
+
+  // Bouton « Suivant » : saute la récitation OU le décompte en cours.
+  function skipToNext() {
+    if (!runningRef.current) return;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    const a = audioRef.current;
+    if (a) {
+      a.onended = null;
+      a.onerror = null;
+      a.pause();
+    }
+    pausedRef.current = false;
+    setPaused(false);
+    goNext();
   }
 
   function finish() {
     runningRef.current = false;
     pausedRef.current = false;
-    gapDoneRef.current = null;
+    pendingRef.current = null;
     audioRef.current?.pause();
     if (timerRef.current) clearInterval(timerRef.current);
     setPaused(false);
@@ -280,7 +297,7 @@ export default function SequencedReadingPractice() {
   function stop() {
     runningRef.current = false;
     pausedRef.current = false;
-    gapDoneRef.current = null;
+    pendingRef.current = null;
     audioRef.current?.pause();
     if (timerRef.current) clearInterval(timerRef.current);
     setPaused(false);
@@ -336,7 +353,7 @@ export default function SequencedReadingPractice() {
     rateRef.current = rate;
     runningRef.current = true;
     pausedRef.current = false;
-    gapDoneRef.current = null;
+    pendingRef.current = null;
     setPaused(false);
     setRevealed(new Set());
     setCurrentVerse(null);
@@ -471,7 +488,7 @@ export default function SequencedReadingPractice() {
                       rate === s ? 'bg-[#4a7c23] text-white border-[#4a7c23]' : 'bg-white text-[#2d5016] border-[#c9a959]/30'
                     }`}
                   >
-                    ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 0.75 ? '0,75' : s}
+                    {speedLabel(s)}
                   </button>
                 ))}
               </div>
@@ -570,7 +587,7 @@ export default function SequencedReadingPractice() {
                 rate === s ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#1f3a0f] text-[#c9a959]'
               }`}
             >
-              ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 0.75 ? '0,75' : s}
+              {speedLabel(s)}
             </button>
           ))}
         </div>
@@ -591,15 +608,13 @@ export default function SequencedReadingPractice() {
               </>
             )}
           </button>
-          {sub === 'gap' && (
-            <button
-              onClick={skipGap}
-              className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-white bg-[#4a7c23] active:scale-95 shadow-lg flex items-center justify-center gap-2"
-            >
-              Suivant
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-            </button>
-          )}
+          <button
+            onClick={skipToNext}
+            className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-white bg-[#4a7c23] active:scale-95 shadow-lg flex items-center justify-center gap-2"
+          >
+            Suivant
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
         </div>
       </div>
     </div>
