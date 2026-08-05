@@ -72,11 +72,13 @@ export default function SequencedReadingPractice() {
   const [countdown, setCountdown] = useState(0);
   const [chunkPos, setChunkPos] = useState({ i: 0, total: 0 });
   const [paused, setPaused] = useState(false);
+  const [loop, setLoop] = useState(false); // répéter en boucle la sélection en cours
 
   const actionsRef = useRef<Action[]>([]);
   const rateRef = useRef(1);
   const runningRef = useRef(false);
   const pausedRef = useRef(false);
+  const loopRef = useRef(false);
   // Callback « passer à l'action suivante » de l'action en cours (récitation OU
   // décompte). Appelé une seule fois (mis à null) → évite un double avancement.
   const pendingRef = useRef<(() => void) | null>(null);
@@ -185,6 +187,12 @@ export default function SequencedReadingPractice() {
     const playNext = () => {
       if (!runningRef.current) return;
       if (vi >= chunk.length) {
+        // Boucle activée → on rejoue la même sélection jusqu'à désactivation.
+        if (loopRef.current) {
+          vi = 0;
+          playNext();
+          return;
+        }
         onDone();
         return;
       }
@@ -242,6 +250,13 @@ export default function SequencedReadingPractice() {
     }
   }
 
+  // Active/désactive la répétition en boucle de la sélection en cours.
+  function toggleLoop() {
+    const v = !loopRef.current;
+    loopRef.current = v;
+    setLoop(v);
+  }
+
   function runAction(k: number) {
     if (!runningRef.current) return;
     const actions = actionsRef.current;
@@ -286,10 +301,12 @@ export default function SequencedReadingPractice() {
   function finish() {
     runningRef.current = false;
     pausedRef.current = false;
+    loopRef.current = false;
     pendingRef.current = null;
     audioRef.current?.pause();
     if (timerRef.current) clearInterval(timerRef.current);
     setPaused(false);
+    setLoop(false);
     setCurrentVerse(null);
     setPhase('done');
   }
@@ -297,10 +314,12 @@ export default function SequencedReadingPractice() {
   function stop() {
     runningRef.current = false;
     pausedRef.current = false;
+    loopRef.current = false;
     pendingRef.current = null;
     audioRef.current?.pause();
     if (timerRef.current) clearInterval(timerRef.current);
     setPaused(false);
+    setLoop(false);
     setPhase('config');
     setRevealed(new Set());
     setCurrentVerse(null);
@@ -353,8 +372,10 @@ export default function SequencedReadingPractice() {
     rateRef.current = rate;
     runningRef.current = true;
     pausedRef.current = false;
+    loopRef.current = false;
     pendingRef.current = null;
     setPaused(false);
+    setLoop(false);
     setRevealed(new Set());
     setCurrentVerse(null);
     followPage(chunks[0][0].page);
@@ -593,8 +614,23 @@ export default function SequencedReadingPractice() {
         </div>
         <div className="flex items-center justify-center gap-3">
           <button
+            onClick={toggleLoop}
+            aria-label="Répéter en boucle"
+            title="Répéter en boucle la sélection en cours"
+            className={`flex-none w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border-2 active:scale-95 transition-all ${
+              loop ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'bg-[#1f3a0f] text-[#c9a959] border-[#c9a959]/40'
+            }`}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m17 2 4 4-4 4" />
+              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+              <path d="m7 22-4-4 4-4" />
+              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+            </svg>
+          </button>
+          <button
             onClick={togglePause}
-            className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-[#2d5016] bg-[#c9a959] active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            className="flex-1 max-w-[200px] py-3.5 rounded-2xl text-base font-bold text-[#2d5016] bg-[#c9a959] active:scale-95 shadow-lg flex items-center justify-center gap-2"
           >
             {paused ? (
               <>
