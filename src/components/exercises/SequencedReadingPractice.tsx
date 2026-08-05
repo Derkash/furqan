@@ -32,6 +32,9 @@ const UNITS: { id: Unit; label: string }[] = [
 ];
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 const INTERVALS = [15, 30, 60, 120, 180];
+// Petit WAV silencieux : joué dans le geste « Démarrer » pour débloquer la
+// lecture audio (sinon les navigateurs bloquent la lecture auto ensuite).
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=';
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -299,6 +302,19 @@ export default function SequencedReadingPractice() {
     if (lo < 1 || hi > 604) {
       setError('Les pages doivent être entre 1 et 604.');
       return;
+    }
+    // Débloque l'audio DANS le geste utilisateur (avant tout await réseau),
+    // sinon la lecture de la récitation sera bloquée par le navigateur.
+    try {
+      const a0 = ensureAudio();
+      a0.src = SILENT_WAV;
+      a0.play()
+        .then(() => {
+          if (a0.src === SILENT_WAV) a0.pause();
+        })
+        .catch(() => {});
+    } catch {
+      /* ignore */
     }
     const chunks = await buildChunks(lo, hi, unit);
     if (chunks.length === 0) {
