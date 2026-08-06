@@ -38,6 +38,7 @@ function speedLabel(s: number): string {
 // Petit WAV silencieux : joué dans le geste « Démarrer » pour débloquer la
 // lecture audio (sinon les navigateurs bloquent la lecture auto ensuite).
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAZGF0YQAAAAA=';
+const LS_KEY = 'almuraja3a:seqreading'; // dernière config mémorisée
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -115,6 +116,33 @@ export default function SequencedReadingPractice() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  // Restaure la dernière configuration saisie (plage, unité, qui commence,
+  // intervalle, vitesse).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw) as Partial<{
+        startPage: number;
+        endPage: number;
+        unit: Unit;
+        interval: number;
+        who: Who;
+        rate: number;
+      }>;
+      if (typeof s.startPage === 'number') setStartPage(s.startPage);
+      if (typeof s.endPage === 'number') setEndPage(s.endPage);
+      if (s.unit) setUnit(s.unit);
+      if (typeof s.interval === 'number') setIntervalSec(s.interval);
+      if (s.who) setWho(s.who);
+      if (typeof s.rate === 'number') setRate(s.rate);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function ensureAudio(): HTMLAudioElement {
     if (!audioRef.current) {
@@ -338,6 +366,12 @@ export default function SequencedReadingPractice() {
     if (lo < 1 || hi > 604) {
       setError('Les pages doivent être entre 1 et 604.');
       return;
+    }
+    // Mémorise la config pour la prochaine ouverture.
+    try {
+      window.localStorage.setItem(LS_KEY, JSON.stringify({ startPage: lo, endPage: hi, unit, interval, who, rate }));
+    } catch {
+      /* ignore */
     }
     // Débloque l'audio DANS le geste utilisateur (avant tout await réseau),
     // sinon la lecture de la récitation sera bloquée par le navigateur.
