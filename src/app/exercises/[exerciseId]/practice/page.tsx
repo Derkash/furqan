@@ -301,6 +301,8 @@ function MushafPractice() {
   // Ibn Kathir portent la même teinte (alternée entre groupes voisins).
   const [showThemes, setShowThemes] = useState(true);
   const tafsirGroups = useTafsirGroups(isHifz && showThemes);
+  // Hifz : masquer les couleurs des mots du lexique (pour ne pas gêner la vision des fautes).
+  const [showLexicon, setShowLexicon] = useState(true);
 
   // Hifz : mode « marquer mes fautes » — taper les mots ratés, puis choisir le type.
   const [markingMode, setMarkingMode] = useState(false);
@@ -370,12 +372,12 @@ function MushafPractice() {
 
   // Marques combinées : lexique (sauf Hifz+Thèmes) + fautes/sélection Hifz (prioritaires).
   const combinedWordMarks = useMemo(() => {
-    const lexOn = isHifz ? !showThemes : true;
+    const lexOn = isHifz ? showLexicon && !showThemes : true;
     const base = new Map<string, string>();
     if (lexOn) for (const [k, v] of lexiconMarks) base.set(k, v);
     if (hifzWordMarks) for (const [k, v] of hifzWordMarks) base.set(k, v);
     return base.size ? base : undefined;
-  }, [isHifz, showThemes, lexiconMarks, hifzWordMarks]);
+  }, [isHifz, showLexicon, showThemes, lexiconMarks, hifzWordMarks]);
 
   // Traduction Hamidullah (Hifz) : affichée seulement au tap sur un verset, en popover.
   const { translations, loading: translationLoading, load: loadTranslations } = useTranslation();
@@ -907,6 +909,20 @@ function MushafPractice() {
             }`}
           >
             Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowLexicon((s) => !s);
+            }}
+            title="Afficher/masquer les couleurs des mots de mon lexique"
+            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
+              showLexicon
+                ? 'bg-[#4a7c23] text-white border-[#4a7c23]'
+                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+            }`}
+          >
+            Lexique
           </button>
           <span className="text-xs uppercase tracking-wide text-[#c9a959] mr-2">Niveau</span>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (

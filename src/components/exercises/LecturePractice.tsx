@@ -23,6 +23,14 @@ import {
 import { fetchIbnKathir, useIbnKathir } from '@/hooks/exercises/useIbnKathir';
 import { fetchTTS } from '@/hooks/exercises/useSpeech';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
+import { useTafsirGroups } from '@/hooks/exercises/useTafsirGroups';
+import {
+  getCurrentUser,
+  getMistakeWordMarks,
+  recordWordMistakes,
+  MISTAKE_TYPE_META,
+  type MistakeType,
+} from '@/utils/exercises/userStats';
 import { playBeep } from '@/utils/beep';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
@@ -116,6 +124,15 @@ export default function LecturePractice() {
   const lpConfigRef = useRef<LongPressConfig>(LP_DEFAULT);
   lpConfigRef.current = lpConfig;
   const [captureMode, setCaptureMode] = useState(false);
+  // Visibilité : couleurs du lexique + thèmes de tafsir (Ibn Kathir).
+  const [showLexicon, setShowLexicon] = useState(true);
+  const [showThemes, setShowThemes] = useState(false);
+  const tafsirGroups = useTafsirGroups(showThemes);
+  // Saisie des fautes (comme en Hifz) : mode marquage + sélection + fautes persistées.
+  const [markingMode, setMarkingMode] = useState(false);
+  const [selWords, setSelWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
+  const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
+  const [showMistakes, setShowMistakes] = useState(true);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [showTrans, setShowTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
@@ -187,6 +204,7 @@ export default function LecturePractice() {
   useEffect(() => {
     setLexicon(lexiconMatchSets());
     setLpConfig(loadLongPressConfig());
+    setMistakeWords(getMistakeWordMarks(getCurrentUser()));
   }, []);
 
   // Persiste les réglages d'appui long.
@@ -932,10 +950,11 @@ export default function LecturePractice() {
       animating: false,
     };
     swipedFired.current = false;
-    // Appui long : seulement sur un verset.
+    // Appui long : seulement sur un verset (désactivé en mode marquage, mais le
+    // glissement reste actif).
     const page = Number(el?.getAttribute('data-page'));
     const verseKey = el?.getAttribute('data-verse');
-    if (!el || !verseKey || !Number.isFinite(page)) return;
+    if (!el || !verseKey || !Number.isFinite(page) || markingMode) return;
     longPressFired.current = false;
     pressStart.current = { x: e.clientX, y: e.clientY, page, verseKey };
     pressTimer.current = setTimeout(() => {
@@ -1031,6 +1050,19 @@ export default function LecturePractice() {
     const isMarker = el?.classList.contains('ayah-marker');
     const isLexiconWord = !isMarker && marks.get(`${verseKey}#${position}`) === 'lexicon';
 
+    // Mode « Marquer mes fautes » : sélectionne/désélectionne le mot touché.
+    if (markingMode) {
+      if (isMarker || !Number.isFinite(position)) return;
+      const key = `${verseKey}#${position}`;
+      setSelWords((prev) => {
+        const next = new Map(prev);
+        if (next.has(key)) next.delete(key);
+        else next.set(key, { verseKey, position, page: p });
+        return next;
+      });
+      return;
+    }
+
     // Mode « Ajouter un mot » : fiche mot (comportement historique).
     if (captureMode && !isMarker && Number.isFinite(position)) {
       audioRef.current?.pause();
@@ -1064,6 +1096,28 @@ export default function LecturePractice() {
     () => new Set([...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey)),
     [right, left]
   );
+
+  // Marques combinées : lexique (si visible et hors thèmes) + fautes déclarées
+  // (si visibles) + sélection en cours de marquage (prioritaire).
+  const combinedMarks = useMemo(() => {
+    const m = new Map<string, string>();
+    if (showLexicon && !showThemes) for (const [k, v] of marks) m.set(k, v);
+    if (showMistakes) for (const [k, v] of mistakeWords) m.set(k, v);
+    for (const k of selWords.keys()) m.set(k, 'selected');
+    return m;
+  }, [showLexicon, showThemes, marks, showMistakes, mistakeWords, selWords]);
+
+  // Déclare les mots sélectionnés avec un type de faute (mémorisé).
+  const declareMistakes = (type: MistakeType) => {
+    const user = getCurrentUser();
+    const at = new Date().toISOString();
+    recordWordMistakes(
+      user,
+      Array.from(selWords.values()).map((w) => ({ ...w, type, at }))
+    );
+    setMistakeWords(getMistakeWordMarks(user));
+    setSelWords(new Map());
+  };
 
   // Sur CHAQUE page : entoure en rouge le numéro du verset PRÉCÉDANT le verset
   // du milieu (même règle « verset du milieu » que les exercices).
@@ -1103,7 +1157,13 @@ export default function LecturePractice() {
         </button>
         <button
           onClick={() => {
-            setCaptureMode((m) => !m);
+            setCaptureMode((m) => {
+              if (!m) {
+                setMarkingMode(false);
+                setSelWords(new Map());
+              }
+              return !m;
+            });
             setSelected(null);
           }}
           className={`text-xs font-bold rounded-full px-2.5 py-1 border ${
@@ -1247,6 +1307,57 @@ export default function LecturePractice() {
         </div>
       )}
 
+      {/* Thèmes / Marquer les fautes / Fautes / Lexique (masqués en plein écran) */}
+      <div className={`flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1.5 flex-wrap ${isFs ? 'hidden' : ''}`}>
+        <button
+          onClick={() => setShowThemes((t) => !t)}
+          title="Surligner les versets partageant le même tafsir Ibn Kathir (thèmes)"
+          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
+            showThemes ? 'bg-[#7a8b3e] text-white border-[#7a8b3e] shadow-md' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+          }`}
+        >
+          Thèmes
+        </button>
+        <button
+          onClick={() =>
+            setMarkingMode((m) => {
+              if (!m) {
+                setCaptureMode(false);
+                setVerseMenu(null);
+                setSelected(null);
+              } else {
+                setSelWords(new Map());
+              }
+              return !m;
+            })
+          }
+          title="Marquer mes fautes : touche les mots ratés, puis choisis le type"
+          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
+            markingMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959] shadow-md' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+          }`}
+        >
+          ✍ Marquer
+        </button>
+        <button
+          onClick={() => setShowMistakes((s) => !s)}
+          title="Afficher/masquer les fautes déclarées"
+          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
+            showMistakes && mistakeWords.size > 0 ? 'bg-red-600 text-white border-red-600' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+          }`}
+        >
+          Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
+        </button>
+        <button
+          onClick={() => setShowLexicon((s) => !s)}
+          title="Afficher/masquer les couleurs des mots de mon lexique"
+          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
+            showLexicon ? 'bg-[#4a7c23] text-white border-[#4a7c23]' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+          }`}
+        >
+          Lexique
+        </button>
+      </div>
+
       {/* Légende / mode */}
       <div className={`flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2 ${isFs ? 'hidden' : ''}`}>
         {lexSize > 0 && (
@@ -1282,7 +1393,8 @@ export default function LecturePractice() {
             extraHighlightVerseKeys={halfPageHighlight}
             isBlurred={false}
             maskAll={false}
-            wordMarks={marks}
+            wordMarks={combinedMarks}
+            verseThemes={showThemes ? tafsirGroups : null}
             circledMarkerVerseKeys={circledMarkerVerseKeys}
             loading={loading}
             onTap={() => {}}
@@ -1363,6 +1475,38 @@ export default function LecturePractice() {
               setSelected(null);
             }}
           />
+        )}
+
+        {/* Marquage : choisir le type de faute pour les mots sélectionnés */}
+        {markingMode && selWords.size > 0 && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
+                  {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} — type de faute ?
+                </span>
+                <button onClick={() => setSelWords(new Map())} className="text-[11px] text-gray-400 hover:text-gray-600 underline">
+                  Annuler
+                </button>
+              </div>
+              {getCurrentUser() ? (
+                <div className="flex gap-1.5 flex-wrap">
+                  {MISTAKE_TYPE_META.map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => declareMistakes(t.value)}
+                      className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95"
+                      style={{ borderColor: t.color, color: t.color }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">Connecte-toi (exercice Récitation ou tableau de bord) pour mémoriser tes fautes.</p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Menu d'actions au clic sur un verset */}
