@@ -17,23 +17,22 @@ def gen_exercises(surah_id, versions=3):
         if not v: return ""
         wds=sorted([(int(k.split(':')[1]),m['form']) for k,m in mor.items() if int(k.split(':')[0])==v])
         return " ".join(f for _,f in wds[:n])
-    def middle(page,exclude=()):
+    # Milieu — MÊME règle que la partie Lecture (getMiddleVerse), aucune exclusion.
+    def middle(page):
         pv=vm['pages'].get(str(page))
         if not pv: return None
-        def pick(excl):
-            best=None; bd=1e9
-            for vk,e in pv.items():
-                sr,v=vk.split(':')
-                if sr!=sid or int(v) in excl: continue
-                b=e['boxes'][0] if e.get('boxes') else None
-                if not b: continue
-                hp=max(0,min(1,(b['right']-7)/86)); pos=b['line']+hp; d=abs(pos-8.5)
-                if d<bd: bd=d; best=int(v)
-            return best
-        return pick(set(exclude)) or pick(set())
+        best=None; bd=1e9
+        for vk,e in pv.items():
+            sr,v=vk.split(':')
+            if sr!=sid: continue
+            b=e['boxes'][0] if e.get('boxes') else None
+            if not b: continue
+            hp=max(0,min(1,(b['right']-7)/86)); pos=b['line']+hp; d=abs(pos-8.5)
+            if d<bd: bd=d; best=int(v)
+        return best
     def rows(p):
         d=XL.get((surah_id,p),{}); deb,fin=d.get('Début'),d.get('Fin')
-        return {'Début':deb,'Milieu':middle(p,(deb,fin) if deb and fin else ()),'Fin':fin}
+        return {'Début':deb,'Milieu':middle(p),'Fin':fin}
 
     pages=list(range(P0,P1+1))
     data={p:rows(p) for p in pages}
