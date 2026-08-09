@@ -94,6 +94,18 @@ export default function ExercisesPage() {
             </div>
           </Link>
 
+          {/* Repères Début / Milieu / Fin (niveaux 0→8) */}
+          <Link
+            href="/reperes"
+            className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#2f5496] to-[#1f3a63] text-white shadow-lg active:scale-[0.99] transition-all"
+          >
+            <span className="text-4xl flex-none">📑</span>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-lg">Repères — Début · Milieu · Fin</h3>
+              <p className="text-sm text-white/80 mt-0.5">Retrouve les repères de chaque page par sourate, difficulté 0→8</p>
+            </div>
+          </Link>
+
           {exercises.map((exercise, idx) => (
             <ExerciseCard key={exercise.id} exercise={exercise} index={idx} />
           ))}
