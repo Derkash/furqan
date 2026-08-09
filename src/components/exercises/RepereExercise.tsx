@@ -41,7 +41,8 @@ function hashFrac(s: string): number {
 
 export default function RepereExercise() {
   const [data, setData] = useState<Reperes | null>(null);
-  const [surah, setSurah] = useState('4'); // An-Nisa par défaut
+  const [surah, setSurah] = useState<string | null>(null); // null = écran de choix de sourate
+  const [query, setQuery] = useState('');
   const [level, setLevel] = useState(0); // 0 = tout visible … 8 = seulement les numéros de page
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
@@ -70,7 +71,7 @@ export default function RepereExercise() {
     return () => timers.forEach((t) => clearTimeout(t));
   }, []);
 
-  const sd = data ? data[surah] : null;
+  const sd = data && surah ? data[surah] : null;
 
   // Révèle une case masquée pendant 2 s (appui long).
   function revealCell(key: string) {
@@ -181,6 +182,64 @@ export default function RepereExercise() {
     }
   }
 
+  // ---- Écran de choix de la sourate ----
+  if (!surah) {
+    const ids = data ? Object.keys(data).sort((a, b) => Number(a) - Number(b)) : [];
+    const q = query.trim().toLowerCase();
+    const filtered = ids.filter(
+      (id) => !q || `${id} ${data![id].name}`.toLowerCase().includes(q) || data![id].arname.includes(query.trim())
+    );
+    return (
+      <div className="min-h-[100dvh] bg-[#fdfaf3] flex flex-col" dir="ltr">
+        <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+          <Link href="/exercises" className="text-sm hover:underline whitespace-nowrap">
+            ← Retour
+          </Link>
+          <span className="text-sm font-bold">Repères — choisis une sourate</span>
+          <span className="w-12" />
+        </div>
+        <div className="flex-none px-3 py-3">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher une sourate…"
+            className="w-full max-w-md mx-auto block px-3 py-2 rounded-xl border-2 border-[#c9a959]/40 focus:outline-none focus:border-[#2d5016] text-[#2d5016]"
+          />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {!data ? (
+            <p className="text-center text-[#4a7c23] py-8">Chargement…</p>
+          ) : (
+            <div className="max-w-2xl mx-auto grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {filtered.map((id) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setSurah(id);
+                    setLevel(0);
+                    setQuery('');
+                  }}
+                  className="text-left p-3 rounded-xl bg-white border border-[#c9a959]/30 hover:border-[#c9a959] active:scale-[0.98] transition-all"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-[#7a8b3e]">{id}</span>
+                    <span className="text-lg text-[#2d5016]" dir="rtl" style={{ fontFamily: AR_FONT }}>
+                      {data[id].arname}
+                    </span>
+                  </div>
+                  <div className="text-sm font-bold text-[#2d5016] truncate">{data[id].name}</div>
+                  <div className="text-[10px] text-gray-400">
+                    {data[id].total} page{data[id].total > 1 ? 's' : ''}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const HEAD = (
     <>
       <th className="v">Verset</th>
@@ -209,24 +268,13 @@ export default function RepereExercise() {
 
       {/* Barre */}
       <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
-        <Link href="/exercises" className="text-sm hover:underline whitespace-nowrap">
-          ← Retour
-        </Link>
-        <span className="text-sm font-bold">Repères — Début · Milieu · Fin</span>
-        <select
-          value={surah}
-          onChange={(e) => setSurah(e.target.value)}
-          className="text-[#2d5016] text-xs font-bold rounded-md px-2 py-1 max-w-[46vw]"
-        >
-          {data &&
-            Object.keys(data)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((id) => (
-                <option key={id} value={id}>
-                  {id}. {data[id].name}
-                </option>
-              ))}
-        </select>
+        <button onClick={() => setSurah(null)} className="text-sm hover:underline whitespace-nowrap">
+          ← Sourates
+        </button>
+        <span className="text-sm font-bold truncate">
+          {surah}. {sd?.name} — Repères
+        </span>
+        <span className="w-16" />
       </div>
 
       {/* Niveaux de difficulté */}
