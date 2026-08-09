@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { toGlobalAyahNumber, getAudioUrl } from '@/utils/ayahMapping';
 
 interface Cell {
   v: number;
@@ -29,15 +30,9 @@ const COLORS: Record<'d' | 'm' | 'f', string> = { d: '#dbead5', m: '#fdf0cf', f:
 const LABELS: Record<'d' | 'm' | 'f', string> = { d: 'Début', m: 'Milieu', f: 'Fin' };
 const POSKEYS: ('d' | 'm' | 'f')[] = ['d', 'm', 'f'];
 
-// Valeur pseudo-aléatoire stable dans [0,1[ pour une cellule (masquage par niveau).
-function hashFrac(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) % 100000 / 100000;
-}
+// Ratio doré (suite de Weyl à faible discordance) : masque les cellules de façon
+// régulièrement répartie sur toute la sourate, sans grappes (jamais tout d'un côté).
+const PHI = 0.6180339887498949;
 
 export default function RepereExercise() {
   const [data, setData] = useState<Reperes | null>(null);
@@ -73,6 +68,41 @@ export default function RepereExercise() {
 
   const sd = data && surah ? data[surah] : null;
 
+  // Index global de chaque cellule (dans l'ordre page puis Début/Milieu/Fin).
+  // Sert à répartir régulièrement les trous : weyl(idx) = frac((idx+0.5)·φ),
+  // masqué si weyl < niveau/8. Deux cellules voisines (même page) ont des valeurs
+  // très éloignées → rarement masquées ensemble ; les trous sont étalés sur la sourate.
+  const cellIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!sd) return m;
+    let i = 0;
+    for (const row of sd.rows) {
+      for (const pos of POSKEYS) {
+        if (row[pos]) m.set(`${surah}:${row.page}:${pos}`, i++);
+      }
+    }
+    return m;
+  }, [sd, surah]);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Joue le verset en vitesse x2 (appui long).
+  function playVerse(verseNum: number) {
+    if (!surah) return;
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const a = new Audio(getAudioUrl(toGlobalAyahNumber(Number(surah), verseNum)));
+      a.playbackRate = 2;
+      // conserve la hauteur de voix malgré l'accélération
+      (a as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      audioRef.current = a;
+      a.play().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
+
   // Révèle une case masquée pendant 2 s (appui long).
   function revealCell(key: string) {
     setRevealed((prev) => {
@@ -95,12 +125,13 @@ export default function RepereExercise() {
     );
   }
 
-  const startPress = (e: React.PointerEvent, key: string, hidden: boolean) => {
-    if (!hidden) return;
+  const startPress = (e: React.PointerEvent, key: string, hidden: boolean, verseNum: number) => {
     pressStart.current = { x: e.clientX, y: e.clientY };
     pressTimer.current = setTimeout(() => {
       pressTimer.current = null;
-      revealCell(key);
+      // Si la case était masquée on l'affiche ; dans tous les cas on lance l'audio x2.
+      if (hidden) revealCell(key);
+      playVerse(verseNum);
     }, 400);
   };
   const movePress = (e: React.PointerEvent) => {
@@ -134,7 +165,9 @@ export default function RepereExercise() {
       );
     }
     const key = `${surah}:${row.page}:${pos}`;
-    const hiddenByLevel = hashFrac(key) < level / 8;
+    const idx = cellIndex.get(key) ?? 0;
+    const weyl = ((idx + 0.5) * PHI) % 1;
+    const hiddenByLevel = weyl < level / 8;
     const show = !hiddenByLevel || revealed.has(key);
     return (
       <>
@@ -142,7 +175,7 @@ export default function RepereExercise() {
           className={`v${hiddenByLevel && !show ? ' hole' : ''}`}
           style={{ background: bg }}
           dir="rtl"
-          onPointerDown={(e) => startPress(e, key, hiddenByLevel)}
+          onPointerDown={(e) => startPress(e, key, hiddenByLevel, cell.v)}
           onPointerMove={movePress}
           onPointerUp={endPress}
           onPointerLeave={endPress}
