@@ -40,6 +40,7 @@ export default function RepereExercise() {
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState(0); // 0 = tout visible … 8 = seulement les numéros de page
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [playing, setPlaying] = useState(false);
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
@@ -96,11 +97,17 @@ export default function RepereExercise() {
       a.playbackRate = 2;
       // conserve la hauteur de voix malgré l'accélération
       (a as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      a.onended = () => setPlaying(false);
+      a.onpause = () => setPlaying(false);
       audioRef.current = a;
-      a.play().catch(() => {});
+      a.play().then(() => setPlaying(true)).catch(() => {});
     } catch {
       /* ignore */
     }
+  }
+  function stopAudio() {
+    if (audioRef.current) audioRef.current.pause();
+    setPlaying(false);
   }
 
   // Révèle une case masquée pendant 2 s (appui long).
@@ -334,7 +341,7 @@ export default function RepereExercise() {
           </span>
           <span className="text-[#7a5d2c] text-sm"> · {sd.name}</span>
           <div className="text-[11px] text-[#7a5d2c]">
-            {level === 0 ? 'Tout est affiché' : level === 8 ? 'Seuls les numéros de page' : `Niveau ${level}/8`} · appui long sur une case masquée = révéler 2 s
+            {level === 0 ? 'Tout est affiché' : level === 8 ? 'Seuls les numéros de page' : `Niveau ${level}/8`} · appui long = révéler 2 s + écouter le verset (x2)
           </div>
         </div>
       )}
@@ -368,6 +375,17 @@ export default function RepereExercise() {
           </table>
         )}
       </div>
+
+      {/* Bouton Stop — visible uniquement pendant la lecture audio */}
+      {playing && (
+        <button
+          onClick={stopAudio}
+          className="fixed z-50 bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-full bg-red-600 text-white font-bold shadow-lg active:scale-95 transition-transform"
+        >
+          <span className="w-3.5 h-3.5 bg-white rounded-[2px]" />
+          Stop
+        </button>
+      )}
     </div>
   );
 }
