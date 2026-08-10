@@ -296,11 +296,19 @@ export default function LecturePractice() {
   }, [showTrans, verseLayer, trans]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Suivi de l'état plein écran (bouton ⛶ + touche Échap du navigateur).
+  // Suivi de l'état plein écran : si le navigateur sort du plein écran natif
+  // (touche Échap), on referme aussi notre plein écran CSS.
   useEffect(() => {
-    const onFs = () => setIsFs(!!document.fullscreenElement);
+    const onFs = () => {
+      const d = document as Document & { webkitFullscreenElement?: Element };
+      if (!d.fullscreenElement && !d.webkitFullscreenElement) setIsFs(false);
+    };
     document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('webkitfullscreenchange', onFs);
+    };
   }, []);
 
   // Feuilletage au trackpad : écouteur wheel NON passif (pour pouvoir bloquer la
@@ -659,11 +667,34 @@ export default function LecturePractice() {
     await startPlayback(sel, cfg);
   }
 
+  // Plein écran robuste : on pilote toujours l'affichage en CSS (isFs) — qui
+  // fonctionne partout, y compris iOS Safari où l'API Fullscreen sur un <div>
+  // n'existe pas — et on tente en plus le plein écran natif si disponible.
   function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (isFs) {
+      setIsFs(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = document as any;
+      if (d.fullscreenElement || d.webkitFullscreenElement) {
+        try {
+          const ex = d.exitFullscreen ?? d.webkitExitFullscreen;
+          ex?.call(d)?.catch?.(() => {});
+        } catch {
+          /* ignore */
+        }
+      }
     } else {
-      rootRef.current?.requestFullscreen().catch(() => {});
+      setIsFs(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const el = rootRef.current as any;
+      const req = el?.requestFullscreen ?? el?.webkitRequestFullscreen;
+      if (el && req) {
+        try {
+          req.call(el)?.catch?.(() => {});
+        } catch {
+          /* le CSS prend le relais */
+        }
+      }
     }
   }
 
@@ -1138,7 +1169,7 @@ export default function LecturePractice() {
   const selCount = selRef.current.length;
 
   return (
-    <div ref={rootRef} className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
+    <div ref={rootRef} className={`h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`}>
       {/* Barre */}
       <div className={`flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2 ${isFs ? 'hidden' : ''}`}>
         <Link href="/exercises/lecture/setup" className="text-sm hover:underline whitespace-nowrap">
@@ -1291,9 +1322,14 @@ export default function LecturePractice() {
         </div>
       )}
 
-      {/* Traduction française du verset en cours (Hamidullah) */}
+      {/* Traduction française du verset en cours (Hamidullah).
+          Hauteur FIXE + défilement interne : le texte varie d'un verset à l'autre
+          mais ne repousse plus le mushaf (évite le « saut de page »). */}
       {showTrans && !isFs && (
-        <div className="flex-none bg-[#fdfaf3] border-b border-[#c9a959]/40 px-4 py-2 text-center">
+        <div
+          className="flex-none bg-[#fdfaf3] border-b border-[#c9a959]/40 px-4 flex items-center justify-center overflow-y-auto"
+          style={{ height: 56 }}
+        >
           <p className="text-[13px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
             {currentVerse && trans?.[currentVerse] ? (
               <>
@@ -1389,8 +1425,8 @@ export default function LecturePractice() {
             orientation={orientation}
             revealedVerses={visibleVerses}
             visibleVerses={visibleVerses}
-            highlightedVerseKey={currentVerse ?? undefined}
-            extraHighlightVerseKeys={halfPageHighlight}
+            highlightedVerseKey={playing ? undefined : (currentVerse ?? undefined)}
+            extraHighlightVerseKeys={playing ? undefined : halfPageHighlight}
             isBlurred={false}
             maskAll={false}
             wordMarks={combinedMarks}

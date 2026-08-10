@@ -609,7 +609,7 @@ export default function SequencedReadingPractice() {
           orientation={orientation}
           revealedVerses={visible}
           visibleVerses={visible}
-          highlightedVerseKey={currentVerse ?? undefined}
+          highlightedVerseKey={sub === 'recite' && !paused ? undefined : (currentVerse ?? undefined)}
           isBlurred={false}
           maskAll
           loading={false}
