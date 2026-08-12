@@ -26,7 +26,7 @@ export const DEFAULT_FRAME: FrameConfig = {
   textInsetH: 8.2,
   textInsetTop: 8.6,
   textInsetBottom: 9,
-  textFontSize: 5.15,
+  textFontSize: 5.4,
   pageNumberSize: 3.2,
   pageNumberBottom: 2.1,
   showPattern: true,
