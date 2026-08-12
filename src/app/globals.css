@@ -107,6 +107,26 @@ body {
   align-items: center;
 }
 
+/* Livre maximisé : remplit la hauteur, rognage latéral PLAFONNÉ aux marges
+   papier des scans (12,5 %) — on n'entame JAMAIS le cadre ornemental. */
+.book-area {
+  container-type: size;
+}
+.book-box {
+  width: min(calc(100cqh * 1.38), calc(100cqw / 0.875));
+  aspect-ratio: 1518 / 1100;
+  flex: none;
+}
+
+/* Barre du bas (dans le flux, sous le livre) : montée douce. */
+@keyframes ds-rise-flow {
+  from { transform: translateY(60%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.ds-rise-flow {
+  animation: ds-rise-flow 0.25s ease;
+}
+
 /* Barre transiente : monte du bas. */
 @keyframes ds-rise {
   from { transform: translate(-50%, 120%); opacity: 0.4; }

@@ -1335,7 +1335,7 @@ export default function LecturePractice() {
       {/* Mushaf — le « livre » ouvert sur le canvas vert */}
       <div
         ref={mushafAreaRef}
-        className="book-centered flex-1 min-h-0 relative select-none overflow-hidden"
+        className="book-centered flex-1 min-h-0 relative select-none overflow-hidden flex flex-col"
         style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
@@ -1346,12 +1346,11 @@ export default function LecturePractice() {
       >
         <div
           ref={flipWrapRef}
-          className="w-full h-full will-change-transform flex justify-center overflow-hidden"
+          className="book-area w-full flex-1 min-h-0 will-change-transform flex justify-center items-center overflow-hidden"
           style={{ filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.35))' }}
         >
         <div
-          className="h-full flex-none max-w-none"
-          style={orientation === 'landscape' ? { aspectRatio: '1518 / 1100' } : { width: '100%' }}
+          className={orientation === 'landscape' ? 'book-box' : 'h-full w-full'}
         >
           <MushafDoublePage
             leftPageVerses={left}
@@ -1389,8 +1388,8 @@ export default function LecturePractice() {
             réécoute — sinon rien (le panneau de gauche pilote tout). */}
         {(playing || sessionActive || recorder.recording || recorder.audioUrl) && (
           <div
-            className="ds-rise absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-full pl-2.5 pr-2.5 py-2 w-[min(96%,700px)]"
-            style={{ bottom: 'calc(8px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+            className="ds-rise-flow flex-none mx-auto my-1.5 flex items-center gap-2.5 md:gap-3 bg-white rounded-2xl px-3 py-1.5 w-[min(97%,900px)]"
+            style={{ marginBottom: 'calc(6px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -1489,6 +1488,17 @@ export default function LecturePractice() {
               ) : (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               )}
+            </button>
+            <button
+              type="button"
+              onClick={() => flip('next')}
+              className="flex-none hidden sm:flex items-center gap-1 pl-3 pr-2 py-2 rounded-full text-[12px] font-bold text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)] transition-colors"
+            >
+              <span className="text-left leading-tight">
+                Page suivante
+                <span className="block text-[10px] text-[var(--ds-n500)]">{toArabicNumbers(Math.min(604, pair.leftPage + 1))}</span>
+              </span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             </button>
           </div>
         )}
