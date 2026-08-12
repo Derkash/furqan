@@ -159,8 +159,8 @@ export default function LecturePractice() {
   const lastRecUrl = useRef<string | null>(null); // pour lancer la réécoute une seule fois
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
-  // Panneau de pilotage gauche (ouvert en overlay sur petit écran).
-  const [panelOpen, setPanelOpen] = useState(false);
+  // Layer de section du rail gauche (Réglages / Affichage), fermé par Valider.
+  const [panelLayer, setPanelLayer] = useState<null | 'reglages' | 'affichage'>(null);
   const [gotoPage, setGotoPage] = useState('');
   const [config, setConfig] = useState<PlayConfig>({
     ...DEFAULT_CONFIG,
@@ -1165,180 +1165,247 @@ export default function LecturePractice() {
   const selCount = selRef.current.length;
 
   return (
-    <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
-      {/* ---- Panneau de pilotage (gauche) : logo = Accueil, Réglages, Affichage, Lecture, Enregistrement ---- */}
+    <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex relative overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
+      {/* ---- Rail de pilotage (gauche) : ICÔNES SEULES — l'espace au texte.
+           Réglages / Affichage s'ouvrent en LAYER avec bouton Valider ;
+           écouter, enregistrer et plein écran sont des actions directes. ---- */}
       {!isFs && (
-        <aside
-          dir="ltr"
-          className={`${panelOpen ? 'flex absolute inset-y-0 left-0 z-50 shadow-2xl' : 'hidden'} md:static md:flex md:shadow-none w-[236px] flex-none flex-col bg-white overflow-y-auto py-4 px-3 gap-4`}
-        >
-          <Link href="/exercises" className="flex flex-col items-center gap-0.5" title="Accueil">
-            <span className="text-[24px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
+        <aside dir="ltr" className="flex w-[60px] flex-none flex-col items-center bg-white overflow-y-auto py-3 gap-1.5 z-40">
+          <Link href="/exercises" title="Accueil" className="flex flex-col items-center gap-0.5 mb-1.5">
+            <span className="text-[20px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
               ع
             </span>
-            <span className="text-[8px] font-extrabold tracking-[0.22em] text-[var(--ds-n600)]">MURAJA3A</span>
+            <span className="text-[6px] font-extrabold tracking-[0.16em] text-[var(--ds-n600)]">MURAJA3A</span>
           </Link>
 
-          <section>
-            <p className="ds-kicker mb-1.5">Réglages</p>
-            <div className="flex items-center gap-1.5 mb-2">
-              <input
-                type="number"
-                min={1}
-                max={604}
-                value={gotoPage}
-                onChange={(e) => setGotoPage(e.target.value)}
-                placeholder={`Page ${pair.rightPage}`}
-                className="w-full min-w-0 px-2.5 py-2 rounded-xl border border-[var(--ds-divider)] text-sm font-bold outline-none focus:border-[var(--ds-gold)]"
-              />
-              <button
-                onClick={() => {
-                  const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
-                  if (p) {
-                    setPage(p);
-                    setGotoPage('');
-                  }
-                }}
-                className="ds-btn-ghost px-3 py-2 text-sm flex-none"
-              >
-                OK
-              </button>
-            </div>
-            <button onClick={() => setShowConfig(true)} className="ds-btn-gold w-full py-2 text-[13px] mb-1.5">
-              Plage &amp; répétitions…
-            </button>
-            <button onClick={() => setShowLpConfig(true)} className="ds-btn-ghost w-full py-2 text-[13px]">
-              Appui long…
-            </button>
-          </section>
+          <button
+            onClick={() => setPanelLayer(panelLayer === 'reglages' ? null : 'reglages')}
+            title="Réglages"
+            className={`flex flex-col items-center gap-0.5 w-12 py-1.5 rounded-xl transition-colors ${
+              panelLayer === 'reglages' ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
+            }`}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            <span className="text-[7px] font-bold uppercase tracking-wider">Réglages</span>
+          </button>
 
-          <section>
-            <p className="ds-kicker mb-1.5">Affichage</p>
-            <div className="flex flex-col gap-0.5">
-              {[
-                { label: 'Thèmes', active: showThemes, onClick: () => setShowThemes((t) => !t) },
-                {
-                  label: '✍ Marquer',
-                  active: markingMode,
-                  onClick: () =>
-                    setMarkingMode((m) => {
-                      if (!m) {
-                        setCaptureMode(false);
-                        setVerseMenu(null);
-                        setSelected(null);
-                      } else {
-                        setSelWords(new Map());
-                      }
-                      return !m;
-                    }),
-                },
-                {
-                  label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
-                  active: showMistakes && mistakeWords.size > 0,
-                  onClick: () => setShowMistakes((s) => !s),
-                },
-                { label: 'Lexique', active: showLexicon, onClick: () => setShowLexicon((s) => !s) },
-                {
-                  label: '➕ Ajouter un mot',
-                  active: captureMode,
-                  onClick: () => {
-                    setCaptureMode((m) => {
-                      if (!m) {
-                        setMarkingMode(false);
-                        setSelWords(new Map());
-                      }
-                      return !m;
-                    });
-                    setSelected(null);
-                  },
-                },
-                { label: 'Traduction FR', active: showTrans, onClick: () => setShowTrans((v) => !v) },
-              ].map((t) => (
-                <button
-                  key={t.label}
-                  onClick={t.onClick}
-                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] font-bold transition-colors ${
-                    t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)]/60'
-                  }`}
-                >
-                  <span className="truncate">{t.label}</span>
-                  <span className={`flex-none w-8 h-[18px] rounded-full relative transition-colors ${t.active ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
-                    <span
-                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${t.active ? 'left-[16px]' : 'left-[2px]'}`}
-                    />
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <button
+            onClick={() => setPanelLayer(panelLayer === 'affichage' ? null : 'affichage')}
+            title="Affichage"
+            className={`flex flex-col items-center gap-0.5 w-12 py-1.5 rounded-xl transition-colors ${
+              panelLayer === 'affichage' ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
+            }`}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <span className="text-[7px] font-bold uppercase tracking-wider">Affichage</span>
+          </button>
 
-          <section>
-            <p className="ds-kicker mb-1.5">Lecture</p>
-            <div className="flex items-center gap-1.5 mb-2">
-              <button onClick={togglePlay} className="ds-btn-gold flex-1 py-2.5 text-sm">
-                {playing ? '⏸ Pause' : '▶ Écouter'}
-              </button>
-              {sessionActive && (
-                <button onClick={stop} aria-label="Arrêter" className="ds-btn-ghost px-3.5 py-2.5 text-sm flex-none">
-                  ■
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {SPEEDS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setRate(s)}
-                  className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors ${
-                    rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
-                  }`}
-                >
-                  ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
-                </button>
-              ))}
-            </div>
-            <button onClick={toggleFullscreen} className="ds-btn-ghost w-full py-2 text-[13px]">
-              ⛶ Plein écran
-            </button>
-          </section>
+          <div className="flex-1" />
 
-          <section>
-            <p className="ds-kicker mb-1.5">Enregistrement</p>
+          <button
+            onClick={togglePlay}
+            title={playing ? 'Pause' : 'Écouter'}
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
+            style={{ background: 'var(--ds-gold)' }}
+          >
+            {playing ? (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            )}
+          </button>
+          {sessionActive && (
             <button
-              onClick={toggleRecord}
-              className={`w-full py-2.5 rounded-full text-sm font-bold text-white transition-all active:scale-[0.98] ${
-                recorder.recording ? 'bg-red-500 animate-pulse' : 'bg-red-600 hover:bg-red-500'
-              }`}
+              onClick={stop}
+              title="Arrêter la lecture"
+              className="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] active:scale-95 transition-all"
             >
-              {recorder.recording ? '■ Arrêter' : '🎙 S’enregistrer'}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
             </button>
-            {recorder.error && <p className="text-[11px] text-red-600 mt-1.5">{recorder.error}</p>}
-          </section>
+          )}
+          <button
+            onClick={toggleRecord}
+            title={recorder.recording ? "Arrêter l'enregistrement" : 'S’enregistrer'}
+            className={`w-11 h-11 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
+              recorder.recording ? 'animate-pulse' : ''
+            }`}
+          >
+            {recorder.recording ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            title="Plein écran"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--ds-n500)] hover:text-[var(--ds-green)] transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </button>
+          {recorder.error && <p className="text-[8px] text-red-600 text-center px-1">{recorder.error}</p>}
         </aside>
       )}
-      {panelOpen && (
-        <button
-          aria-label="Fermer le panneau"
-          className="md:hidden absolute inset-0 z-40 bg-black/30"
-          onClick={() => setPanelOpen(false)}
-        />
+
+      {/* LAYER de section (Réglages / Affichage) : bouton Valider pour fermer */}
+      {panelLayer && !isFs && (
+        <>
+          <button
+            aria-label="Fermer"
+            className="absolute inset-0 z-40 bg-black/25"
+            onClick={() => setPanelLayer(null)}
+          />
+          <div
+            dir="ltr"
+            className="absolute left-[64px] top-2 bottom-2 z-50 w-[280px] max-w-[78vw] bg-white rounded-2xl p-4 overflow-y-auto flex flex-col"
+            style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+          >
+            {panelLayer === 'reglages' && (
+              <div className="flex-1">
+                <p className="ds-kicker mb-2">Réglages</p>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={604}
+                    value={gotoPage}
+                    onChange={(e) => setGotoPage(e.target.value)}
+                    placeholder={`Page ${pair.rightPage}`}
+                    className="w-full min-w-0 px-2.5 py-2 rounded-xl border border-[var(--ds-divider)] text-sm font-bold outline-none focus:border-[var(--ds-gold)]"
+                  />
+                  <button
+                    onClick={() => {
+                      const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
+                      if (p) {
+                        setPage(p);
+                        setGotoPage('');
+                      }
+                    }}
+                    className="ds-btn-ghost px-3 py-2 text-sm flex-none"
+                  >
+                    OK
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setPanelLayer(null);
+                    setShowConfig(true);
+                  }}
+                  className="ds-btn-ghost w-full py-2 text-[13px] mb-1.5"
+                >
+                  Plage &amp; répétitions…
+                </button>
+                <button
+                  onClick={() => {
+                    setPanelLayer(null);
+                    setShowLpConfig(true);
+                  }}
+                  className="ds-btn-ghost w-full py-2 text-[13px] mb-3"
+                >
+                  Appui long…
+                </button>
+                <p className="ds-kicker mb-1.5">Vitesse</p>
+                <div className="flex flex-wrap gap-1">
+                  {SPEEDS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setRate(s)}
+                      className={`px-2.5 py-1.5 rounded-full text-[12px] font-bold transition-colors ${
+                        rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                      }`}
+                    >
+                      ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {panelLayer === 'affichage' && (
+              <div className="flex-1">
+                <p className="ds-kicker mb-2">Affichage</p>
+                <div className="flex flex-col gap-0.5">
+                  {[
+                    { label: 'Thèmes', active: showThemes, onClick: () => setShowThemes((t) => !t) },
+                    {
+                      label: '✍ Marquer',
+                      active: markingMode,
+                      onClick: () =>
+                        setMarkingMode((m) => {
+                          if (!m) {
+                            setCaptureMode(false);
+                            setVerseMenu(null);
+                            setSelected(null);
+                          } else {
+                            setSelWords(new Map());
+                          }
+                          return !m;
+                        }),
+                    },
+                    {
+                      label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
+                      active: showMistakes && mistakeWords.size > 0,
+                      onClick: () => setShowMistakes((s) => !s),
+                    },
+                    { label: 'Lexique', active: showLexicon, onClick: () => setShowLexicon((s) => !s) },
+                    {
+                      label: '➕ Ajouter un mot',
+                      active: captureMode,
+                      onClick: () => {
+                        setCaptureMode((m) => {
+                          if (!m) {
+                            setMarkingMode(false);
+                            setSelWords(new Map());
+                          }
+                          return !m;
+                        });
+                        setSelected(null);
+                      },
+                    },
+                    { label: 'Traduction FR', active: showTrans, onClick: () => setShowTrans((v) => !v) },
+                  ].map((t) => (
+                    <button
+                      key={t.label}
+                      onClick={t.onClick}
+                      className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] font-bold transition-colors ${
+                        t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)]/60'
+                      }`}
+                    >
+                      <span className="truncate">{t.label}</span>
+                      <span className={`flex-none w-8 h-[18px] rounded-full relative transition-colors ${t.active ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
+                        <span
+                          className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${t.active ? 'left-[16px]' : 'left-[2px]'}`}
+                        />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => setPanelLayer(null)} className="ds-btn-gold w-full py-2.5 text-sm mt-4 flex-none">
+              Valider
+            </button>
+          </div>
+        </>
       )}
 
       {/* ---- Livre : rien d’autre que la double page ---- */}
       <div className="flex-1 min-w-0 h-full relative flex flex-col">
-      {/* Bouton panneau (petit écran) */}
-      {!isFs && (
-        <button
-          onClick={() => setPanelOpen((v) => !v)}
-          aria-label="Réglages"
-          className="md:hidden absolute top-2 left-2 z-30 w-10 h-10 rounded-full bg-white/90 text-[var(--ds-green)] flex items-center justify-center shadow-lg"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
-          </svg>
-        </button>
-      )}
-
       {/* Traduction française du verset en cours (Hamidullah).
           Hauteur FIXE + défilement interne : le texte varie d'un verset à l'autre
           mais ne repousse plus le mushaf (évite le « saut de page »). */}
