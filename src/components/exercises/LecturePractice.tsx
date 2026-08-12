@@ -45,6 +45,34 @@ function pairOf(page: number): PagePair {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
+// Préférences de Lecture PERSISTÉES (l'utilisateur ne re-règle jamais) :
+// vitesse, interrupteurs d'affichage, et configuration plage & répétitions.
+const LECTURE_PREFS_KEY = 'almuraja3a:lecture:prefs';
+const LECTURE_PLAY_KEY = 'almuraja3a:lecture:playconfig';
+
+function loadJSON<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return JSON.parse(window.localStorage.getItem(key) || 'null') as T | null;
+  } catch {
+    return null;
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+interface LecturePrefs {
+  rate: number;
+  showLexicon: boolean;
+  showThemes: boolean;
+  showMistakes: boolean;
+  showTrans: boolean;
+}
+
 // Réglages du comportement de l'appui long (persistés dans localStorage).
 const LP_SPEEDS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const LP_PAGES = [2, 3, 4, 5, 6]; // nombre de pages lues en portée « pages »
@@ -123,7 +151,7 @@ export default function LecturePractice() {
   const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
   const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
   const [playing, setPlaying] = useState(false);
-  const [rate, setRate] = useState(2);
+  const [rate, setRate] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.rate ?? 2);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
   // Appui long : surligne en jaune tous les versets de la portée en cours d'écoute.
   const [halfPageHighlight, setHalfPageHighlight] = useState<Set<string>>(new Set());
@@ -134,16 +162,16 @@ export default function LecturePractice() {
   lpConfigRef.current = lpConfig;
   const [captureMode, setCaptureMode] = useState(false);
   // Visibilité : couleurs du lexique + thèmes de tafsir (Ibn Kathir).
-  const [showLexicon, setShowLexicon] = useState(true);
-  const [showThemes, setShowThemes] = useState(false);
+  const [showLexicon, setShowLexicon] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showLexicon ?? true);
+  const [showThemes, setShowThemes] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showThemes ?? false);
   const tafsirGroups = useTafsirGroups(showThemes);
   // Saisie des fautes (comme en Hifz) : mode marquage + sélection + fautes persistées.
   const [markingMode, setMarkingMode] = useState(false);
   const [selWords, setSelWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
   const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
-  const [showMistakes, setShowMistakes] = useState(true);
+  const [showMistakes, setShowMistakes] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showMistakes ?? true);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
-  const [showTrans, setShowTrans] = useState(false);
+  const [showTrans, setShowTrans] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showTrans ?? false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   // Menu d'actions au clic sur un verset (hors mode « Ajouter ») + coordonnées.
   const [verseMenu, setVerseMenu] = useState<{ verseKey: string; x: number; y: number } | null>(null);
@@ -162,13 +190,20 @@ export default function LecturePractice() {
   // Layer de section du rail gauche (Réglages / Affichage), fermé par Valider.
   const [panelLayer, setPanelLayer] = useState<null | 'reglages' | 'affichage'>(null);
   const [gotoPage, setGotoPage] = useState('');
-  const [config, setConfig] = useState<PlayConfig>({
-    ...DEFAULT_CONFIG,
-    selMode: 'page',
-    unitStart: startPage,
-    unitEnd: startPage,
+  const [config, setConfig] = useState<PlayConfig>(() => {
+    const stored = loadJSON<PlayConfig>(LECTURE_PLAY_KEY);
+    if (stored) return stored;
+    return { ...DEFAULT_CONFIG, selMode: 'page', unitStart: startPage, unitEnd: startPage };
   });
   const [sessionActive, setSessionActive] = useState(false);
+
+  // Persistance des préférences : plus jamais à re-régler en entrant.
+  useEffect(() => {
+    saveJSON(LECTURE_PREFS_KEY, { rate, showLexicon, showThemes, showMistakes, showTrans });
+  }, [rate, showLexicon, showThemes, showMistakes, showTrans]);
+  useEffect(() => {
+    saveJSON(LECTURE_PLAY_KEY, config);
+  }, [config]);
   const [frAvailable, setFrAvailable] = useState<boolean | null>(null);
   const [tafsirLoading, setTafsirLoading] = useState(false); // synthèse Ibn Kathir en préparation
 
@@ -1208,7 +1243,32 @@ export default function LecturePractice() {
             <span className="text-[7px] font-bold uppercase tracking-wider">Affichage</span>
           </button>
 
-          <div className="flex-1" />
+          {/* Numéro de page : saisie directe sur le rail (Entrée ou sortie du champ) */}
+          <input
+            type="number"
+            min={1}
+            max={604}
+            value={gotoPage}
+            onChange={(e) => setGotoPage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
+                if (p) setPage(p);
+                setGotoPage('');
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            onBlur={() => {
+              const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
+              if (p) setPage(p);
+              setGotoPage('');
+            }}
+            placeholder={String(pair.rightPage)}
+            title="Aller à la page"
+            className="w-12 px-1 py-1.5 rounded-lg border border-[var(--ds-divider)] text-center text-[12px] font-bold outline-none focus:border-[var(--ds-gold)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+
+          <div className="w-8 h-px bg-[var(--ds-divider)] my-1" />
 
           <button
             onClick={togglePlay}
@@ -1271,35 +1331,12 @@ export default function LecturePractice() {
           />
           <div
             dir="ltr"
-            className="absolute left-[64px] top-2 bottom-2 z-50 w-[280px] max-w-[78vw] bg-white rounded-2xl p-4 overflow-y-auto flex flex-col"
+            className="absolute left-[64px] top-2 max-h-[calc(100%-16px)] z-50 w-[280px] max-w-[78vw] bg-white rounded-2xl p-4 overflow-y-auto flex flex-col"
             style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
           >
             {panelLayer === 'reglages' && (
-              <div className="flex-1">
+              <div>
                 <p className="ds-kicker mb-2">Réglages</p>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={604}
-                    value={gotoPage}
-                    onChange={(e) => setGotoPage(e.target.value)}
-                    placeholder={`Page ${pair.rightPage}`}
-                    className="w-full min-w-0 px-2.5 py-2 rounded-xl border border-[var(--ds-divider)] text-sm font-bold outline-none focus:border-[var(--ds-gold)]"
-                  />
-                  <button
-                    onClick={() => {
-                      const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
-                      if (p) {
-                        setPage(p);
-                        setGotoPage('');
-                      }
-                    }}
-                    className="ds-btn-ghost px-3 py-2 text-sm flex-none"
-                  >
-                    OK
-                  </button>
-                </div>
                 <button
                   onClick={() => {
                     setPanelLayer(null);
@@ -1336,7 +1373,7 @@ export default function LecturePractice() {
             )}
 
             {panelLayer === 'affichage' && (
-              <div className="flex-1">
+              <div>
                 <p className="ds-kicker mb-2">Affichage</p>
                 <div className="flex flex-col gap-0.5">
                   {[
