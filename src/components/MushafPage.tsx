@@ -44,12 +44,6 @@ const AUTHENTIC_INSETS = {
   even: { top: 12.2, bottom: 11.7, left: 17.5, right: 9.2 },
 } as const;
 
-// Libellés rédigés par l'app (badge sourate en haut, numéro dans le médaillon
-// de hizb, nom de sourate dans le cartouche). Désactivés à la demande de
-// l'utilisateur — NB : les fonds extraits des scans ont été nettoyés de ces
-// textes (ils étaient propres à une page précise), donc rien n'est « écrit en
-// dur » dans le cadre. Repasser à true pour réafficher les libellés de l'app.
-const SHOW_MARGIN_LABELS = false;
 
 // ---- Fonds par page (scans du vrai mushaf, texte coranique effacé) ----
 // public/mushaf-bg/page-XXX.webp : le scan d'origine de CHAQUE page avec ses
@@ -572,15 +566,18 @@ export default function MushafPage({
           aria-hidden
         />
 
-        {/* Numéro de page relatif à la sourate : en haut à DROITE pour la page
-            de droite (impaire), en haut à GAUCHE pour la page de gauche (paire) */}
-        {SHOW_MARGIN_LABELS && surahPageLabel && (
+        {/* Progression dans la sourate (« An-Nisa · 1/30 ») : en haut AU CENTRE,
+            seule zone de marge toujours vierge sur les scans (le nom de la
+            sourate est imprimé en haut à gauche, le juz en haut à droite). */}
+        {surahPageLabel && (
           <div
             style={{
               position: 'absolute',
-              top: '1.2%',
-              ...(isOddPage ? { right: '2.8%' } : { left: '2.8%' }),
-              fontSize: '2.1cqi',
+              top: '1.4%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              whiteSpace: 'nowrap',
+              fontSize: '1.9cqi',
               fontWeight: 700,
               color: '#7a5d2c',
               letterSpacing: '0.03em',
