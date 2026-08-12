@@ -115,9 +115,12 @@ export function matchesLexicon(
 }
 
 // ---- Lecture / écriture ----
+// Le vocabulaire est PERSONNEL : sans compte connecté, lexique vide en lecture
+// et écritures ignorées (pas de lexique « invité »).
 
 export function getVocab(): VocabEntry[] {
   if (!isBrowser()) return [];
+  if (!getCurrentUser()) return [];
   try {
     const raw = window.localStorage.getItem(PREFIX + userKey());
     if (!raw) return [];
@@ -130,6 +133,7 @@ export function getVocab(): VocabEntry[] {
 
 function writeVocab(list: VocabEntry[]) {
   if (!isBrowser()) return;
+  if (!getCurrentUser()) return;
   try {
     window.localStorage.setItem(PREFIX + userKey(), JSON.stringify(list));
   } catch {
@@ -408,13 +412,20 @@ interface SeedRow {
   baseFormType?: string;
 }
 
+// Le seed public/vocab-seed.json est le lexique PERSONNEL extrait de
+// ARAB_VOCAB.pdf : il n'appartient qu'à ce compte. Les autres comptes
+// (et les visiteurs non connectés) démarrent avec un lexique vide.
+const SEED_OWNER = 'derkash';
+
 /**
  * Importe le lexique personnel (public/vocab-seed.json) la 1re fois, si la liste
  * est vide et qu'aucun import n'a encore eu lieu pour cet utilisateur.
+ * Réservé au compte SEED_OWNER connecté — jamais en invité.
  * Renvoie le nombre de mots importés.
  */
 export async function seedVocabIfNeeded(): Promise<number> {
   if (!isBrowser()) return 0;
+  if (getCurrentUser() !== SEED_OWNER) return 0;
   migrateVocabAnchors(); // ré-ancre l'existant sur le lemme avant toute chose
   const flagKey = SEEDED_PREFIX + userKey();
   // Déjà à la bonne version → rien à faire.

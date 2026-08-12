@@ -25,6 +25,8 @@ import {
   autoLocalBackup,
   type VocabEntry,
 } from '@/utils/vocab/vocabStore';
+import { getCurrentUser } from '@/utils/exercises/userStats';
+import LoginCard from '@/components/exercises/LoginCard';
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -34,6 +36,22 @@ function pairOf(page: number): PagePair {
 type Mode = 'review' | 'capture' | 'list';
 
 export default function VocabPage() {
+  // Le vocabulaire est PERSONNEL : accès réservé aux comptes connectés.
+  // undefined = état de connexion pas encore lu (évite un flash du LoginCard).
+  const [user, setUser] = useState<string | null | undefined>(undefined);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  if (user === undefined) return null;
+  if (user === null) return <LoginCard onLoggedIn={setUser} />;
+  return <VocabPageInner key={user} />;
+}
+
+function VocabPageInner() {
   const [mode, setMode] = useState<Mode>('review');
   const { data: units } = useQuranUnits();
 
