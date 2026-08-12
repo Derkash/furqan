@@ -269,10 +269,13 @@ html, body {
   min-height: 100%;
 }
 
-/* Pages qui nécessitent overflow hidden (practice) */
+/* Pages qui nécessitent overflow hidden (practice).
+   height 100 % (PAS 100vh) : les écrans vivent dans une coque h-dvh qui
+   retire déjà la zone sûre — 100vh débordait sous l'écran sur iPad et
+   rognait la barre du bas. */
 .overflow-locked {
   overflow: hidden;
-  height: 100vh;
+  height: 100%;
 }
 
 /* Responsive - toujours 2 pages visibles */
