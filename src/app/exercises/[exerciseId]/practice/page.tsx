@@ -39,9 +39,7 @@ export default function PracticePage() {
   // Capacitor) : useSearchParams est utilisé plus bas dans MushafPractice.
   return (
     <Suspense fallback={null}>
-      <PracticeShell>
-        <PracticeRouter />
-      </PracticeShell>
+      <PracticeRouter />
     </Suspense>
   );
 }
@@ -50,16 +48,29 @@ function PracticeRouter() {
   const params = useParams();
   const exerciseId = params.exerciseId as string;
 
+  // La Lecture a son PROPRE panneau de pilotage à gauche (logo = Accueil) :
+  // pas de barre générale en plus.
+  if (exerciseId === 'lecture') {
+    return (
+      <div className="h-dvh w-full overflow-hidden ds-page" dir="ltr">
+        <LecturePractice />
+      </div>
+    );
+  }
   // La récitation (micro + détection de fautes) a sa propre interface,
   // sans les pages Mushaf ni la machine à états des autres exercices.
   if (exerciseId === 'recitation') {
-    return <RecitationPractice />;
+    return (
+      <PracticeShell>
+        <RecitationPractice />
+      </PracticeShell>
+    );
   }
-  // La Lecture : lire + écouter (vitesse) + surligner le lexique. Interface dédiée.
-  if (exerciseId === 'lecture') {
-    return <LecturePractice />;
-  }
-  return <MushafPractice />;
+  return (
+    <PracticeShell>
+      <MushafPractice />
+    </PracticeShell>
+  );
 }
 
 // Tafsir Al-Mukhtasar : masqué à la demande de l'utilisateur au profit

@@ -230,7 +230,7 @@ export default function RepereExercise() {
       (id) => !q || `${id} ${data![id].name}`.toLowerCase().includes(q) || data![id].arname.includes(query.trim())
     );
     return (
-      <div className="min-h-full bg-[var(--ds-bg)] flex flex-col" dir="ltr">
+      <div className="h-full overflow-y-auto bg-[var(--ds-bg)] flex flex-col" dir="ltr">
         <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
           <Link
             href="/revision"
@@ -296,7 +296,7 @@ export default function RepereExercise() {
   );
 
   return (
-    <div className="min-h-full bg-[var(--ds-bg)] flex flex-col" dir="ltr">
+    <div className="h-full overflow-y-auto bg-[var(--ds-bg)] flex flex-col" dir="ltr">
       <style>{`
         .rep-table { border-collapse: collapse; }
         .rep-table th { background:#2f5496; color:#fff; font-size:12px; padding:5px 6px; border:1px solid #2f5496; }

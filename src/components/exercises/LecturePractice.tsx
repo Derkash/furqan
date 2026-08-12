@@ -101,13 +101,21 @@ export default function LecturePractice() {
   const params = useSearchParams();
   // Page de départ (page / sourate / hizb / juz résolus en page côté setup).
   // La Lecture n'est PLUS bloquée à une plage : navigation libre sur tout le Mushaf.
-  const startPage = Number(params.get('start')) || 2;
+  const storedPage =
+    typeof window !== 'undefined' ? Number(window.localStorage.getItem('almuraja3a:lecture:last-page')) : 0;
+  const startPage = Number(params.get('start')) || storedPage || 2;
 
   const { data: units } = useQuranUnits();
   const { verseMap } = useVerseMap();
   const recorder = useAudioRecorder(); // enregistrement micro + réécoute
 
   const [page, setPage] = useState(startPage % 2 === 0 ? startPage + 1 : startPage);
+  // Mémorise la dernière page lue : la sidebar « Lecture » rentre directement dedans.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('almuraja3a:lecture:last-page', String(page));
+    } catch {}
+  }, [page]);
   const [left, setLeft] = useState<PageVerses | null>(null);
   const [right, setRight] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,8 +159,9 @@ export default function LecturePractice() {
   const lastRecUrl = useRef<string | null>(null); // pour lancer la réécoute une seule fois
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
-  // Panneau « Audio » (droite) : récitateur, vitesse, options — design Application2.
-  const [showAudioPanel, setShowAudioPanel] = useState(false);
+  // Panneau de pilotage gauche (ouvert en overlay sur petit écran).
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [gotoPage, setGotoPage] = useState('');
   const [config, setConfig] = useState<PlayConfig>({
     ...DEFAULT_CONFIG,
     selMode: 'page',
@@ -1128,164 +1137,178 @@ export default function LecturePractice() {
   const selCount = selRef.current.length;
 
   return (
-    <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex flex-col overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
-      {/* Barre haute unique : retour, pages, modes, plein écran */}
-      <div dir="ltr" className={`app-topbar flex-none px-3 py-2 flex items-center justify-between gap-2 text-white ${isFs ? 'hidden' : ''}`}>
-        <div className="flex items-center gap-2 min-w-0">
-          <Link
-            href="/exercises/lecture/setup"
-            aria-label="Retour"
-            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
-          <span className="text-sm font-bold whitespace-nowrap opacity-90">
-            Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <button
-            onClick={() => setShowThemes((t) => !t)}
-            title="Surligner les versets partageant le même tafsir Ibn Kathir (thèmes)"
-            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
-              showThemes ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
-            }`}
-          >
-            Thèmes
-          </button>
-          <button
-            onClick={() =>
-              setMarkingMode((m) => {
-                if (!m) {
-                  setCaptureMode(false);
-                  setVerseMenu(null);
-                  setSelected(null);
-                } else {
-                  setSelWords(new Map());
-                }
-                return !m;
-              })
-            }
-            title="Marquer mes fautes : touche les mots ratés, puis choisis le type"
-            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
-              markingMode ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
-            }`}
-          >
-            ✍ Marquer
-          </button>
-          <button
-            onClick={() => setShowMistakes((s) => !s)}
-            title="Afficher/masquer les fautes déclarées"
-            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
-              showMistakes && mistakeWords.size > 0 ? 'bg-red-500 text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
-            }`}
-          >
-            Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
-          </button>
-          <button
-            onClick={() => setShowLexicon((s) => !s)}
-            title="Afficher/masquer les couleurs des mots de mon lexique"
-            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
-              showLexicon ? 'bg-[var(--ds-sage)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
-            }`}
-          >
-            Lexique
-          </button>
-          <button
-            onClick={() => {
-              setCaptureMode((m) => {
-                if (!m) {
-                  setMarkingMode(false);
-                  setSelWords(new Map());
-                }
-                return !m;
-              });
-              setSelected(null);
-            }}
-            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
-              captureMode ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
-            }`}
-          >
-            ➕ Mot
-          </button>
-        </div>
-        <button
-          onClick={toggleFullscreen}
-          aria-label={isFs ? 'Quitter le plein écran' : 'Plein écran'}
-          className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+    <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
+      {/* ---- Panneau de pilotage (gauche) : logo = Accueil, Réglages, Affichage, Lecture, Enregistrement ---- */}
+      {!isFs && (
+        <aside
+          dir="ltr"
+          className={`${panelOpen ? 'flex absolute inset-y-0 left-0 z-50 shadow-2xl' : 'hidden'} md:static md:flex md:shadow-none w-[236px] flex-none flex-col bg-white overflow-y-auto py-4 px-3 gap-4`}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Enregistrement micro : état + réécoute */}
-      {(recorder.recording || recorder.audioUrl || recorder.error) && (
-        <div className="flex-none bg-[var(--ds-green-deep)] px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
-          {recorder.recording ? (
-            <span className="flex items-center gap-2 text-[#e7b7b7] text-sm font-semibold">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              Enregistrement en cours… parle puis appuie sur « Arrêter »
+          <Link href="/exercises" className="flex flex-col items-center gap-0.5" title="Accueil">
+            <span className="text-[24px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
+              ع
             </span>
-          ) : recorder.audioUrl ? (
-            <>
-              <span className="text-[11px] font-bold text-[var(--ds-gold)] whitespace-nowrap">🎧 Ta récitation</span>
-              <audio
-                ref={recPlayerRef}
-                controls
-                src={recorder.audioUrl}
-                className="h-9 max-w-full"
-                onLoadedMetadata={(e) => {
-                  e.currentTarget.playbackRate = recRate;
-                }}
+            <span className="text-[8px] font-extrabold tracking-[0.22em] text-[var(--ds-n600)]">MURAJA3A</span>
+          </Link>
+
+          <section>
+            <p className="ds-kicker mb-1.5">Réglages</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <input
+                type="number"
+                min={1}
+                max={604}
+                value={gotoPage}
+                onChange={(e) => setGotoPage(e.target.value)}
+                placeholder={`Page ${pair.rightPage}`}
+                className="w-full min-w-0 px-2.5 py-2 rounded-xl border border-[var(--ds-divider)] text-sm font-bold outline-none focus:border-[var(--ds-gold)]"
               />
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-[var(--ds-gold)] font-bold mr-0.5">Vitesse</span>
-                {[0.75, 1, 1.5, 2].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setRecRate(r);
-                      if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
-                    }}
-                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                      recRate === r ? 'bg-[var(--ds-gold)] text-[var(--ds-green)]' : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border border-[var(--ds-gold)]/40'
-                    }`}
-                  >
-                    ×{r === 0.75 ? '0,75' : r === 1.5 ? '1,5' : r}
-                  </button>
-                ))}
-              </div>
               <button
-                onClick={toggleRecord}
-                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[var(--ds-gold)] text-[var(--ds-gold)] hover:bg-[var(--ds-green)]"
+                onClick={() => {
+                  const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
+                  if (p) {
+                    setPage(p % 2 === 0 ? p + 1 : p);
+                    setGotoPage('');
+                  }
+                }}
+                className="ds-btn-ghost px-3 py-2 text-sm flex-none"
               >
-                🎤 Réenregistrer
+                OK
               </button>
-              <button
-                onClick={() => recorder.clear()}
-                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#7a3030] text-[#e7b7b7] hover:bg-[var(--ds-green)]"
-              >
-                🗑️ Effacer
+            </div>
+            <button onClick={() => setShowConfig(true)} className="ds-btn-gold w-full py-2 text-[13px] mb-1.5">
+              Plage &amp; répétitions…
+            </button>
+            <button onClick={() => setShowLpConfig(true)} className="ds-btn-ghost w-full py-2 text-[13px]">
+              Appui long…
+            </button>
+          </section>
+
+          <section>
+            <p className="ds-kicker mb-1.5">Affichage</p>
+            <div className="flex flex-col gap-0.5">
+              {[
+                { label: 'Thèmes', active: showThemes, onClick: () => setShowThemes((t) => !t) },
+                {
+                  label: '✍ Marquer',
+                  active: markingMode,
+                  onClick: () =>
+                    setMarkingMode((m) => {
+                      if (!m) {
+                        setCaptureMode(false);
+                        setVerseMenu(null);
+                        setSelected(null);
+                      } else {
+                        setSelWords(new Map());
+                      }
+                      return !m;
+                    }),
+                },
+                {
+                  label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
+                  active: showMistakes && mistakeWords.size > 0,
+                  onClick: () => setShowMistakes((s) => !s),
+                },
+                { label: 'Lexique', active: showLexicon, onClick: () => setShowLexicon((s) => !s) },
+                {
+                  label: '➕ Ajouter un mot',
+                  active: captureMode,
+                  onClick: () => {
+                    setCaptureMode((m) => {
+                      if (!m) {
+                        setMarkingMode(false);
+                        setSelWords(new Map());
+                      }
+                      return !m;
+                    });
+                    setSelected(null);
+                  },
+                },
+                { label: 'Traduction FR', active: showTrans, onClick: () => setShowTrans((v) => !v) },
+              ].map((t) => (
+                <button
+                  key={t.label}
+                  onClick={t.onClick}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] font-bold transition-colors ${
+                    t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)]/60'
+                  }`}
+                >
+                  <span className="truncate">{t.label}</span>
+                  <span className={`flex-none w-8 h-[18px] rounded-full relative transition-colors ${t.active ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
+                    <span
+                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${t.active ? 'left-[16px]' : 'left-[2px]'}`}
+                    />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <p className="ds-kicker mb-1.5">Lecture</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <button onClick={togglePlay} className="ds-btn-gold flex-1 py-2.5 text-sm">
+                {playing ? '⏸ Pause' : '▶ Écouter'}
               </button>
-            </>
-          ) : null}
-          {recorder.error && <span className="text-[#e7b7b7] text-xs">{recorder.error}</span>}
-        </div>
+              {sessionActive && (
+                <button onClick={stop} aria-label="Arrêter" className="ds-btn-ghost px-3.5 py-2.5 text-sm flex-none">
+                  ■
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setRate(s)}
+                  className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                    rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                  }`}
+                >
+                  ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
+                </button>
+              ))}
+            </div>
+            <button onClick={toggleFullscreen} className="ds-btn-ghost w-full py-2 text-[13px]">
+              ⛶ Plein écran
+            </button>
+          </section>
+
+          <section>
+            <p className="ds-kicker mb-1.5">Enregistrement</p>
+            <button
+              onClick={toggleRecord}
+              className={`w-full py-2.5 rounded-full text-sm font-bold text-white transition-all active:scale-[0.98] ${
+                recorder.recording ? 'bg-red-500 animate-pulse' : 'bg-red-600 hover:bg-red-500'
+              }`}
+            >
+              {recorder.recording ? '■ Arrêter' : '🎙 S’enregistrer'}
+            </button>
+            {recorder.error && <p className="text-[11px] text-red-600 mt-1.5">{recorder.error}</p>}
+          </section>
+        </aside>
+      )}
+      {panelOpen && (
+        <button
+          aria-label="Fermer le panneau"
+          className="md:hidden absolute inset-0 z-40 bg-black/30"
+          onClick={() => setPanelOpen(false)}
+        />
       )}
 
-      {/* Récap sélection en cours */}
-      {sessionActive && !isFs && (
-        <div className="flex-none bg-[var(--ds-green-deep)] text-[var(--ds-gold)] text-[11px] px-3 py-1 text-center">
-          🎧 {describeSelection(config, selCount)}
-          {config.french && frAvailable === false && (
-            <span className="text-[#e7b7b7]"> · récitation FR indisponible</span>
-          )}
-          {tafsirLoading && <span className="text-[var(--ds-gold)]"> · 📖 préparation du tafsir…</span>}
-        </div>
+      {/* ---- Livre : rien d’autre que la double page ---- */}
+      <div className="flex-1 min-w-0 h-full relative flex flex-col">
+      {/* Bouton panneau (petit écran) */}
+      {!isFs && (
+        <button
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-label="Réglages"
+          className="md:hidden absolute top-2 left-2 z-30 w-10 h-10 rounded-full bg-white/90 text-[var(--ds-green)] flex items-center justify-center shadow-lg"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+        </button>
       )}
 
       {/* Traduction française du verset en cours (Hamidullah).
@@ -1309,17 +1332,10 @@ export default function LecturePractice() {
         </div>
       )}
 
-      {/* Aide contextuelle (mode Ajouter) */}
-      {captureMode && !isFs && (
-        <div className="flex-none text-[11px] text-white/75 px-3 py-1 text-center">
-          Touche un mot pour l&apos;ajouter à ton lexique ou voir ses occurrences
-        </div>
-      )}
-
       {/* Mushaf — le « livre » ouvert sur le canvas vert */}
       <div
         ref={mushafAreaRef}
-        className="flex-1 min-h-0 relative select-none overflow-hidden px-2 pt-1 pb-20 md:px-6"
+        className="book-centered flex-1 min-h-0 relative select-none overflow-hidden px-2 py-2 md:px-3"
         style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
@@ -1364,166 +1380,111 @@ export default function LecturePractice() {
           </button>
         )}
 
-        {/* Barre lecteur (design Application2) : enregistrement à gauche,
-            lecture/pause au centre-droit, réglages à l'extrême droite.
-            Toujours visible, plein écran compris. */}
-        <div
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 md:gap-4 bg-white rounded-full pl-3 pr-2 py-2 w-[min(96%,640px)]"
-          style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {/* Enregistrement — extrême gauche */}
-          <button
-            type="button"
-            onClick={toggleRecord}
-            aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
-            className={`flex-none w-12 h-12 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
-              recorder.recording ? 'animate-pulse' : ''
-            }`}
-          >
-            {recorder.recording ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-            ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            )}
-          </button>
-
-          {/* Infos : verset en cours / pages */}
-          <div className="flex-1 min-w-0 text-center">
-            <p className="text-[13px] font-bold text-[var(--ds-text)] truncate">
-              {currentVerse ? `Verset ${currentVerse}` : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
-            </p>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-n500)] truncate">
-              {sessionActive ? describeSelection(config, selCount) : 'Prêt à réciter'}
-            </p>
-          </div>
-
-          {/* Stop (session en cours) */}
-          {sessionActive && (
-            <button
-              type="button"
-              onClick={stop}
-              aria-label="Arrêter la lecture"
-              className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
-            </button>
-          )}
-
-          {/* Lecture / Pause */}
-          <button
-            type="button"
-            onClick={togglePlay}
-            aria-label={playing ? 'Pause' : 'Lecture'}
-            className="flex-none w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
-            style={{ background: 'var(--ds-green)' }}
-          >
-            {playing ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            )}
-          </button>
-
-          {/* Réglages audio — extrême droite */}
-          <button
-            type="button"
-            onClick={() => setShowAudioPanel((v) => !v)}
-            aria-label="Réglages audio"
-            className={`flex-none w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition-all ${
-              showAudioPanel ? 'bg-[var(--ds-gold)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-green)] hover:bg-[var(--ds-sage-200)]'
-            }`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
-              <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
-              <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Panneau AUDIO (droite) — récitateur, vitesse, options */}
-        {showAudioPanel && (
+        {/* Barre horizontale TRANSIENTE : visible pendant lecture / enregistrement /
+            réécoute — sinon rien (le panneau de gauche pilote tout). */}
+        {(playing || sessionActive || recorder.recording || recorder.audioUrl) && (
           <div
-            className="absolute top-2 right-2 bottom-20 z-40 w-[280px] max-w-[85%] bg-white rounded-3xl p-4 overflow-y-auto"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-full pl-2.5 pr-2.5 py-2 w-[min(96%,700px)]"
             style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-lg font-extrabold text-[var(--ds-text)]">Audio</p>
-              <button
-                type="button"
-                onClick={() => setShowAudioPanel(false)}
-                aria-label="Fermer"
-                className="w-8 h-8 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-n700)] flex items-center justify-center"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <p className="ds-kicker mb-1.5">Récitateur</p>
-            <div className="ds-card px-3 py-2.5 mb-4">
-              <p className="text-sm font-bold text-[var(--ds-text)]">Mahmoud Khalil Al-Husary</p>
-              <p className="text-[11px] text-[var(--ds-n600)]">
-                {config.french ? '+ traduction française (Youssouf Leclerc)' : 'Récitation arabe'}
-              </p>
-            </div>
-
-            <p className="ds-kicker mb-1.5">Vitesse</p>
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {SPEEDS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setRate(s)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                    rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
-                  }`}
-                >
-                  ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
-                </button>
-              ))}
-            </div>
-
-            <p className="ds-kicker mb-1.5">Affichage</p>
             <button
-              onClick={() => setShowTrans((v) => !v)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl mb-4 text-sm font-bold transition-colors ${
-                showTrans ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'bg-white border border-[var(--ds-divider)] text-[var(--ds-n700)]'
+              type="button"
+              onClick={toggleRecord}
+              aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
+              className={`flex-none w-11 h-11 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
+                recorder.recording ? 'animate-pulse' : ''
               }`}
             >
-              Traduction française
-              <span className={`w-9 h-5 rounded-full relative transition-colors ${showTrans ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${showTrans ? 'left-[18px]' : 'left-0.5'}`} />
-              </span>
+              {recorder.recording ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+              )}
             </button>
 
-            <div className="space-y-2">
+            {recorder.audioUrl && !recorder.recording ? (
+              <>
+                <audio
+                  ref={recPlayerRef}
+                  controls
+                  src={recorder.audioUrl}
+                  className="h-9 flex-1 min-w-0"
+                  onLoadedMetadata={(e) => {
+                    e.currentTarget.playbackRate = recRate;
+                  }}
+                />
+                <div className="flex items-center gap-1 flex-none">
+                  {[1, 1.5, 2].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => {
+                        setRecRate(r);
+                        if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
+                      }}
+                      className={`px-2 py-1 rounded-full text-[11px] font-bold ${
+                        recRate === r ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                      }`}
+                    >
+                      ×{r === 1.5 ? '1,5' : r}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => recorder.clear()}
+                    aria-label="Effacer l'enregistrement"
+                    className="w-8 h-8 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-n700)] flex items-center justify-center"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 min-w-0 text-center">
+                <p className="text-[13px] font-bold text-[var(--ds-text)] truncate">
+                  {recorder.recording
+                    ? 'Enregistrement en cours…'
+                    : currentVerse
+                      ? `Verset ${currentVerse}`
+                      : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
+                </p>
+                {sessionActive && (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-n500)] truncate">
+                    {describeSelection(config, selCount)}
+                    {config.french && frAvailable === false && ' · FR indisponible'}
+                    {tafsirLoading && ' · tafsir en préparation…'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {sessionActive && (
               <button
-                onClick={() => {
-                  setShowAudioPanel(false);
-                  setShowConfig(true);
-                }}
-                className="ds-btn-gold w-full py-2.5 text-sm"
+                type="button"
+                onClick={stop}
+                aria-label="Arrêter la lecture"
+                className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
               >
-                Plage & répétitions…
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
               </button>
-              <button
-                onClick={() => {
-                  setShowAudioPanel(false);
-                  setShowLpConfig(true);
-                }}
-                className="ds-btn-ghost w-full py-2.5 text-sm"
-              >
-                Appui long…
-              </button>
-            </div>
+            )}
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label={playing ? 'Pause' : 'Lecture'}
+              className="flex-none w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
+              style={{ background: 'var(--ds-green)' }}
+            >
+              {playing ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              )}
+            </button>
           </div>
         )}
 
@@ -1862,6 +1823,7 @@ export default function LecturePractice() {
           onClose={() => setShowConfig(false)}
         />
       )}
+      </div>
     </div>
   );
 }

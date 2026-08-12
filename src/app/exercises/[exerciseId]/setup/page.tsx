@@ -276,7 +276,7 @@ function SetupPageInner() {
 
   if (!isValidExerciseId(exerciseId)) {
     return (
-      <div className="min-h-full flex items-center justify-center p-4" style={{ fontFamily: 'var(--ds-font)' }}>
+      <div className="h-full overflow-y-auto flex items-center justify-center p-4" style={{ fontFamily: 'var(--ds-font)' }}>
         <div className="text-center">
           <p className="text-red-600 mb-4">Exercice non trouvé</p>
           <Link href="/revision" className="ds-btn-ghost inline-block px-4 py-2 text-sm">
@@ -401,7 +401,7 @@ function SetupPageInner() {
   const pageCount = hasPageRange ? Math.abs(endPage! - startPage!) + 1 : 0;
 
   return (
-    <div className="min-h-full p-4 pb-12" dir="ltr" style={{ fontFamily: 'var(--ds-font)' }}>
+    <div className="h-full overflow-y-auto p-4 pb-12" dir="ltr" style={{ fontFamily: 'var(--ds-font)' }}>
       <div className="max-w-md mx-auto">
         <button
           type="button"

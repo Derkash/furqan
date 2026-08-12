@@ -423,7 +423,7 @@ export default function SequencedReadingPractice() {
   // ---- Écran de configuration ----
   if (phase === 'config') {
     return (
-      <div className="min-h-full bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] p-4 pb-12" dir="ltr">
+      <div className="h-full overflow-y-auto bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] p-4 pb-12" dir="ltr">
         <div className="max-w-md mx-auto">
           <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline mb-4 inline-block">
             ← Retour aux exercices
@@ -566,7 +566,7 @@ export default function SequencedReadingPractice() {
   // ---- Écran de fin ----
   if (phase === 'done') {
     return (
-      <div className="min-h-full bg-[var(--ds-bg)] flex items-center justify-center p-4">
+      <div className="h-full overflow-y-auto bg-[var(--ds-bg)] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full border-2 border-[var(--ds-green)] text-center">
           <h2 className="text-2xl font-bold text-[var(--ds-green)] mb-2">Terminé ! 🎉</h2>
           <p className="text-[var(--ds-sage)] mb-4 text-sm">Tu as parcouru toute la plage.</p>

@@ -97,10 +97,10 @@ function Icon({ name }: { name: IconName }) {
   }
 }
 
+// Le logo Muraja3a (en haut) sert d'Accueil — pas d'entrée « Accueil » dédiée.
 const NAV: { href: string; label: string; icon: IconName; match: (p: string) => boolean }[] = [
-  { href: '/exercises', label: 'Accueil', icon: 'home', match: (p) => p === '/exercises' || p === '/' },
   { href: '/revision', label: 'Révision', icon: 'revision', match: (p) => p.startsWith('/revision') || /^\/exercises\/(?!lecture)[a-z-]+\//.test(p) },
-  { href: '/exercises/lecture/setup', label: 'Lecture', icon: 'lecture', match: (p) => p.startsWith('/exercises/lecture') },
+  { href: '/exercises/lecture/practice', label: 'Lecture', icon: 'lecture', match: (p) => p.startsWith('/exercises/lecture') },
   { href: '/vocab', label: 'Vocabulaire', icon: 'vocab', match: (p) => p.startsWith('/vocab') },
   { href: '/reperes', label: 'Repères', icon: 'reperes', match: (p) => p.startsWith('/reperes') },
   { href: '/adhkar', label: 'Adhkâr', icon: 'adhkar', match: (p) => p.startsWith('/adhkar') },
@@ -207,7 +207,7 @@ export function PracticeShell({ children }: { children: React.ReactNode }) {
       <div className="flex-none hidden md:block">
         <Sidebar />
       </div>
-      <div className="flex-1 min-w-0 h-dvh relative overflow-y-auto">{children}</div>
+      <div className="flex-1 min-w-0 h-dvh relative overflow-hidden">{children}</div>
     </div>
   );
 }

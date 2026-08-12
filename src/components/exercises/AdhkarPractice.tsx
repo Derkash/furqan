@@ -121,7 +121,7 @@ export default function AdhkarPractice() {
   // ---- Écran d'entrée ----
   if (!session) {
     return (
-      <div className="min-h-full bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] flex flex-col" dir="ltr">
+      <div className="h-full overflow-y-auto bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] flex flex-col" dir="ltr">
         <div className="px-4 pt-4">
           <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline">
             ← Retour aux exercices

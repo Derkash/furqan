@@ -95,6 +95,11 @@ html.capacitor .ds-page {
   padding-top: env(safe-area-inset-top);
 }
 
+/* Zone « livre » (Lecture) : double page centrée verticalement sur le canvas. */
+.book-centered .mushaf-page-wrapper {
+  align-items: center;
+}
+
 /* Champs de saisie : contenu français/numérique par défaut. Sans ça ils
    héritent du dir="rtl" du document (saisie et placeholder « en arabe »).
    Un champ qui attend de l'arabe peut poser dir="rtl" explicitement. */
