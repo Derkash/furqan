@@ -423,14 +423,14 @@ export default function SequencedReadingPractice() {
   // ---- Écran de configuration ----
   if (phase === 'config') {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-b from-[#fdfaf3] to-[#f4e9d0] p-4 pb-12" dir="ltr">
+      <div className="min-h-full bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] p-4 pb-12" dir="ltr">
         <div className="max-w-md mx-auto">
-          <Link href="/exercises" className="text-[#4a7c23] text-sm hover:underline mb-4 inline-block">
+          <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline mb-4 inline-block">
             ← Retour aux exercices
           </Link>
-          <div className="bg-white rounded-2xl shadow-lg p-5 border border-[#c9a959]/20 space-y-4">
+          <div className="bg-white rounded-2xl shadow-lg p-5 border border-[var(--ds-gold)]/20 space-y-4">
             <div>
-              <h1 className="text-xl font-bold text-[#2d5016]">Lecture séquencée</h1>
+              <h1 className="text-xl font-bold text-[var(--ds-green)]">Lecture séquencée</h1>
               <p className="text-gray-500 text-sm mt-1">
                 Le récitateur lit une sélection, laisse un intervalle pour que tu récites, puis
                 continue jusqu&apos;à la fin de la plage.
@@ -439,10 +439,10 @@ export default function SequencedReadingPractice() {
 
             {/* Plage de pages */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Plage de pages</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Plage de pages</p>
               <div className="flex items-end gap-3">
                 <div className="flex-1">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1">Début</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1">Début</label>
                   <input
                     type="number"
                     min={1}
@@ -450,12 +450,12 @@ export default function SequencedReadingPractice() {
                     placeholder="1–604"
                     value={startPage ?? ''}
                     onChange={(e) => setStartPage(e.target.value === '' ? null : Number(e.target.value))}
-                    className="w-full px-3 py-2 text-center font-bold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl focus:outline-none focus:border-[#2d5016]"
+                    className="w-full px-3 py-2 text-center font-bold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl focus:outline-none focus:border-[var(--ds-green)]"
                   />
                 </div>
-                <span className="pb-2 text-[#c9a959]">→</span>
+                <span className="pb-2 text-[var(--ds-gold)]">→</span>
                 <div className="flex-1">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1">Fin</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1">Fin</label>
                   <input
                     type="number"
                     min={1}
@@ -463,7 +463,7 @@ export default function SequencedReadingPractice() {
                     placeholder="1–604"
                     value={endPage ?? ''}
                     onChange={(e) => setEndPage(e.target.value === '' ? null : Number(e.target.value))}
-                    className="w-full px-3 py-2 text-center font-bold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl focus:outline-none focus:border-[#2d5016]"
+                    className="w-full px-3 py-2 text-center font-bold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl focus:outline-none focus:border-[var(--ds-green)]"
                   />
                 </div>
               </div>
@@ -471,14 +471,14 @@ export default function SequencedReadingPractice() {
 
             {/* Sélection récitée à chaque fois */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Sélection à chaque tour</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Sélection à chaque tour</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {UNITS.map((u) => (
                   <button
                     key={u.id}
                     onClick={() => setUnit(u.id)}
                     className={`py-2 rounded-lg text-sm font-bold border-2 ${
-                      unit === u.id ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/30'
+                      unit === u.id ? 'bg-[var(--ds-green)] text-white border-[var(--ds-green)]' : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30'
                     }`}
                   >
                     {u.label}
@@ -489,7 +489,7 @@ export default function SequencedReadingPractice() {
 
             {/* Qui commence */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Qui commence</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Qui commence</p>
               <div className="flex gap-1.5">
                 {([
                   ['reciter', '🎧 Le récitateur'],
@@ -499,7 +499,7 @@ export default function SequencedReadingPractice() {
                     key={w}
                     onClick={() => setWho(w)}
                     className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 ${
-                      who === w ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/30'
+                      who === w ? 'bg-[var(--ds-green)] text-white border-[var(--ds-green)]' : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30'
                     }`}
                   >
                     {label}
@@ -515,14 +515,14 @@ export default function SequencedReadingPractice() {
 
             {/* Intervalle */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Intervalle (décompte)</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Intervalle (décompte)</p>
               <div className="flex gap-1.5 flex-wrap">
                 {INTERVALS.map((s) => (
                   <button
                     key={s}
                     onClick={() => setIntervalSec(s)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${
-                      interval === s ? 'bg-[#4a7c23] text-white border-[#4a7c23]' : 'bg-white text-[#2d5016] border-[#c9a959]/30'
+                      interval === s ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)]' : 'bg-white text-[var(--ds-green)] border-[var(--ds-gold)]/30'
                     }`}
                   >
                     {fmt(s)}
@@ -533,14 +533,14 @@ export default function SequencedReadingPractice() {
 
             {/* Vitesse */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Vitesse de lecture</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Vitesse de lecture</p>
               <div className="flex gap-1.5 flex-wrap">
                 {SPEEDS.map((s) => (
                   <button
                     key={s}
                     onClick={() => setRate(s)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${
-                      rate === s ? 'bg-[#4a7c23] text-white border-[#4a7c23]' : 'bg-white text-[#2d5016] border-[#c9a959]/30'
+                      rate === s ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)]' : 'bg-white text-[var(--ds-green)] border-[var(--ds-gold)]/30'
                     }`}
                   >
                     {speedLabel(s)}
@@ -553,7 +553,7 @@ export default function SequencedReadingPractice() {
 
             <button
               onClick={launch}
-              className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white font-bold rounded-xl active:scale-[0.98] transition-all"
             >
               ▶ Démarrer
             </button>
@@ -566,15 +566,15 @@ export default function SequencedReadingPractice() {
   // ---- Écran de fin ----
   if (phase === 'done') {
     return (
-      <div className="min-h-[100dvh] bg-[#fdfaf3] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full border-2 border-[#2d5016] text-center">
-          <h2 className="text-2xl font-bold text-[#2d5016] mb-2">Terminé ! 🎉</h2>
-          <p className="text-[#4a7c23] mb-4 text-sm">Tu as parcouru toute la plage.</p>
+      <div className="min-h-full bg-[var(--ds-bg)] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full border-2 border-[var(--ds-green)] text-center">
+          <h2 className="text-2xl font-bold text-[var(--ds-green)] mb-2">Terminé ! 🎉</h2>
+          <p className="text-[var(--ds-sage)] mb-4 text-sm">Tu as parcouru toute la plage.</p>
           <div className="flex gap-3 justify-center flex-wrap">
-            <button onClick={() => setPhase('config')} className="px-4 py-2 bg-[#c9a959] text-white rounded-lg font-semibold">
+            <button onClick={() => setPhase('config')} className="px-4 py-2 bg-[var(--ds-gold)] text-white rounded-lg font-semibold">
               Recommencer
             </button>
-            <Link href="/exercises" className="px-4 py-2 bg-[#2d5016] text-white rounded-lg font-semibold">
+            <Link href="/exercises" className="px-4 py-2 bg-[var(--ds-green)] text-white rounded-lg font-semibold">
               Autres exercices
             </Link>
           </div>
@@ -586,16 +586,16 @@ export default function SequencedReadingPractice() {
   // ---- Écran de déroulé ----
   const visible = revealed;
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden bg-[#fdfaf3] flex flex-col">
+    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col">
       {/* Barre */}
-      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
         <button onClick={stop} className="text-sm hover:underline whitespace-nowrap">
           ← Arrêter
         </button>
         <span className="text-sm font-medium">
           Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
         </span>
-        <span className="text-xs font-bold bg-[#1f3a0f] rounded-full px-2.5 py-1 whitespace-nowrap">
+        <span className="text-xs font-bold bg-[var(--ds-green-deep)] rounded-full px-2.5 py-1 whitespace-nowrap">
           {chunkPos.i} / {chunkPos.total}
         </span>
       </div>
@@ -618,11 +618,11 @@ export default function SequencedReadingPractice() {
 
         {/* Décompte plein cadre pendant l'intervalle */}
         {sub === 'gap' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#fdfaf3]/80 backdrop-blur-sm">
-            <span className="text-[13px] font-bold uppercase tracking-widest text-[#c9a959] mb-2">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--ds-bg)]/80 backdrop-blur-sm">
+            <span className="text-[13px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-2">
               {who === 'student' ? 'À toi de réciter' : 'Répète à voix haute'}
             </span>
-            <span className={`text-7xl sm:text-8xl font-bold tabular-nums ${paused ? 'text-[#7a5d2c]' : 'text-[#2d5016]'}`}>
+            <span className={`text-7xl sm:text-8xl font-bold tabular-nums ${paused ? 'text-[#7a5d2c]' : 'text-[var(--ds-green)]'}`}>
               {fmt(Math.max(0, countdown))}
             </span>
             {paused && <span className="mt-2 text-sm font-bold text-[#7a3030]">⏸ En pause</span>}
@@ -631,15 +631,15 @@ export default function SequencedReadingPractice() {
       </div>
 
       {/* Contrôles : vitesse en direct + gros boutons */}
-      <div className="flex-none bg-[#2d5016] px-3 py-2.5 flex flex-col gap-2.5">
+      <div className="flex-none bg-[var(--ds-green)] px-3 py-2.5 flex flex-col gap-2.5">
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-bold text-[#c9a959] mr-1">Vitesse</span>
+          <span className="text-[11px] font-bold text-[var(--ds-gold)] mr-1">Vitesse</span>
           {SPEEDS.map((s) => (
             <button
               key={s}
               onClick={() => setRate(s)}
               className={`px-2.5 py-1 rounded-md text-[12px] font-bold ${
-                rate === s ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#1f3a0f] text-[#c9a959]'
+                rate === s ? 'bg-[var(--ds-gold)] text-[var(--ds-green)]' : 'bg-[var(--ds-green-deep)] text-[var(--ds-gold)]'
               }`}
             >
               {speedLabel(s)}
@@ -652,7 +652,7 @@ export default function SequencedReadingPractice() {
             aria-label="Répéter en boucle"
             title="Répéter en boucle la sélection en cours"
             className={`flex-none w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border-2 active:scale-95 transition-all ${
-              loop ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'bg-[#1f3a0f] text-[#c9a959] border-[#c9a959]/40'
+              loop ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] border-[var(--ds-gold)]' : 'bg-[var(--ds-green-deep)] text-[var(--ds-gold)] border-[var(--ds-gold)]/40'
             }`}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -664,7 +664,7 @@ export default function SequencedReadingPractice() {
           </button>
           <button
             onClick={togglePause}
-            className="flex-1 max-w-[200px] py-3.5 rounded-2xl text-base font-bold text-[#2d5016] bg-[#c9a959] active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            className="flex-1 max-w-[200px] py-3.5 rounded-2xl text-base font-bold text-[var(--ds-green)] bg-[var(--ds-gold)] active:scale-95 shadow-lg flex items-center justify-center gap-2"
           >
             {paused ? (
               <>
@@ -680,7 +680,7 @@ export default function SequencedReadingPractice() {
           </button>
           <button
             onClick={skipToNext}
-            className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-white bg-[#4a7c23] active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-white bg-[var(--ds-sage)] active:scale-95 shadow-lg flex items-center justify-center gap-2"
           >
             Suivant
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>

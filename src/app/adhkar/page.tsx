@@ -1,5 +1,10 @@
 import AdhkarPractice from '@/components/exercises/AdhkarPractice';
+import { PracticeShell } from '@/components/AppShell';
 
 export default function AdhkarPage() {
-  return <AdhkarPractice />;
+  return (
+    <PracticeShell>
+      <AdhkarPractice />
+    </PracticeShell>
+  );
 }

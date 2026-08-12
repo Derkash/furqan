@@ -34,7 +34,7 @@ interface NumberFieldProps {
 function NumberField({ label, value, max, onChange }: NumberFieldProps) {
   return (
     <div className="flex-1 min-w-0">
-      <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] text-center mb-1.5">
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] text-center mb-1.5">
         {label}
       </label>
       <div className="relative">
@@ -54,11 +54,11 @@ function NumberField({ label, value, max, onChange }: NumberFieldProps) {
             const n = Number(raw);
             onChange(Number.isFinite(n) ? n : null);
           }}
-          className="w-full px-4 py-2.5 text-center text-base font-semibold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] transition"
+          className="w-full px-4 py-2.5 text-center text-base font-semibold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ds-sage)] focus:border-[var(--ds-green)] transition"
         />
         {value !== null && (
           <span
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#c9a959] pointer-events-none"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--ds-gold)] pointer-events-none"
             dir="rtl"
             style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
           >
@@ -81,7 +81,7 @@ function SurahField({ label, value, chapters, onChange }: SurahFieldProps) {
   const loading = chapters.length === 0;
   return (
     <div className="flex-1 min-w-0">
-      <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] text-center mb-1.5">
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] text-center mb-1.5">
         {label}
       </label>
       <select
@@ -91,7 +91,7 @@ function SurahField({ label, value, chapters, onChange }: SurahFieldProps) {
           const raw = e.target.value;
           onChange(raw === '' ? null : Number(raw));
         }}
-        className="w-full px-3 py-2.5 text-sm font-semibold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#4a7c23] focus:border-[#2d5016] transition disabled:opacity-60"
+        className="w-full px-3 py-2.5 text-sm font-semibold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ds-sage)] focus:border-[var(--ds-green)] transition disabled:opacity-60"
       >
         <option value="">{loading ? 'Chargement…' : '— Sourate —'}</option>
         {chapters.map((c) => (
@@ -116,7 +116,7 @@ export default function RangePicker({ value, onChange, chapters = [] }: RangePic
   return (
     <div dir="ltr">
       {/* Onglets de mode */}
-      <div className="flex gap-1 p-1 bg-[#2d5016]/5 rounded-xl mb-4">
+      <div className="flex gap-1 p-1 bg-[var(--ds-green)]/5 rounded-xl mb-4">
         {(Object.keys(MODE_LABELS) as RangeMode[]).map((m) => {
           const active = value.mode === m;
           return (
@@ -126,12 +126,12 @@ export default function RangePicker({ value, onChange, chapters = [] }: RangePic
               onClick={() => updateMode(m)}
               className={`
                 flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all
-                ${active ? 'bg-[#2d5016] text-[#fdfaf3] shadow-md' : 'text-[#4a7c23] hover:bg-white/50'}
+                ${active ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] shadow-md' : 'text-[var(--ds-sage)] hover:bg-white/50'}
               `}
             >
               <div>{MODE_LABELS[m]}</div>
               <div
-                className={`text-[10px] mt-0.5 ${active ? 'text-[#c9a959]' : 'text-[#7a8b3e]/70'}`}
+                className={`text-[10px] mt-0.5 ${active ? 'text-[var(--ds-gold)]' : 'text-[var(--ds-sage)]/70'}`}
                 dir="rtl"
                 style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
               >
@@ -159,7 +159,7 @@ export default function RangePicker({ value, onChange, chapters = [] }: RangePic
             onChange={(v) => onChange({ ...value, start: v })}
           />
         )}
-        <div className="flex items-center text-[#c9a959] pb-2.5">
+        <div className="flex items-center text-[var(--ds-gold)] pb-2.5">
           <svg
             width="20"
             height="20"

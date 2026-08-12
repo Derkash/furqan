@@ -27,6 +27,7 @@ import {
 } from '@/utils/vocab/vocabStore';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import LoginCard from '@/components/exercises/LoginCard';
+import AppShell, { PracticeShell } from '@/components/AppShell';
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -47,8 +48,17 @@ export default function VocabPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   if (user === undefined) return null;
-  if (user === null) return <LoginCard onLoggedIn={setUser} />;
-  return <VocabPageInner key={user} />;
+  if (user === null)
+    return (
+      <AppShell>
+        <LoginCard onLoggedIn={setUser} />
+      </AppShell>
+    );
+  return (
+    <PracticeShell>
+      <VocabPageInner key={user} />
+    </PracticeShell>
+  );
 }
 
 function VocabPageInner() {
@@ -91,19 +101,25 @@ function VocabPageInner() {
   ];
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col">
+    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col">
       {/* Barre */}
-      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
-        <Link href="/exercises" className="text-sm hover:underline whitespace-nowrap">
-          ← Exercices
-        </Link>
-        <div className="flex gap-1 bg-[#1f3a0f] rounded-full p-0.5">
+      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
+        <Link
+            href="/exercises"
+            aria-label="Retour"
+            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </Link>
+        <div className="flex gap-1 bg-[var(--ds-green-deep)] rounded-full p-0.5">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setMode(t.id)}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                mode === t.id ? 'bg-[#c9a959] text-[#2d5016]' : 'text-[#c9a959]'
+                mode === t.id ? 'bg-[var(--ds-gold)] text-[var(--ds-green)]' : 'text-[var(--ds-gold)]'
               }`}
             >
               {t.label}
@@ -114,15 +130,15 @@ function VocabPageInner() {
       </div>
 
       {/* Sélecteur de plage GLOBAL, permanent */}
-      <div className="flex-none bg-[#f4e9d0] border-b border-[#c9a959]/40 px-3 py-1.5">
+      <div className="flex-none bg-[var(--ds-sage-100)] border-b border-[var(--ds-gold)]/40 px-3 py-1.5">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <span className="text-[13px]">📍</span>
-          <span className="text-[13px] font-bold text-[#2d5016] flex-1 truncate">
+          <span className="text-[13px] font-bold text-[var(--ds-green)] flex-1 truncate">
             {recap}
           </span>
           <button
             onClick={() => setEditing((v) => !v)}
-            className="text-[11px] font-bold text-[#4a7c23] border border-[#c9a959]/50 rounded-full px-2.5 py-1 hover:bg-white/60"
+            className="text-[11px] font-bold text-[var(--ds-sage)] border border-[var(--ds-gold)]/50 rounded-full px-2.5 py-1 hover:bg-white/60"
           >
             {editing ? 'Fermer' : 'Modifier la plage'}
           </button>
@@ -231,8 +247,8 @@ function ReadMode() {
   if (!started) {
     return (
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-5 border border-[#c9a959]/20 mt-4">
-          <h2 className="text-lg font-bold text-[#2d5016] mb-1">Choisir une plage à lire</h2>
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-5 border border-[var(--ds-gold)]/20 mt-4">
+          <h2 className="text-lg font-bold text-[var(--ds-green)] mb-1">Choisir une plage à lire</h2>
           <p className="text-sm text-gray-500 mb-4">
             Touche n&apos;importe quel mot sur la page pour l&apos;analyser (racine, forme de base,
             grammaire) et l&apos;ajouter à ton vocabulaire.
@@ -241,7 +257,7 @@ function ReadMode() {
           <button
             onClick={begin}
             disabled={startPage == null}
-            className="w-full mt-4 py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl disabled:opacity-40 active:scale-[0.98] transition-all"
+            className="w-full mt-4 py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white font-bold rounded-xl disabled:opacity-40 active:scale-[0.98] transition-all"
           >
             Commencer la lecture
           </button>
@@ -285,8 +301,8 @@ function ReadMode() {
           e.stopPropagation();
           flip('prev');
         }}
-        className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
-          canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+        className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
+          canPrev ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
         }`}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -301,8 +317,8 @@ function ReadMode() {
           e.stopPropagation();
           flip('next');
         }}
-        className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
-          canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+        className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
+          canNext ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
         }`}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -311,7 +327,7 @@ function ReadMode() {
       </button>
 
       {/* Badge page */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-[#2d5016]/85 text-[#fdfaf3] text-xs font-bold rounded-full px-3 py-1 pointer-events-none">
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-[var(--ds-green)]/85 text-[var(--ds-bg)] text-xs font-bold rounded-full px-3 py-1 pointer-events-none">
         Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
       </div>
     </div>
@@ -418,11 +434,11 @@ function ListMode() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher (français, arabe, racine)…"
-            className="flex-1 px-3 py-2 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none text-sm"
+            className="flex-1 px-3 py-2 rounded-lg border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none text-sm"
           />
           <button
             onClick={doImport}
-            className="text-xs font-bold text-[#4a7c23] border-2 border-[#c9a959]/40 rounded-lg px-3 py-2 hover:border-[#c9a959] whitespace-nowrap"
+            className="text-xs font-bold text-[var(--ds-sage)] border-2 border-[var(--ds-gold)]/40 rounded-lg px-3 py-2 hover:border-[var(--ds-gold)] whitespace-nowrap"
           >
             Importer lexique
           </button>
@@ -433,14 +449,14 @@ function ListMode() {
           <button
             onClick={doExport}
             title="Télécharger une sauvegarde JSON de tous tes mots"
-            className="flex-1 text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-3 py-2 hover:bg-[#2d5016]/20 whitespace-nowrap"
+            className="flex-1 text-xs font-bold text-[var(--ds-green)] bg-[var(--ds-green)]/10 rounded-lg px-3 py-2 hover:bg-[var(--ds-green)]/20 whitespace-nowrap"
           >
             ⬇︎ Exporter (sauvegarde)
           </button>
           <button
             onClick={() => fileInput.current?.click()}
             title="Restaurer depuis un fichier de sauvegarde (aucun mot écrasé)"
-            className="flex-1 text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-3 py-2 hover:bg-[#2d5016]/20 whitespace-nowrap"
+            className="flex-1 text-xs font-bold text-[var(--ds-green)] bg-[var(--ds-green)]/10 rounded-lg px-3 py-2 hover:bg-[var(--ds-green)]/20 whitespace-nowrap"
           >
             ⬆︎ Restaurer un fichier
           </button>
@@ -456,7 +472,7 @@ function ListMode() {
             }}
           />
         </div>
-        {seedMsg && <p className="text-xs text-[#4a7c23] mb-2">{seedMsg}</p>}
+        {seedMsg && <p className="text-xs text-[var(--ds-sage)] mb-2">{seedMsg}</p>}
 
         <p className="text-xs text-gray-400 mb-2">
           {toArabicNumbers(items.length)} mot{items.length > 1 ? 's' : ''} — {toArabicNumbers(items.filter((e) => e.root).length)} avec racine
@@ -470,24 +486,24 @@ function ListMode() {
 
         <div className="space-y-2">
           {filtered.map((e) => (
-            <div key={e.id} className="bg-white rounded-xl p-3 border border-[#c9a959]/20 flex items-center gap-3">
+            <div key={e.id} className="bg-white rounded-xl p-3 border border-[var(--ds-gold)]/20 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '1.7em' }}>
+                  <span dir="rtl" className="text-[var(--ds-green)]" style={{ fontFamily: "'Amiri',serif", fontSize: '1.7em' }}>
                     {e.arabic}
                   </span>
                   <span className="text-sm text-gray-600">{e.gloss}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {e.root && (
-                    <span className="text-[11px] text-[#7a5d2c] bg-[#c9a959]/15 rounded-full px-2 py-0.5" dir="rtl" style={{ fontFamily: "'Amiri',serif" }}>
+                    <span className="text-[11px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-2 py-0.5" dir="rtl" style={{ fontFamily: "'Amiri',serif" }}>
                       {e.root.split('').join(' ')}
                     </span>
                   )}
                   {/* Boîte Leitner */}
                   <span className="flex gap-0.5">
                     {[0, 1, 2, 3, 4].map((b) => (
-                      <span key={b} className={`w-1.5 h-1.5 rounded-full ${b < e.box ? 'bg-[#4a7c23]' : 'bg-[#4a7c23]/15'}`} />
+                      <span key={b} className={`w-1.5 h-1.5 rounded-full ${b < e.box ? 'bg-[var(--ds-sage)]' : 'bg-[var(--ds-sage)]/15'}`} />
                     ))}
                   </span>
                   {e.source === 'seed' && <span className="text-[10px] text-gray-400">lexique</span>}
@@ -497,7 +513,7 @@ function ListMode() {
                 <button
                   onClick={() => setExplore({ root: e.root!, gloss: e.gloss, lemma: e.lemma })}
                   title="Voir toutes les formes dans le Coran"
-                  className="flex-none text-xs font-bold text-[#2d5016] bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5 hover:bg-[#2d5016]/20"
+                  className="flex-none text-xs font-bold text-[var(--ds-green)] bg-[var(--ds-green)]/10 rounded-lg px-2.5 py-1.5 hover:bg-[var(--ds-green)]/20"
                 >
                   occurrences
                 </button>

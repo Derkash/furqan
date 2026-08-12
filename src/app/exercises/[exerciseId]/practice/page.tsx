@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
+import { PracticeShell } from '@/components/AppShell';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
@@ -38,7 +39,9 @@ export default function PracticePage() {
   // Capacitor) : useSearchParams est utilisé plus bas dans MushafPractice.
   return (
     <Suspense fallback={null}>
-      <PracticeRouter />
+      <PracticeShell>
+        <PracticeRouter />
+      </PracticeShell>
     </Suspense>
   );
 }
@@ -94,7 +97,7 @@ function renderRich(text: string, keyPrefix: string) {
           <span
             key={`${keyPrefix}-${i}`}
             dir="rtl"
-            className="block text-center my-2 text-[#2d5016]"
+            className="block text-center my-2 text-[var(--ds-green)]"
             style={{
               fontFamily: "'UthmanicHafs', 'Amiri', 'Scheherazade New', serif",
               fontSize: '3em',
@@ -177,7 +180,7 @@ function KaraokeText({
           ref={i === activeIdx ? activeRef : undefined}
           className={
             i === activeIdx
-              ? 'bg-[#c9a959]/35 rounded px-0.5 transition-colors'
+              ? 'bg-[var(--ds-gold)]/35 rounded px-0.5 transition-colors'
               : 'transition-colors'
           }
         >
@@ -719,10 +722,10 @@ function MushafPractice() {
   // Validate exercise ID
   if (!isValidExerciseId(exerciseId)) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-600 mb-4">Exercice non trouvé</p>
-          <Link href="/exercises" className="text-[#2d5016] underline">
+          <Link href="/exercises" className="text-[var(--ds-green)] underline">
             Retour aux exercices
           </Link>
         </div>
@@ -735,10 +738,10 @@ function MushafPractice() {
   // Loading state
   if (!initialized || loading) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-[#2d5016] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#4a7c23]">Chargement...</p>
+          <div className="w-10 h-10 border-4 border-[var(--ds-green)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--ds-sage)]">Chargement...</p>
         </div>
       </div>
     );
@@ -747,10 +750,10 @@ function MushafPractice() {
   // Completed state
   if (state.status === 'completed') {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[#2d5016] text-center">
-          <h2 className="text-2xl font-bold text-[#2d5016] mb-2">Terminé !</h2>
-          <p className="text-[#4a7c23] mb-4">
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[var(--ds-green)] text-center">
+          <h2 className="text-2xl font-bold text-[var(--ds-green)] mb-2">Terminé !</h2>
+          <p className="text-[var(--ds-sage)] mb-4">
             Vous avez terminé {toArabicNumbers(state.progress.totalRounds)} question
             {state.progress.totalRounds > 1 ? 's' : ''}
           </p>
@@ -760,13 +763,13 @@ function MushafPractice() {
                 reset();
                 setInitialized(false);
               }}
-              className="px-4 py-2 bg-[#c9a959] hover:bg-[#b89848] text-white rounded-lg"
+              className="px-4 py-2 bg-[var(--ds-gold)] hover:bg-[#b89848] text-white rounded-lg"
             >
               Recommencer
             </button>
             <Link
               href="/exercises"
-              className="px-4 py-2 bg-[#2d5016] hover:bg-[#4a7c23] text-white rounded-lg"
+              className="px-4 py-2 bg-[var(--ds-green)] hover:bg-[var(--ds-sage)] text-white rounded-lg"
             >
               Autres exercices
             </Link>
@@ -777,15 +780,18 @@ function MushafPractice() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
+    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col overflow-locked">
       {/* Header avec progression */}
       {!fullscreen && (
-        <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
+        <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-4 py-2 flex items-center justify-between">
           <Link
             href={`/exercises/${exerciseId}/setup`}
-            className="text-sm hover:underline"
+            aria-label="Retour"
+            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
           >
-            ← Retour
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </Link>
           <span className="text-sm font-medium">
             {exerciseId === 'hifz' ? (
@@ -805,7 +811,7 @@ function MushafPractice() {
               type="button"
               onClick={() => setReadingMode(true)}
               aria-label="Mode lecture plein écran"
-              className="flex items-center gap-1 text-xs font-semibold text-[#c9a959] hover:text-[#fdfaf3] transition-colors"
+              className="flex items-center gap-1 text-xs font-semibold text-[var(--ds-gold)] hover:text-[var(--ds-bg)] transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3" />
@@ -823,19 +829,19 @@ function MushafPractice() {
 
       {/* Overlay avec message - sous la barre verte */}
       {currentStep && !fullscreen && (
-        <div className="flex-none bg-[#2d5016]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
+        <div className="flex-none bg-[var(--ds-green)]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
           {audio.isPlaying && (
             <div className="flex gap-0.5">
               <span
-                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
                 style={{ animationDelay: '0ms' }}
               />
               <span
-                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
                 style={{ animationDelay: '150ms' }}
               />
               <span
-                className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce"
+                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
                 style={{ animationDelay: '300ms' }}
               />
             </div>
@@ -843,7 +849,7 @@ function MushafPractice() {
           <span className="text-base font-medium">
             {currentStep.message.title}
           </span>
-          <span className="text-[#c9a959] text-sm">
+          <span className="text-[var(--ds-gold)] text-sm">
             {currentStep.message.subtitle}
           </span>
           {lastAudioVerse && (
@@ -854,7 +860,7 @@ function MushafPractice() {
                 audio.play(lastAudioVerse, audioSeconds > 0 ? audioSeconds : undefined);
               }}
               aria-label="Faire répéter le verset"
-              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all flex-shrink-0"
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--ds-gold)]/20 text-[var(--ds-gold)] hover:bg-[var(--ds-gold)]/35 active:scale-95 transition-all flex-shrink-0"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -863,7 +869,7 @@ function MushafPractice() {
             </button>
           )}
           {timedStep && countdown > 0 && (
-            <span className="ml-1 flex items-center gap-1 text-[#c9a959] text-sm font-bold tabular-nums flex-shrink-0">
+            <span className="ml-1 flex items-center gap-1 text-[var(--ds-gold)] text-sm font-bold tabular-nums flex-shrink-0">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="13" r="8" />
                 <path d="M12 9v4l2 2" />
@@ -878,7 +884,7 @@ function MushafPractice() {
 
       {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz, masqués en plein écran) */}
       {isHifz && !fullscreen && (
-        <div className="flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
+        <div className="flex-none bg-[var(--ds-green)]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -887,8 +893,8 @@ function MushafPractice() {
             title="Surligner les versets partageant le même tafsir (thèmes)"
             className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
               showThemes
-                ? 'bg-[#7a8b3e] text-white border-[#7a8b3e] shadow-md'
-                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+                ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)] shadow-md'
+                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
             }`}
           >
             Thèmes
@@ -905,8 +911,8 @@ function MushafPractice() {
             title="Marquer mes fautes : touchez les mots ratés, puis choisissez le type"
             className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
               markingMode
-                ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959] shadow-md'
-                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+                ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] border-[var(--ds-gold)] shadow-md'
+                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
             }`}
           >
             ✍ Marquer
@@ -920,7 +926,7 @@ function MushafPractice() {
             className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
               showMistakes && mistakeWords.size > 0
                 ? 'bg-red-600 text-white border-red-600'
-                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
             }`}
           >
             Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
@@ -933,13 +939,13 @@ function MushafPractice() {
             title="Afficher/masquer les couleurs des mots de mon lexique"
             className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
               showLexicon
-                ? 'bg-[#4a7c23] text-white border-[#4a7c23]'
-                : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
+                ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)]'
+                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
             }`}
           >
             Lexique
           </button>
-          <span className="text-xs uppercase tracking-wide text-[#c9a959] mr-2">Niveau</span>
+          <span className="text-xs uppercase tracking-wide text-[var(--ds-gold)] mr-2">Niveau</span>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
             <button
               key={lvl}
@@ -949,8 +955,8 @@ function MushafPractice() {
               }}
               className={`min-w-[36px] h-8 px-2 rounded-md text-sm font-bold transition-colors ${
                 hifzLevel === lvl
-                  ? 'bg-[#c9a959] text-[#2d5016] shadow-md'
-                  : 'bg-[#2d5016] hover:bg-[#3e6b1d] text-[#c9a959] border border-[#4a7c23]'
+                  ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] shadow-md'
+                  : 'bg-[var(--ds-green)] hover:bg-[#3e6b1d] text-[var(--ds-gold)] border border-[var(--ds-sage)]'
               }`}
             >
               {lvl}
@@ -970,7 +976,7 @@ function MushafPractice() {
               setReadingMode(false);
             }}
             aria-label="Quitter le plein écran"
-            className="absolute right-2 top-2 z-30 w-10 h-10 rounded-full flex items-center justify-center bg-[#2d5016]/70 text-[#fdfaf3] hover:bg-[#2d5016] shadow-lg border border-[#c9a959]/40 active:scale-95 transition-all"
+            className="absolute right-2 top-2 z-30 w-10 h-10 rounded-full flex items-center justify-center bg-[var(--ds-green)]/70 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] shadow-lg border border-[var(--ds-gold)]/40 active:scale-95 transition-all"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 3v3a2 2 0 0 1-2 2H3" />
@@ -1009,14 +1015,14 @@ function MushafPractice() {
               questionSide === 'left' ? 'left-0' : 'right-0'
             }`}
           >
-            <div className="bg-[#fdfaf3]/[0.97] backdrop-blur border-2 border-[#c9a959] rounded-3xl shadow-2xl px-6 py-8 w-full max-w-md text-center">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-3">
+            <div className="bg-[var(--ds-bg)]/[0.97] backdrop-blur border-2 border-[var(--ds-gold)] rounded-3xl shadow-2xl px-6 py-8 w-full max-w-md text-center">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-3">
                 Question
               </p>
-              <p className="text-2xl lg:text-3xl font-bold text-[#2d5016] leading-snug mb-2">
+              <p className="text-2xl lg:text-3xl font-bold text-[var(--ds-green)] leading-snug mb-2">
                 {currentStep.message.title}
               </p>
-              <p className="text-sm text-[#7a8b3e] mb-6">{currentStep.message.subtitle}</p>
+              <p className="text-sm text-[var(--ds-sage)] mb-6">{currentStep.message.subtitle}</p>
 
               {lastAudioVerse && (
                 <button
@@ -1025,7 +1031,7 @@ function MushafPractice() {
                     e.stopPropagation();
                     audio.play(lastAudioVerse, audioSeconds > 0 ? audioSeconds : undefined);
                   }}
-                  className="mx-auto mb-5 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 font-bold text-sm active:scale-95 transition-all"
+                  className="mx-auto mb-5 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--ds-green)]/10 text-[var(--ds-green)] hover:bg-[var(--ds-green)]/20 font-bold text-sm active:scale-95 transition-all"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -1041,7 +1047,7 @@ function MushafPractice() {
                     <div className="flex flex-col items-center gap-3">
                       <div className="flex items-center gap-3">
                         <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="font-bold tabular-nums text-[#2d5016] text-3xl">
+                        <span className="font-bold tabular-nums text-[var(--ds-green)] text-3xl">
                           {Math.floor(recElapsed / 60)}:{String(recElapsed % 60).padStart(2, '0')}
                         </span>
                       </div>
@@ -1095,7 +1101,7 @@ function MushafPractice() {
                 </>
               ) : timedStep ? (
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="text-5xl font-bold tabular-nums text-[#2d5016] leading-none">
+                  <div className="text-5xl font-bold tabular-nums text-[var(--ds-green)] leading-none">
                     {countdown}
                   </div>
                   <p className="text-xs text-gray-400">
@@ -1115,8 +1121,8 @@ function MushafPractice() {
             className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl px-3 py-2 shadow-lg">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959]">
+            <div className="flex items-center gap-2 bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-[var(--ds-gold)] rounded-2xl px-3 py-2 shadow-lg">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--ds-gold)]">
                 Ma récitation
               </span>
               <audio controls src={recorder.audioUrl} className="h-8 w-52" />
@@ -1124,7 +1130,7 @@ function MushafPractice() {
                 type="button"
                 onClick={recorder.clear}
                 aria-label="Fermer le lecteur"
-                className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 flex items-center justify-center active:scale-95 transition-all"
+                className="w-8 h-8 rounded-full bg-[var(--ds-green)]/10 text-[var(--ds-green)] hover:bg-[var(--ds-green)]/20 flex items-center justify-center active:scale-95 transition-all"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 6 6 18" />
@@ -1139,7 +1145,7 @@ function MushafPractice() {
         {isHifz && markingMode && selWords.size > 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]">
             <div
-              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
+              className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -1192,9 +1198,9 @@ function MushafPractice() {
             onClick={(e) => e.stopPropagation()}
           >
             {recorder.recording ? (
-              <div className="flex items-center gap-2.5 bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-full pl-4 pr-1.5 py-1.5 shadow-lg">
+              <div className="flex items-center gap-2.5 bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-full pl-4 pr-1.5 py-1.5 shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="font-bold tabular-nums text-[#2d5016] text-lg">
+                <span className="font-bold tabular-nums text-[var(--ds-green)] text-lg">
                   {Math.floor(recElapsed / 60)}:{String(recElapsed % 60).padStart(2, '0')}
                 </span>
                 <button
@@ -1209,7 +1215,7 @@ function MushafPractice() {
                 </button>
               </div>
             ) : recorder.audioUrl ? (
-              <div className="flex items-center gap-2 bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl px-3 py-2 shadow-lg flex-wrap justify-center">
+              <div className="flex items-center gap-2 bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-[var(--ds-gold)] rounded-2xl px-3 py-2 shadow-lg flex-wrap justify-center">
                 <audio
                   ref={playerRef}
                   controls
@@ -1227,8 +1233,8 @@ function MushafPractice() {
                       onClick={() => setPlaybackRate(rate)}
                       className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold transition-all ${
                         playbackRate === rate
-                          ? 'bg-[#2d5016] text-[#fdfaf3]'
-                          : 'bg-white border border-[#c9a959]/40 text-[#4a7c23]'
+                          ? 'bg-[var(--ds-green)] text-[var(--ds-bg)]'
+                          : 'bg-white border border-[var(--ds-gold)]/40 text-[var(--ds-sage)]'
                       }`}
                     >
                       ×{rate === 1.5 ? '1,5' : rate}
@@ -1251,7 +1257,7 @@ function MushafPractice() {
                   type="button"
                   onClick={recorder.clear}
                   aria-label="Fermer le lecteur"
-                  className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 flex items-center justify-center active:scale-95 transition-all"
+                  className="w-8 h-8 rounded-full bg-[var(--ds-green)]/10 text-[var(--ds-green)] hover:bg-[var(--ds-green)]/20 flex items-center justify-center active:scale-95 transition-all"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 6 6 18" />
@@ -1295,10 +1301,10 @@ function MushafPractice() {
                 setPopover(null);
                 flipPair('prev');
               }}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
                 canFlipPrev
-                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
-                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+                  ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
+                  : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1316,10 +1322,10 @@ function MushafPractice() {
                 setPopover(null);
                 flipPair('next');
               }}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
                 canFlipNext
-                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
-                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+                  ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
+                  : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1351,12 +1357,12 @@ function MushafPractice() {
               aria-label="Écouter cette section"
               className={`flex-none w-9 h-9 rounded-full flex items-center justify-center active:scale-95 transition ${
                 (speech.speaking || speech.loading) && speakingSection === section
-                  ? 'bg-[#2d5016] text-[#fdfaf3]'
-                  : 'bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20'
+                  ? 'bg-[var(--ds-green)] text-[var(--ds-bg)]'
+                  : 'bg-[var(--ds-green)]/10 text-[var(--ds-green)] hover:bg-[var(--ds-green)]/20'
               }`}
             >
               {speech.loading && speakingSection === section ? (
-                <span className="w-4 h-4 border-2 border-[#fdfaf3] border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-[var(--ds-bg)] border-t-transparent rounded-full animate-spin" />
               ) : speech.speaking && speakingSection === section ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -1376,7 +1382,7 @@ function MushafPractice() {
           speakText: string | null | undefined
         ) => (
           <div className="flex items-center justify-between gap-1 py-1.5">
-            <span className="text-[12px] font-bold uppercase tracking-widest text-[#c9a959]">
+            <span className="text-[12px] font-bold uppercase tracking-widest text-[var(--ds-gold)]">
               {title}
             </span>
             {speakerButton(section, speakText)}
@@ -1389,7 +1395,7 @@ function MushafPractice() {
             <button
               type="button"
               onClick={() => toggleSection(section)}
-              className="text-[13px] font-semibold text-[#4a7c23] underline mb-1.5"
+              className="text-[13px] font-semibold text-[var(--ds-sage)] underline mb-1.5"
             >
               {openSections.has(section) ? 'Réduire' : 'Voir plus'}
             </button>
@@ -1402,23 +1408,23 @@ function MushafPractice() {
           <div
             dir="ltr"
             onClick={(e) => e.stopPropagation()}
-            className={`absolute inset-y-0 z-30 w-1/2 bg-[#fdfaf3]/[0.98] backdrop-blur overflow-y-auto overscroll-contain shadow-[0_0_40px_rgba(45,80,22,0.3)] ${
+            className={`absolute inset-y-0 z-30 w-1/2 bg-[var(--ds-bg)]/[0.98] backdrop-blur overflow-y-auto overscroll-contain shadow-[0_0_40px_rgba(45,80,22,0.3)] ${
               popover.side === 'left'
-                ? 'left-0 border-r-2 border-[#c9a959]'
-                : 'right-0 border-l-2 border-[#c9a959]'
+                ? 'left-0 border-r-2 border-[var(--ds-gold)]'
+                : 'right-0 border-l-2 border-[var(--ds-gold)]'
             }`}
           >
             <div className="px-5 pt-3 pb-8 max-w-xl mx-auto">
               {/* Entête : référence du verset + fermeture */}
-              <div className="sticky top-0 -mx-5 px-5 py-2 bg-[#fdfaf3]/95 backdrop-blur z-10 flex items-center justify-between gap-2 border-b border-[#c9a959]/30 mb-2">
-                <div className="text-lg font-bold text-[#2d5016] flex items-center gap-2 flex-wrap min-w-0">
+              <div className="sticky top-0 -mx-5 px-5 py-2 bg-[var(--ds-bg)]/95 backdrop-blur z-10 flex items-center justify-between gap-2 border-b border-[var(--ds-gold)]/30 mb-2">
+                <div className="text-lg font-bold text-[var(--ds-green)] flex items-center gap-2 flex-wrap min-w-0">
                   <span>
                     {sNum}:{aNum}
                     {chapter ? ` · ${chapter.name_simple}` : ''}
                   </span>
                   {chapter && (
                     <span
-                      className="text-[#7a8b3e]"
+                      className="text-[var(--ds-sage)]"
                       dir="rtl"
                       style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
                     >
@@ -1430,7 +1436,7 @@ function MushafPractice() {
                   type="button"
                   aria-label="Fermer"
                   onClick={() => setPopover(null)}
-                  className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[#2d5016]/10 text-[#2d5016] hover:bg-[#2d5016]/20 active:scale-95 transition"
+                  className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-green)]/10 text-[var(--ds-green)] hover:bg-[var(--ds-green)]/20 active:scale-95 transition"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 6 6 18" />
@@ -1465,7 +1471,7 @@ function MushafPractice() {
               {seeMore('translation', text?.length ?? 0)}
 
               {/* Section 2 : tafsir Ibn Kathir (complet, EN→FR par IA) */}
-              <div className="border-t border-[#c9a959]/30 mt-2" />
+              <div className="border-t border-[var(--ds-gold)]/30 mt-2" />
               {sectionHeader('ibnkathir', 'Tafsir — Ibn Kathir', ibnKathir.text)}
               {ibnKathir.text ? (
                 <>
@@ -1500,7 +1506,7 @@ function MushafPractice() {
               {/* Section Al-Mukhtasar (masquée — SHOW_MUKHTASAR pour réactiver) */}
               {SHOW_MUKHTASAR && (
                 <>
-                  <div className="border-t border-[#c9a959]/30 mt-2" />
+                  <div className="border-t border-[var(--ds-gold)]/30 mt-2" />
                   {sectionHeader('tafsir', 'Tafsir — Al-Mukhtasar', tafsir.text)}
                   <KaraokeText
                     text={tafsir.text ?? ''}
@@ -1512,7 +1518,7 @@ function MushafPractice() {
               )}
 
               {/* Section 3 : sabab an-nuzûl (occasions authentifiées) */}
-              <div className="border-t border-[#c9a959]/30 mt-2" />
+              <div className="border-t border-[var(--ds-gold)]/30 mt-2" />
               {sectionHeader('asbab', 'Sabab an-Nuzûl — authentifié', asbabFull)}
               {asbabTexts && asbabTexts.length > 0 && asbabFull ? (
                 <>
@@ -1556,12 +1562,12 @@ function MushafPractice() {
                   <button
                     type="button"
                     onClick={() => setShowAsbabArabic((v) => !v)}
-                    className="mt-1 mb-1 text-[13px] font-semibold text-[#7a5d2c] bg-[#c9a959]/15 border border-[#c9a959]/30 rounded-full px-3 py-1.5 active:scale-95 transition"
+                    className="mt-1 mb-1 text-[13px] font-semibold text-[#7a5d2c] bg-[var(--ds-gold)]/15 border border-[var(--ds-gold)]/30 rounded-full px-3 py-1.5 active:scale-95 transition"
                   >
                     {showAsbabArabic ? 'Masquer le texte original (arabe)' : 'Texte original (arabe)'}
                   </button>
                   {showAsbabArabic && (
-                    <div className="space-y-2 pb-1 border-t border-[#c9a959]/20 pt-2">
+                    <div className="space-y-2 pb-1 border-t border-[var(--ds-gold)]/20 pt-2">
                       {asbabTexts.map((occasion, i) => (
                         <p
                           key={i}
@@ -1591,8 +1597,8 @@ function MushafPractice() {
       {/* Question de fin de tour : « Avez-vous trouvé ? » (exercices de quiz) */}
       {askFound && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-[#fdfaf3] border-2 border-[#c9a959] rounded-2xl shadow-xl p-5 w-[min(90vw,340px)] text-center">
-            <p className="text-lg font-bold text-[#2d5016] mb-1">Avez-vous trouvé ?</p>
+          <div className="bg-[var(--ds-bg)] border-2 border-[var(--ds-gold)] rounded-2xl shadow-xl p-5 w-[min(90vw,340px)] text-center">
+            <p className="text-lg font-bold text-[var(--ds-green)] mb-1">Avez-vous trouvé ?</p>
             <p className="text-xs text-gray-500 mb-4">
               Votre réponse oriente les prochaines questions vers ce que vous ratez.
             </p>
@@ -1600,7 +1606,7 @@ function MushafPractice() {
               <button
                 type="button"
                 onClick={() => answerFound(true)}
-                className="flex-1 py-3 rounded-xl bg-[#2d5016] hover:bg-[#4a7c23] text-white font-bold active:scale-95 transition-all"
+                className="flex-1 py-3 rounded-xl bg-[var(--ds-green)] hover:bg-[var(--ds-sage)] text-white font-bold active:scale-95 transition-all"
               >
                 ✓ Oui
               </button>

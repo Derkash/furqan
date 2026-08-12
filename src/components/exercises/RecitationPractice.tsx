@@ -409,7 +409,7 @@ export default function RecitationPractice() {
   // ---------- Rendu ----------
 
   if (!userChecked) {
-    return <div className="min-h-screen bg-[#fdfaf3]" />;
+    return <div className="min-h-screen bg-[var(--ds-bg)]" />;
   }
 
   if (!user) {
@@ -418,10 +418,10 @@ export default function RecitationPractice() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-600 mb-4">{loadError}</p>
-          <Link href="/exercises/recitation/setup" className="text-[#2d5016] underline">
+          <Link href="/exercises/recitation/setup" className="text-[var(--ds-green)] underline">
             Retour à la configuration
           </Link>
         </div>
@@ -432,9 +432,9 @@ export default function RecitationPractice() {
   // Fin de session : nombre de questions atteint
   if (completed) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[#2d5016] text-center">
-          <h2 className="text-2xl font-bold text-[#2d5016] mb-2">Session terminée !</h2>
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full border-2 border-[var(--ds-green)] text-center">
+          <h2 className="text-2xl font-bold text-[var(--ds-green)] mb-2">Session terminée !</h2>
           {selfAssess ? (
             <>
               <p
@@ -450,10 +450,10 @@ export default function RecitationPractice() {
               >
                 {toArabicNumbers(foundCount)}/{toArabicNumbers(maxRounds)}
               </p>
-              <p className="text-[#4a7c23] mb-3 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
+              <p className="text-[var(--ds-sage)] mb-3 text-sm">versets trouvés — fautes mémorisées pour {user}</p>
             </>
           ) : (
-            <p className="text-[#4a7c23] my-3 text-sm">
+            <p className="text-[var(--ds-sage)] my-3 text-sm">
               {toArabicNumbers(maxRounds)} versets révisés — bien joué, {user} !
             </p>
           )}
@@ -461,7 +461,7 @@ export default function RecitationPractice() {
           {/* Versets où tu te trompes souvent (historique + session) */}
           {habitualVerses.length > 0 ? (
             <div className="mb-4 text-left">
-              <h3 className="text-sm font-bold text-[#2d5016] mb-2 text-center">
+              <h3 className="text-sm font-bold text-[var(--ds-green)] mb-2 text-center">
                 📌 Versets où tu te trompes souvent
               </h3>
               <div className="max-h-52 overflow-y-auto flex flex-col gap-1.5 pr-1">
@@ -471,7 +471,7 @@ export default function RecitationPractice() {
                     className="flex items-center justify-between gap-2 bg-[#f0f7ea] rounded-lg px-3 py-1.5"
                   >
                     <div className="flex items-center gap-2">
-                      <span dir="ltr" className="text-sm font-bold text-[#2d5016]">
+                      <span dir="ltr" className="text-sm font-bold text-[var(--ds-green)]">
                         {v.verseKey}
                       </span>
                       <span className="text-[10px] text-gray-500">p.{toArabicNumbers(v.page)}</span>
@@ -499,25 +499,25 @@ export default function RecitationPractice() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-[#4a7c23] mb-4">Aucune faute récurrente enregistrée — excellent ! 🎉</p>
+            <p className="text-sm text-[var(--ds-sage)] mb-4">Aucune faute récurrente enregistrée — excellent ! 🎉</p>
           )}
 
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={restartSession}
-              className="px-4 py-2 bg-[#c9a959] hover:bg-[#b89848] text-white rounded-lg font-semibold"
+              className="px-4 py-2 bg-[var(--ds-gold)] hover:bg-[#b89848] text-white rounded-lg font-semibold"
             >
               Recommencer
             </button>
             <Link
               href="/dashboard"
-              className="px-4 py-2 bg-white border-2 border-[#2d5016] text-[#2d5016] hover:bg-[#f0f7ea] rounded-lg font-semibold"
+              className="px-4 py-2 bg-white border-2 border-[var(--ds-green)] text-[var(--ds-green)] hover:bg-[#f0f7ea] rounded-lg font-semibold"
             >
               Tableau de bord
             </Link>
             <Link
               href="/exercises"
-              className="px-4 py-2 bg-[#2d5016] hover:bg-[#4a7c23] text-white rounded-lg font-semibold"
+              className="px-4 py-2 bg-[var(--ds-green)] hover:bg-[var(--ds-sage)] text-white rounded-lg font-semibold"
             >
               Autres exercices
             </Link>
@@ -538,10 +538,10 @@ export default function RecitationPractice() {
 
   if (!target || !pagePair || !resultPair) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--ds-bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-[#2d5016] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#4a7c23]">Chargement...</p>
+          <div className="w-10 h-10 border-4 border-[var(--ds-green)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--ds-sage)]">Chargement...</p>
         </div>
       </div>
     );
@@ -550,12 +550,18 @@ export default function RecitationPractice() {
   const displayedPair = phase === 'result' ? resultPair : pagePair;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
+    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col overflow-locked">
       {/* Header avec progression (même format que les autres exercices) */}
-      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
-        <Link href="/exercises/recitation/setup" className="text-sm hover:underline">
-          ← Retour
-        </Link>
+      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-4 py-2 flex items-center justify-between">
+        <Link
+            href="/exercises/recitation/setup"
+            aria-label="Retour"
+            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </Link>
         <span className="text-sm font-medium">
           Pages {toArabicNumbers(displayedPair.rightPage)}–{toArabicNumbers(displayedPair.leftPage)}{' '}
           • Question {toArabicNumbers(Math.min(round, maxRounds))}/{toArabicNumbers(maxRounds)}
@@ -570,18 +576,18 @@ export default function RecitationPractice() {
       </div>
 
       {/* Bandeau de consigne (même format que les autres exercices) */}
-      <div className="flex-none bg-[#2d5016]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
+      <div className="flex-none bg-[var(--ds-green)]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
         {phase === 'listening' && (
           <>
             {audio.isPlaying && (
               <span className="flex gap-0.5">
-                <span className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-0.5 h-3 bg-[#c9a959] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
             )}
             <span className="text-base font-medium">Écoutez l&apos;extrait</span>
-            <span className="text-[#c9a959] text-sm">
+            <span className="text-[var(--ds-gold)] text-sm">
               Puis appuyez sur le bouton rouge pour réciter
             </span>
             <button
@@ -591,7 +597,7 @@ export default function RecitationPractice() {
                 playSnippet();
               }}
               aria-label="Réécouter l'extrait"
-              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all"
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--ds-gold)]/20 text-[var(--ds-gold)] hover:bg-[var(--ds-gold)]/35 active:scale-95 transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -604,7 +610,7 @@ export default function RecitationPractice() {
           <>
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
             <span className="text-base font-medium">Enregistrement en cours</span>
-            <span className="text-[#c9a959] text-sm">Appuyez sur stop quand vous avez terminé</span>
+            <span className="text-[var(--ds-gold)] text-sm">Appuyez sur stop quand vous avez terminé</span>
             <button
               type="button"
               onClick={(e) => {
@@ -612,7 +618,7 @@ export default function RecitationPractice() {
                 playSnippet();
               }}
               aria-label="Faire répéter l'extrait"
-              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[#c9a959]/20 text-[#c9a959] hover:bg-[#c9a959]/35 active:scale-95 transition-all flex-shrink-0"
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--ds-gold)]/20 text-[var(--ds-gold)] hover:bg-[var(--ds-gold)]/35 active:scale-95 transition-all flex-shrink-0"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -624,7 +630,7 @@ export default function RecitationPractice() {
         {phase === 'result' && (
           <>
             <span className="text-base font-medium">Verset surligné</span>
-            <span className="text-[#c9a959] text-sm">
+            <span className="text-[var(--ds-gold)] text-sm">
               Touchez les mots ratés • feuilletez tout le Mushaf
             </span>
             <span className="hidden sm:flex items-center gap-2 ml-2">
@@ -683,7 +689,7 @@ export default function RecitationPractice() {
                 <line x1="12" x2="12" y1="19" y2="22" />
               </svg>
             </button>
-            <span className="text-sm font-bold text-[#2d5016] bg-[#fdfaf3]/90 px-3 py-1 rounded-full shadow">
+            <span className="text-sm font-bold text-[var(--ds-green)] bg-[var(--ds-bg)]/90 px-3 py-1 rounded-full shadow">
               Réciter
             </span>
           </div>
@@ -692,7 +698,7 @@ export default function RecitationPractice() {
         {/* Gros bouton stop + compteur (pages toujours floutées) */}
         {phase === 'reciting' && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3">
-            <span className="text-4xl font-bold tabular-nums text-[#2d5016] bg-[#fdfaf3]/95 px-5 py-1.5 rounded-2xl shadow-lg border border-[#c9a959]/40">
+            <span className="text-4xl font-bold tabular-nums text-[var(--ds-green)] bg-[var(--ds-bg)]/95 px-5 py-1.5 rounded-2xl shadow-lg border border-[var(--ds-gold)]/40">
               {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
             </span>
             <button
@@ -708,7 +714,7 @@ export default function RecitationPractice() {
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             </button>
-            <span className="text-sm font-bold text-[#2d5016] bg-[#fdfaf3]/90 px-3 py-1 rounded-full shadow">
+            <span className="text-sm font-bold text-[var(--ds-green)] bg-[var(--ds-bg)]/90 px-3 py-1 rounded-full shadow">
               Stop
             </span>
           </div>
@@ -726,10 +732,10 @@ export default function RecitationPractice() {
                 e.stopPropagation();
                 flipResult('prev');
               }}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
                 canFlipPrev
-                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
-                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+                  ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
+                  : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -744,10 +750,10 @@ export default function RecitationPractice() {
                 e.stopPropagation();
                 flipResult('next');
               }}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 transition-opacity ${
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
                 canFlipNext
-                  ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016] active:scale-95'
-                  : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+                  ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
+                  : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -761,7 +767,7 @@ export default function RecitationPractice() {
         {phase === 'result' && selectedWords.size > 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]">
             <div
-              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
+              className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -813,7 +819,7 @@ export default function RecitationPractice() {
             }
           >
             <div
-              className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-[#c9a959] rounded-2xl shadow-[0_8px_28px_rgba(45,80,22,0.28)] px-4 pb-3"
+              className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-[var(--ds-gold)] rounded-2xl shadow-[0_8px_28px_rgba(45,80,22,0.28)] px-4 pb-3"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Poignée de déplacement */}
@@ -825,7 +831,7 @@ export default function RecitationPractice() {
                 className="flex items-center justify-between gap-2 pt-2 pb-1.5 cursor-grab active:cursor-grabbing select-none"
                 style={{ touchAction: 'none' }}
               >
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)]">
                   Votre récitation
                 </span>
                 <svg
@@ -833,7 +839,7 @@ export default function RecitationPractice() {
                   height="18"
                   viewBox="0 0 24 24"
                   fill="currentColor"
-                  className="text-[#c9a959]"
+                  className="text-[var(--ds-gold)]"
                   aria-hidden
                 >
                   <circle cx="9" cy="6" r="1.5" />
@@ -856,7 +862,7 @@ export default function RecitationPractice() {
                     }}
                   />
                   <div className="flex items-center gap-1 mt-1.5">
-                    <span className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold mr-1">
+                    <span className="text-[10px] uppercase tracking-widest text-[var(--ds-gold)] font-bold mr-1">
                       Vitesse
                     </span>
                     {[1, 1.5, 2].map((rate) => (
@@ -866,8 +872,8 @@ export default function RecitationPractice() {
                         onClick={() => setPlaybackRate(rate)}
                         className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all ${
                           playbackRate === rate
-                            ? 'bg-[#2d5016] text-[#fdfaf3]'
-                            : 'bg-white border border-[#c9a959]/40 text-[#4a7c23] hover:border-[#c9a959]'
+                            ? 'bg-[var(--ds-green)] text-[var(--ds-bg)]'
+                            : 'bg-white border border-[var(--ds-gold)]/40 text-[var(--ds-sage)] hover:border-[var(--ds-gold)]'
                         }`}
                       >
                         ×{rate === 1.5 ? '1,5' : rate}
@@ -882,7 +888,7 @@ export default function RecitationPractice() {
                 <button
                   type="button"
                   onClick={() => audio.play(target)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-[#c9a959]/40 text-[#2d5016] text-sm font-semibold active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-[var(--ds-gold)]/40 text-[var(--ds-green)] text-sm font-semibold active:scale-95 transition-all"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -896,7 +902,7 @@ export default function RecitationPractice() {
                       <button
                         type="button"
                         onClick={() => answerRound(true)}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#2d5016] hover:bg-[#4a7c23] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[var(--ds-green)] hover:bg-[var(--ds-sage)] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
                       >
                         ✓ Trouvé
                       </button>
@@ -912,7 +918,7 @@ export default function RecitationPractice() {
                     <button
                       type="button"
                       onClick={advanceRound}
-                      className="flex items-center gap-1 px-5 py-2 rounded-lg bg-[#2d5016] hover:bg-[#4a7c23] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
+                      className="flex items-center gap-1 px-5 py-2 rounded-lg bg-[var(--ds-green)] hover:bg-[var(--ds-sage)] text-white text-sm font-bold shadow-md active:scale-95 transition-all"
                     >
                       Suivant ›
                     </button>

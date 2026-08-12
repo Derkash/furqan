@@ -170,13 +170,13 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
   const hiddenCount = ordered.length - shown.length;
 
   const header = (
-    <div className={embedded ? 'px-1 pt-1 pb-2' : 'flex-none p-4 border-b border-[#c9a959]/30'}>
+    <div className={embedded ? 'px-1 pt-1 pb-2' : 'flex-none p-4 border-b border-[var(--ds-gold)]/30'}>
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959]">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)]">
             Occurrences de la racine
           </p>
-          <p dir="rtl" className="text-2xl font-bold text-[#2d5016]" style={{ fontFamily: "'Amiri',serif" }}>
+          <p dir="rtl" className="text-2xl font-bold text-[var(--ds-green)]" style={{ fontFamily: "'Amiri',serif" }}>
             {root.split('').join(' ')}
           </p>
           {gloss && <p className="text-sm text-gray-500">{gloss}</p>}
@@ -186,7 +186,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
             type="button"
             onClick={onClose}
             aria-label="Fermer"
-            className="w-8 h-8 rounded-full bg-[#2d5016]/10 text-[#2d5016] flex items-center justify-center hover:bg-[#2d5016]/20"
+            className="w-8 h-8 rounded-full bg-[var(--ds-green)]/10 text-[var(--ds-green)] flex items-center justify-center hover:bg-[var(--ds-green)]/20"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -198,15 +198,15 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
       {/* Plage : tout le Coran / « déjà vu » figé, sinon sélecteur */}
       <div className="mt-3">
         {locked ? (
-          <div className="flex items-center justify-between text-xs bg-[#2d5016]/10 rounded-lg px-2.5 py-1.5">
-            <span className="text-[#2d5016] font-semibold">
+          <div className="flex items-center justify-between text-xs bg-[var(--ds-green)]/10 rounded-lg px-2.5 py-1.5">
+            <span className="text-[var(--ds-green)] font-semibold">
               {fullQuran
                 ? 'Toutes les occurrences (البقرة → الناس)'
                 : end >= start
                   ? `Déjà rencontré avant la page ${toArabicNumbers(beforePage!)} (pages ${toArabicNumbers(start)}–${toArabicNumbers(end)})`
                   : `Aucune page avant la page ${toArabicNumbers(beforePage!)}`}
             </span>
-            <span className="text-[#4a7c23] font-bold whitespace-nowrap ml-2">
+            <span className="text-[var(--ds-sage)] font-bold whitespace-nowrap ml-2">
               {occ ? `${toArabicNumbers(occ.length)} fois` : ''}
             </span>
           </div>
@@ -219,7 +219,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                   ? `pages ${Math.min(startPage, endPage!)}–${Math.max(startPage, endPage!)}`
                   : 'tout le Coran'}
               </span>
-              <span className="text-[#4a7c23] font-bold">
+              <span className="text-[var(--ds-sage)] font-bold">
                 {occ ? `${toArabicNumbers(occ.length)} apparition${occ.length > 1 ? 's' : ''}` : ''}
               </span>
             </div>
@@ -234,7 +234,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
             <span
               key={f}
               dir="rtl"
-              className="text-[#2d5016] bg-white/70 border border-[#c9a959]/30 rounded-lg px-2 py-0.5"
+              className="text-[var(--ds-green)] bg-white/70 border border-[var(--ds-gold)]/30 rounded-lg px-2 py-0.5"
               style={{ fontFamily: "'Amiri',serif", fontSize: '1.2em' }}
             >
               {f}
@@ -256,14 +256,14 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
               const inf = info[infoKey(o)];
               const occGloss = inf?.gloss;
               return (
-                <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[#c9a959]/20">
+                <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[var(--ds-gold)]/20">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
                       {o.verseKey} · p.{toArabicNumbers(o.page)}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {o.morph?.lemma && (
-                        <span dir="rtl" className="text-[10px] text-[#7a5d2c] bg-[#c9a959]/15 rounded-full px-1.5" style={{ fontFamily: "'Amiri',serif" }}>
+                        <span dir="rtl" className="text-[10px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-1.5" style={{ fontFamily: "'Amiri',serif" }}>
                           {o.morph.lemma}
                         </span>
                       )}
@@ -276,11 +276,11 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                   </div>
 
                   {/* Verset arabe — le mot ciblé surligné */}
-                  <p dir="rtl" className="text-[#2d5016] leading-loose" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.6em' }}>
+                  <p dir="rtl" className="text-[var(--ds-green)] leading-loose" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.6em' }}>
                     {(verseWords[o.verseKey] ?? []).map((w) => (
                       <span
                         key={w.position}
-                        className={w.position === o.word ? 'bg-[#c9a959]/45 rounded px-0.5 font-bold' : ''}
+                        className={w.position === o.word ? 'bg-[var(--ds-gold)]/45 rounded px-0.5 font-bold' : ''}
                       >
                         {w.form}{' '}
                       </span>
@@ -294,7 +294,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                   )}
 
                   {/* Traduction DE CETTE forme (en gras) + mini-explication du wazn */}
-                  <p className="text-[12px] text-[#2d5016] mt-1">
+                  <p className="text-[12px] text-[var(--ds-green)] mt-1">
                     → <span className="font-bold">{occGloss || gloss || '…'}</span>
                   </p>
                   {inf?.note && (
@@ -324,7 +324,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3" onClick={onClose}>
       <div
-        className="bg-[#fdfaf3] rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border-2 border-[#c9a959]"
+        className="bg-[var(--ds-bg)] rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border-2 border-[var(--ds-gold)]"
         onClick={(e) => e.stopPropagation()}
       >
         {header}

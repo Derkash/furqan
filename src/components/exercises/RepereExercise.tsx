@@ -230,10 +230,16 @@ export default function RepereExercise() {
       (id) => !q || `${id} ${data![id].name}`.toLowerCase().includes(q) || data![id].arname.includes(query.trim())
     );
     return (
-      <div className="min-h-[100dvh] bg-[#fdfaf3] flex flex-col" dir="ltr">
-        <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
-          <Link href="/exercises" className="text-sm hover:underline whitespace-nowrap">
-            ← Retour
+      <div className="min-h-full bg-[var(--ds-bg)] flex flex-col" dir="ltr">
+        <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
+          <Link
+            href="/revision"
+            aria-label="Retour"
+            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </Link>
           <span className="text-sm font-bold">Repères — choisis une sourate</span>
           <span className="w-12" />
@@ -243,12 +249,12 @@ export default function RepereExercise() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher une sourate…"
-            className="w-full max-w-md mx-auto block px-3 py-2 rounded-xl border-2 border-[#c9a959]/40 focus:outline-none focus:border-[#2d5016] text-[#2d5016]"
+            className="w-full max-w-md mx-auto block px-3 py-2 rounded-xl border-2 border-[var(--ds-gold)]/40 focus:outline-none focus:border-[var(--ds-green)] text-[var(--ds-green)]"
           />
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-8" style={{ WebkitOverflowScrolling: 'touch' }}>
           {!data ? (
-            <p className="text-center text-[#4a7c23] py-8">Chargement…</p>
+            <p className="text-center text-[var(--ds-sage)] py-8">Chargement…</p>
           ) : (
             <div className="max-w-2xl mx-auto grid grid-cols-2 sm:grid-cols-3 gap-2">
               {filtered.map((id) => (
@@ -259,15 +265,15 @@ export default function RepereExercise() {
                     setLevel(0);
                     setQuery('');
                   }}
-                  className="text-left p-3 rounded-xl bg-white border border-[#c9a959]/30 hover:border-[#c9a959] active:scale-[0.98] transition-all"
+                  className="text-left p-3 rounded-xl bg-white border border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)] active:scale-[0.98] transition-all"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-[#7a8b3e]">{id}</span>
-                    <span className="text-lg text-[#2d5016]" dir="rtl" style={{ fontFamily: AR_FONT }}>
+                    <span className="text-[11px] font-bold text-[var(--ds-sage)]">{id}</span>
+                    <span className="text-lg text-[var(--ds-green)]" dir="rtl" style={{ fontFamily: AR_FONT }}>
                       {data[id].arname}
                     </span>
                   </div>
-                  <div className="text-sm font-bold text-[#2d5016] truncate">{data[id].name}</div>
+                  <div className="text-sm font-bold text-[var(--ds-green)] truncate">{data[id].name}</div>
                   <div className="text-[10px] text-gray-400">
                     {data[id].total} page{data[id].total > 1 ? 's' : ''}
                   </div>
@@ -290,7 +296,7 @@ export default function RepereExercise() {
   );
 
   return (
-    <div className="min-h-[100dvh] bg-[#fdfaf3] flex flex-col" dir="ltr">
+    <div className="min-h-full bg-[var(--ds-bg)] flex flex-col" dir="ltr">
       <style>{`
         .rep-table { border-collapse: collapse; }
         .rep-table th { background:#2f5496; color:#fff; font-size:12px; padding:5px 6px; border:1px solid #2f5496; }
@@ -307,7 +313,7 @@ export default function RepereExercise() {
       `}</style>
 
       {/* Barre */}
-      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
         <button onClick={() => setSurah(null)} className="text-sm hover:underline whitespace-nowrap">
           ← Sourates
         </button>
@@ -318,14 +324,14 @@ export default function RepereExercise() {
       </div>
 
       {/* Niveaux de difficulté */}
-      <div className="flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1.5 flex-wrap">
-        <span className="text-[11px] uppercase tracking-wide text-[#c9a959] mr-1">Difficulté</span>
+      <div className="flex-none bg-[var(--ds-green)]/95 text-white px-2 py-2 flex items-center justify-center gap-1.5 flex-wrap">
+        <span className="text-[11px] uppercase tracking-wide text-[var(--ds-gold)] mr-1">Difficulté</span>
         {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
           <button
             key={lvl}
             onClick={() => setLevel(lvl)}
             className={`min-w-[32px] h-8 px-2 rounded-md text-sm font-bold ${
-              level === lvl ? 'bg-[#c9a959] text-[#2d5016] shadow-md' : 'bg-[#2d5016] text-[#c9a959] border border-[#4a7c23] hover:bg-[#3e6b1d]'
+              level === lvl ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] shadow-md' : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
             }`}
           >
             {lvl}
@@ -335,8 +341,8 @@ export default function RepereExercise() {
 
       {/* En-tête sourate + consigne */}
       {sd && (
-        <div className="flex-none text-center py-1.5 bg-[#f4e9d0]">
-          <span className="text-[#2d5016] font-bold" dir="rtl" style={{ fontFamily: AR_FONT, fontSize: 20 }}>
+        <div className="flex-none text-center py-1.5 bg-[var(--ds-sage-100)]">
+          <span className="text-[var(--ds-green)] font-bold" dir="rtl" style={{ fontFamily: AR_FONT, fontSize: 20 }}>
             سورة {sd.arname}
           </span>
           <span className="text-[#7a5d2c] text-sm"> · {sd.name}</span>
@@ -349,7 +355,7 @@ export default function RepereExercise() {
       {/* Tableau (défilable) */}
       <div className="flex-1 min-h-0 overflow-auto p-2" style={{ WebkitOverflowScrolling: 'touch' }}>
         {!sd ? (
-          <p className="text-center text-[#4a7c23] py-8">Chargement…</p>
+          <p className="text-center text-[var(--ds-sage)] py-8">Chargement…</p>
         ) : (
           <table className="rep-table mx-auto" style={{ touchAction: 'pan-y', userSelect: 'none' }}>
             <thead>

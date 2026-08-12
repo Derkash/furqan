@@ -153,11 +153,11 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
               await importSeed();
               setTotal(getVocab().length);
             }}
-            className="px-4 py-2 bg-[#2d5016] text-white rounded-lg text-sm font-bold"
+            className="px-4 py-2 bg-[var(--ds-green)] text-white rounded-lg text-sm font-bold"
           >
             Importer mon lexique
           </button>
-          <button onClick={() => onEmpty?.()} className="px-4 py-2 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-lg text-sm font-bold">
+          <button onClick={() => onEmpty?.()} className="px-4 py-2 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-lg text-sm font-bold">
             Enregistrer des mots
           </button>
         </div>
@@ -170,7 +170,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
     const hasRange = startPage != null && endPage != null;
     return (
       <Centered>
-        <p className="text-[#2d5016] text-lg font-bold mb-1">Parcourir mon vocabulaire</p>
+        <p className="text-[var(--ds-green)] text-lg font-bold mb-1">Parcourir mon vocabulaire</p>
         {hasRange ? (
           <p className="text-sm text-gray-500 mb-4">
             Sur ta plage (pages {Math.min(startPage!, endPage!)}→{Math.max(startPage!, endPage!)}),
@@ -183,13 +183,13 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
           <button
             onClick={beginRange}
             disabled={!hasRange || building}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white rounded-xl text-sm font-bold disabled:opacity-40"
+            className="px-5 py-2.5 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white rounded-xl text-sm font-bold disabled:opacity-40"
           >
             {building ? 'Préparation…' : 'Réviser cette plage'}
           </button>
           <button
             onClick={beginAll}
-            className="px-5 py-2.5 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-xl text-sm font-bold hover:border-[#c9a959]"
+            className="px-5 py-2.5 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-xl text-sm font-bold hover:border-[var(--ds-gold)]"
           >
             Tout ({toArabicNumbers(total)})
           </button>
@@ -204,10 +204,10 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
       <Centered>
         <p className="text-gray-500 mb-4">Aucun mot de ton lexique dans cette plage.</p>
         <div className="flex gap-2 justify-center">
-          <button onClick={() => setStarted(false)} className="px-4 py-2 bg-[#2d5016] text-white rounded-lg text-sm font-bold">
+          <button onClick={() => setStarted(false)} className="px-4 py-2 bg-[var(--ds-green)] text-white rounded-lg text-sm font-bold">
             Retour
           </button>
-          <button onClick={beginAll} className="px-4 py-2 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-lg text-sm font-bold">
+          <button onClick={beginAll} className="px-4 py-2 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-lg text-sm font-bold">
             Tout mon lexique
           </button>
         </div>
@@ -218,15 +218,15 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
   if (done) {
     return (
       <Centered>
-        <p className="text-2xl font-bold text-[#2d5016] mb-1">Terminé 🎉</p>
-        <p className="text-[#4a7c23] mb-4">
+        <p className="text-2xl font-bold text-[var(--ds-green)] mb-1">Terminé 🎉</p>
+        <p className="text-[var(--ds-sage)] mb-4">
           {toArabicNumbers(done.known)}/{toArabicNumbers(done.reviewed)} acquis
         </p>
         <div className="flex gap-2 justify-center">
-          <button onClick={() => launch(queue)} className="px-5 py-2.5 bg-[#2d5016] text-white rounded-xl text-sm font-bold">
+          <button onClick={() => launch(queue)} className="px-5 py-2.5 bg-[var(--ds-green)] text-white rounded-xl text-sm font-bold">
             Recommencer
           </button>
-          <button onClick={() => setStarted(false)} className="px-5 py-2.5 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-xl text-sm font-bold">
+          <button onClick={() => setStarted(false)} className="px-5 py-2.5 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-xl text-sm font-bold">
             Retour
           </button>
         </div>
@@ -249,10 +249,10 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
           <span>
             {toArabicNumbers(idx + 1)} / {toArabicNumbers(queue.length)}
           </span>
-          <span className="text-[#4a7c23]">✓ {toArabicNumbers(knownCount)}</span>
+          <span className="text-[var(--ds-sage)]">✓ {toArabicNumbers(knownCount)}</span>
         </div>
-        <div className="h-1.5 bg-[#c9a959]/20 rounded-full overflow-hidden">
-          <div className="h-full bg-[#4a7c23] transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
+        <div className="h-1.5 bg-[var(--ds-gold)]/20 rounded-full overflow-hidden">
+          <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${(idx / queue.length) * 100}%` }} />
         </div>
       </div>
 
@@ -289,7 +289,7 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
         </button>
         <button
           onClick={() => commit(true)}
-          className="flex-1 py-3 rounded-xl bg-[#2d5016] text-white font-bold active:scale-95 transition-all"
+          className="flex-1 py-3 rounded-xl bg-[var(--ds-green)] text-white font-bold active:scale-95 transition-all"
         >
           Acquis ✓
         </button>
@@ -301,27 +301,27 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
 function Card({ item, rightHint = 0, leftHint = 0 }: { item: QItem; rightHint?: number; leftHint?: number }) {
   const { entry, ref, count } = item;
   return (
-    <div className="relative bg-white rounded-3xl shadow-xl border-2 border-[#c9a959]/30 p-8 min-h-[280px] flex flex-col items-center justify-center gap-4 text-center">
-      <div className="absolute top-4 left-4 text-[#2d5016] font-black text-lg border-2 border-[#2d5016] rounded-lg px-2 py-0.5 rotate-[-12deg]" style={{ opacity: rightHint }}>
+    <div className="relative bg-white rounded-3xl shadow-xl border-2 border-[var(--ds-gold)]/30 p-8 min-h-[280px] flex flex-col items-center justify-center gap-4 text-center">
+      <div className="absolute top-4 left-4 text-[var(--ds-green)] font-black text-lg border-2 border-[var(--ds-green)] rounded-lg px-2 py-0.5 rotate-[-12deg]" style={{ opacity: rightHint }}>
         ACQUIS
       </div>
       <div className="absolute top-4 right-4 text-[#7a3030] font-black text-lg border-2 border-[#7a3030] rounded-lg px-2 py-0.5 rotate-[12deg]" style={{ opacity: leftHint }}>
         À REVOIR
       </div>
 
-      <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '3.2em', lineHeight: 1.3 }}>
+      <span dir="rtl" className="text-[var(--ds-green)]" style={{ fontFamily: "'Amiri',serif", fontSize: '3.2em', lineHeight: 1.3 }}>
         {entry.arabic}
       </span>
-      <span className="text-[#4a7c23] text-xl font-semibold">{entry.gloss}</span>
+      <span className="text-[var(--ds-sage)] text-xl font-semibold">{entry.gloss}</span>
 
       <div className="flex items-center gap-2 flex-wrap justify-center">
         {entry.root && (
-          <span dir="rtl" className="text-[11px] text-[#7a5d2c] bg-[#c9a959]/15 rounded-full px-2 py-0.5" style={{ fontFamily: "'Amiri',serif" }}>
+          <span dir="rtl" className="text-[11px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-2 py-0.5" style={{ fontFamily: "'Amiri',serif" }}>
             {entry.root.split('').join(' ')}
           </span>
         )}
         {ref && (
-          <span className="text-[11px] text-[#2d5016] bg-[#2d5016]/8 rounded-full px-2 py-0.5 font-semibold">
+          <span className="text-[11px] text-[var(--ds-green)] bg-[var(--ds-green)]/8 rounded-full px-2 py-0.5 font-semibold">
             {ref.verseKey} · p.{toArabicNumbers(ref.page)}
             {count > 1 ? ` (+${toArabicNumbers(count - 1)})` : ''}
           </span>

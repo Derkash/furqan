@@ -151,6 +151,8 @@ export default function LecturePractice() {
   const lastRecUrl = useRef<string | null>(null); // pour lancer la réécoute une seule fois
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
+  // Panneau « Audio » (droite) : récitateur, vitesse, options — design Application2.
+  const [showAudioPanel, setShowAudioPanel] = useState(false);
   const [config, setConfig] = useState<PlayConfig>({
     ...DEFAULT_CONFIG,
     selMode: 'page',
@@ -1126,96 +1128,103 @@ export default function LecturePractice() {
   const selCount = selRef.current.length;
 
   return (
-    <div ref={rootRef} className={`h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`}>
-      {/* Barre */}
-      <div dir="ltr" className={`app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2 ${isFs ? 'hidden' : ''}`}>
-        <Link href="/exercises/lecture/setup" className="text-sm hover:underline whitespace-nowrap">
-          ← Retour
-        </Link>
-        <span className="text-sm font-medium">
-          Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
-        </span>
-        <div className="flex items-center gap-2">
+    <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex flex-col overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
+      {/* Barre haute unique : retour, pages, modes, plein écran */}
+      <div dir="ltr" className={`app-topbar flex-none px-3 py-2 flex items-center justify-between gap-2 text-white ${isFs ? 'hidden' : ''}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <Link
+            href="/exercises/lecture/setup"
+            aria-label="Retour"
+            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </Link>
+          <span className="text-sm font-bold whitespace-nowrap opacity-90">
+            Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setShowThemes((t) => !t)}
+            title="Surligner les versets partageant le même tafsir Ibn Kathir (thèmes)"
+            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
+              showThemes ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
+            }`}
+          >
+            Thèmes
+          </button>
+          <button
+            onClick={() =>
+              setMarkingMode((m) => {
+                if (!m) {
+                  setCaptureMode(false);
+                  setVerseMenu(null);
+                  setSelected(null);
+                } else {
+                  setSelWords(new Map());
+                }
+                return !m;
+              })
+            }
+            title="Marquer mes fautes : touche les mots ratés, puis choisis le type"
+            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
+              markingMode ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
+            }`}
+          >
+            ✍ Marquer
+          </button>
+          <button
+            onClick={() => setShowMistakes((s) => !s)}
+            title="Afficher/masquer les fautes déclarées"
+            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
+              showMistakes && mistakeWords.size > 0 ? 'bg-red-500 text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
+            }`}
+          >
+            Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
+          </button>
+          <button
+            onClick={() => setShowLexicon((s) => !s)}
+            title="Afficher/masquer les couleurs des mots de mon lexique"
+            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
+              showLexicon ? 'bg-[var(--ds-sage)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
+            }`}
+          >
+            Lexique
+          </button>
+          <button
+            onClick={() => {
+              setCaptureMode((m) => {
+                if (!m) {
+                  setMarkingMode(false);
+                  setSelWords(new Map());
+                }
+                return !m;
+              });
+              setSelected(null);
+            }}
+            className={`h-8 px-3 rounded-full text-xs font-bold transition-colors ${
+              captureMode ? 'bg-[var(--ds-gold)] text-white' : 'bg-white/10 text-white/85 hover:bg-white/20'
+            }`}
+          >
+            ➕ Mot
+          </button>
+        </div>
         <button
           onClick={toggleFullscreen}
-          title={isFs ? 'Quitter le plein écran' : 'Plein écran'}
-          className="text-xs font-bold rounded-full px-2.5 py-1 border text-[#c9a959] border-[#4a7c23] hover:bg-[#1f3a0f]"
+          aria-label={isFs ? 'Quitter le plein écran' : 'Plein écran'}
+          className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
         >
-          {isFs ? '⛶ Quitter' : '⛶ Plein écran'}
-        </button>
-        <button
-          onClick={() => {
-            setCaptureMode((m) => {
-              if (!m) {
-                setMarkingMode(false);
-                setSelWords(new Map());
-              }
-              return !m;
-            });
-            setSelected(null);
-          }}
-          className={`text-xs font-bold rounded-full px-2.5 py-1 border ${
-            captureMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
-          }`}
-        >
-          ➕ Ajouter un mot
-        </button>
-        </div>
-      </div>
-
-      {/* Contrôles : lecture + vitesse + réglages */}
-      <div className={`flex-none bg-[#2d5016]/95 text-white px-3 py-2 flex items-center justify-center gap-3 flex-wrap ${isFs ? 'hidden' : ''}`}>
-        <button
-          onClick={() => setShowConfig(true)}
-          title="Configurer la lecture (plage, répétitions, français)"
-          className="flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#c9a959] text-[#c9a959] hover:bg-[#1f3a0f]"
-        >
-          ⚙️ Réglages
-        </button>
-        <button
-          onClick={() => setShowLpConfig(true)}
-          title="Régler le comportement de l'appui long (vitesse, portée, traduction, tafsir)"
-          className="flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#c9a959] text-[#c9a959] hover:bg-[#1f3a0f]"
-        >
-          👆 Appui long
-        </button>
-        {sessionActive && (
-          <button
-            onClick={stop}
-            title="Arrêter"
-            className="text-[12px] font-bold rounded-full px-3 py-1.5 border border-[#7a3030] text-[#e7b7b7] hover:bg-[#1f3a0f]"
-          >
-            ■ Stop
-          </button>
-        )}
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] text-[#c9a959] mr-1">Vitesse</span>
-          {SPEEDS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setRate(s)}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                rate === s ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#1f3a0f] text-[#c9a959]'
-              }`}
-            >
-              ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setShowTrans((v) => !v)}
-          title="Afficher la traduction française du verset"
-          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-            showTrans ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959]' : 'text-[#c9a959] border-[#4a7c23]'
-          }`}
-        >
-          FR texte
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+          </svg>
         </button>
       </div>
 
       {/* Enregistrement micro : état + réécoute */}
       {(recorder.recording || recorder.audioUrl || recorder.error) && (
-        <div className="flex-none bg-[#1f3a0f] px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
+        <div className="flex-none bg-[var(--ds-green-deep)] px-3 py-2 flex items-center justify-center gap-3 flex-wrap">
           {recorder.recording ? (
             <span className="flex items-center gap-2 text-[#e7b7b7] text-sm font-semibold">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
@@ -1223,7 +1232,7 @@ export default function LecturePractice() {
             </span>
           ) : recorder.audioUrl ? (
             <>
-              <span className="text-[11px] font-bold text-[#c9a959] whitespace-nowrap">🎧 Ta récitation</span>
+              <span className="text-[11px] font-bold text-[var(--ds-gold)] whitespace-nowrap">🎧 Ta récitation</span>
               <audio
                 ref={recPlayerRef}
                 controls
@@ -1234,7 +1243,7 @@ export default function LecturePractice() {
                 }}
               />
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-[#c9a959] font-bold mr-0.5">Vitesse</span>
+                <span className="text-[10px] text-[var(--ds-gold)] font-bold mr-0.5">Vitesse</span>
                 {[0.75, 1, 1.5, 2].map((r) => (
                   <button
                     key={r}
@@ -1243,7 +1252,7 @@ export default function LecturePractice() {
                       if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
                     }}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                      recRate === r ? 'bg-[#c9a959] text-[#2d5016]' : 'bg-[#2d5016] text-[#c9a959] border border-[#c9a959]/40'
+                      recRate === r ? 'bg-[var(--ds-gold)] text-[var(--ds-green)]' : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border border-[var(--ds-gold)]/40'
                     }`}
                   >
                     ×{r === 0.75 ? '0,75' : r === 1.5 ? '1,5' : r}
@@ -1252,13 +1261,13 @@ export default function LecturePractice() {
               </div>
               <button
                 onClick={toggleRecord}
-                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#c9a959] text-[#c9a959] hover:bg-[#2d5016]"
+                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[var(--ds-gold)] text-[var(--ds-gold)] hover:bg-[var(--ds-green)]"
               >
                 🎤 Réenregistrer
               </button>
               <button
                 onClick={() => recorder.clear()}
-                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#7a3030] text-[#e7b7b7] hover:bg-[#2d5016]"
+                className="text-[11px] font-bold rounded-full px-3 py-1 border border-[#7a3030] text-[#e7b7b7] hover:bg-[var(--ds-green)]"
               >
                 🗑️ Effacer
               </button>
@@ -1270,12 +1279,12 @@ export default function LecturePractice() {
 
       {/* Récap sélection en cours */}
       {sessionActive && !isFs && (
-        <div className="flex-none bg-[#1f3a0f] text-[#c9a959] text-[11px] px-3 py-1 text-center">
+        <div className="flex-none bg-[var(--ds-green-deep)] text-[var(--ds-gold)] text-[11px] px-3 py-1 text-center">
           🎧 {describeSelection(config, selCount)}
           {config.french && frAvailable === false && (
             <span className="text-[#e7b7b7]"> · récitation FR indisponible</span>
           )}
-          {tafsirLoading && <span className="text-[#c9a959]"> · 📖 préparation du tafsir…</span>}
+          {tafsirLoading && <span className="text-[var(--ds-gold)]"> · 📖 préparation du tafsir…</span>}
         </div>
       )}
 
@@ -1284,13 +1293,13 @@ export default function LecturePractice() {
           mais ne repousse plus le mushaf (évite le « saut de page »). */}
       {showTrans && !isFs && (
         <div
-          className="flex-none bg-[#fdfaf3] border-b border-[#c9a959]/40 px-4 flex items-center justify-center overflow-y-auto"
+          className="flex-none bg-[var(--ds-bg)] border-b border-[var(--ds-gold)]/40 px-4 flex items-center justify-center overflow-y-auto"
           style={{ height: 56 }}
         >
-          <p className="text-[13px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
+          <p className="text-[13px] text-[var(--ds-green)] leading-relaxed max-w-3xl mx-auto">
             {currentVerse && trans?.[currentVerse] ? (
               <>
-                <span className="text-[11px] font-bold text-[#c9a959] mr-1">{currentVerse}</span>
+                <span className="text-[11px] font-bold text-[var(--ds-gold)] mr-1">{currentVerse}</span>
                 {trans[currentVerse]}
               </>
             ) : (
@@ -1300,72 +1309,17 @@ export default function LecturePractice() {
         </div>
       )}
 
-      {/* Thèmes / Marquer les fautes / Fautes / Lexique (masqués en plein écran) */}
-      <div className={`flex-none bg-[#2d5016]/95 text-white px-2 py-2 flex items-center justify-center gap-1.5 flex-wrap ${isFs ? 'hidden' : ''}`}>
-        <button
-          onClick={() => setShowThemes((t) => !t)}
-          title="Surligner les versets partageant le même tafsir Ibn Kathir (thèmes)"
-          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
-            showThemes ? 'bg-[#7a8b3e] text-white border-[#7a8b3e] shadow-md' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
-          }`}
-        >
-          Thèmes
-        </button>
-        <button
-          onClick={() =>
-            setMarkingMode((m) => {
-              if (!m) {
-                setCaptureMode(false);
-                setVerseMenu(null);
-                setSelected(null);
-              } else {
-                setSelWords(new Map());
-              }
-              return !m;
-            })
-          }
-          title="Marquer mes fautes : touche les mots ratés, puis choisis le type"
-          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
-            markingMode ? 'bg-[#c9a959] text-[#2d5016] border-[#c9a959] shadow-md' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
-          }`}
-        >
-          ✍ Marquer
-        </button>
-        <button
-          onClick={() => setShowMistakes((s) => !s)}
-          title="Afficher/masquer les fautes déclarées"
-          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
-            showMistakes && mistakeWords.size > 0 ? 'bg-red-600 text-white border-red-600' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
-          }`}
-        >
-          Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
-        </button>
-        <button
-          onClick={() => setShowLexicon((s) => !s)}
-          title="Afficher/masquer les couleurs des mots de mon lexique"
-          className={`h-8 px-2.5 rounded-md text-xs font-bold border ${
-            showLexicon ? 'bg-[#4a7c23] text-white border-[#4a7c23]' : 'bg-[#2d5016] text-[#c9a959] border-[#4a7c23] hover:bg-[#3e6b1d]'
-          }`}
-        >
-          Lexique
-        </button>
-      </div>
+      {/* Aide contextuelle (mode Ajouter) */}
+      {captureMode && !isFs && (
+        <div className="flex-none text-[11px] text-white/75 px-3 py-1 text-center">
+          Touche un mot pour l&apos;ajouter à ton lexique ou voir ses occurrences
+        </div>
+      )}
 
-      {/* Légende / mode */}
-      <div className={`flex-none bg-[#f4e9d0] text-[11px] text-[#4a5a2e] px-3 py-1 flex items-center justify-center gap-2 ${isFs ? 'hidden' : ''}`}>
-        {lexSize > 0 && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(74,124,35,0.35)', boxShadow: '0 0 0 1.5px rgba(74,124,35,0.5)' }} />
-            mots de ton lexique
-          </span>
-        )}
-        {captureMode && <span className="text-[#7a5d2c] font-semibold">· touche un mot pour l&apos;ajouter / voir ses occurrences</span>}
-      </div>
-
-      {/* Mushaf */}
+      {/* Mushaf — le « livre » ouvert sur le canvas vert */}
       <div
         ref={mushafAreaRef}
-        className="flex-1 min-h-0 relative select-none overflow-hidden"
+        className="flex-1 min-h-0 relative select-none overflow-hidden px-2 pt-1 pb-20 md:px-6"
         style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
@@ -1374,7 +1328,11 @@ export default function LecturePractice() {
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
       >
-        <div ref={flipWrapRef} className="w-full h-full will-change-transform">
+        <div
+          ref={flipWrapRef}
+          className="w-full h-full will-change-transform"
+          style={{ filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.35))' }}
+        >
           <MushafDoublePage
             leftPageVerses={left}
             rightPageVerses={right}
@@ -1399,48 +1357,175 @@ export default function LecturePractice() {
           <button
             onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="absolute top-2 right-2 z-30 w-10 h-10 rounded-full bg-[#2d5016]/90 text-[#c9a959] flex items-center justify-center shadow-lg border border-[#c9a959]/40"
+            className="absolute top-2 right-2 z-30 w-10 h-10 rounded-full bg-[var(--ds-green)]/90 text-[var(--ds-gold)] flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40"
             aria-label="Quitter le plein écran"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9 4 4m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4M15 15l5 5m0 0v-4m0 4h-4" /></svg>
           </button>
         )}
 
-        {/* Boutons FIXES (exigence utilisateur) : enregistrement à l'extrême
-            gauche en bas, lecture/pause à l'extrême droite en bas. Ils ne
-            bougent jamais — mode standard comme plein écran. */}
-        <button
-          type="button"
+        {/* Barre lecteur (design Application2) : enregistrement à gauche,
+            lecture/pause au centre-droit, réglages à l'extrême droite.
+            Toujours visible, plein écran compris. */}
+        <div
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 md:gap-4 bg-white rounded-full pl-3 pr-2 py-2 w-[min(96%,640px)]"
+          style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+          onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); toggleRecord(); }}
-          aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
-          className={`absolute bottom-3 left-3 z-30 w-16 h-16 rounded-full flex items-center justify-center bg-red-600 text-white shadow-[0_6px_22px_rgba(220,38,38,0.5)] border-4 border-white active:scale-95 transition-all ${
-            recorder.recording ? 'animate-pulse' : ''
-          }`}
         >
-          {recorder.recording ? (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-          ) : (
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" x2="12" y1="19" y2="22" />
+          {/* Enregistrement — extrême gauche */}
+          <button
+            type="button"
+            onClick={toggleRecord}
+            aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
+            className={`flex-none w-12 h-12 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
+              recorder.recording ? 'animate-pulse' : ''
+            }`}
+          >
+            {recorder.recording ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            )}
+          </button>
+
+          {/* Infos : verset en cours / pages */}
+          <div className="flex-1 min-w-0 text-center">
+            <p className="text-[13px] font-bold text-[var(--ds-text)] truncate">
+              {currentVerse ? `Verset ${currentVerse}` : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-n500)] truncate">
+              {sessionActive ? describeSelection(config, selCount) : 'Prêt à réciter'}
+            </p>
+          </div>
+
+          {/* Stop (session en cours) */}
+          {sessionActive && (
+            <button
+              type="button"
+              onClick={stop}
+              aria-label="Arrêter la lecture"
+              className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+            </button>
+          )}
+
+          {/* Lecture / Pause */}
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={playing ? 'Pause' : 'Lecture'}
+            className="flex-none w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
+            style={{ background: 'var(--ds-green)' }}
+          >
+            {playing ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            )}
+          </button>
+
+          {/* Réglages audio — extrême droite */}
+          <button
+            type="button"
+            onClick={() => setShowAudioPanel((v) => !v)}
+            aria-label="Réglages audio"
+            className={`flex-none w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition-all ${
+              showAudioPanel ? 'bg-[var(--ds-gold)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-green)] hover:bg-[var(--ds-sage-200)]'
+            }`}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
             </svg>
-          )}
-        </button>
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-          aria-label={playing ? 'Pause' : 'Lecture'}
-          className="absolute bottom-3 right-3 z-30 w-16 h-16 rounded-full flex items-center justify-center bg-[#2d5016] text-[#c9a959] shadow-[0_6px_22px_rgba(0,0,0,0.4)] border-4 border-white active:scale-95 transition-all"
-        >
-          {playing ? (
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-          ) : (
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          )}
-        </button>
+          </button>
+        </div>
+
+        {/* Panneau AUDIO (droite) — récitateur, vitesse, options */}
+        {showAudioPanel && (
+          <div
+            className="absolute top-2 right-2 bottom-20 z-40 w-[280px] max-w-[85%] bg-white rounded-3xl p-4 overflow-y-auto"
+            style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-lg font-extrabold text-[var(--ds-text)]">Audio</p>
+              <button
+                type="button"
+                onClick={() => setShowAudioPanel(false)}
+                aria-label="Fermer"
+                className="w-8 h-8 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-n700)] flex items-center justify-center"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <p className="ds-kicker mb-1.5">Récitateur</p>
+            <div className="ds-card px-3 py-2.5 mb-4">
+              <p className="text-sm font-bold text-[var(--ds-text)]">Mahmoud Khalil Al-Husary</p>
+              <p className="text-[11px] text-[var(--ds-n600)]">
+                {config.french ? '+ traduction française (Youssouf Leclerc)' : 'Récitation arabe'}
+              </p>
+            </div>
+
+            <p className="ds-kicker mb-1.5">Vitesse</p>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setRate(s)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                    rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                  }`}
+                >
+                  ×{s === 0.75 ? '0,75' : s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 2.5 ? '2,5' : s}
+                </button>
+              ))}
+            </div>
+
+            <p className="ds-kicker mb-1.5">Affichage</p>
+            <button
+              onClick={() => setShowTrans((v) => !v)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl mb-4 text-sm font-bold transition-colors ${
+                showTrans ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'bg-white border border-[var(--ds-divider)] text-[var(--ds-n700)]'
+              }`}
+            >
+              Traduction française
+              <span className={`w-9 h-5 rounded-full relative transition-colors ${showTrans ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${showTrans ? 'left-[18px]' : 'left-0.5'}`} />
+              </span>
+            </button>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setShowAudioPanel(false);
+                  setShowConfig(true);
+                }}
+                className="ds-btn-gold w-full py-2.5 text-sm"
+              >
+                Plage & répétitions…
+              </button>
+              <button
+                onClick={() => {
+                  setShowAudioPanel(false);
+                  setShowLpConfig(true);
+                }}
+                className="ds-btn-ghost w-full py-2.5 text-sm"
+              >
+                Appui long…
+              </button>
+            </div>
+          </div>
+        )}
 
         {selected && (
           <WordCard
@@ -1460,7 +1545,7 @@ export default function LecturePractice() {
         {/* Marquage : choisir le type de faute pour les mots sélectionnés */}
         {markingMode && selWords.size > 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-[#fdfaf3]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2">
+            <div className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2">
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
                   {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} — type de faute ?
@@ -1496,27 +1581,27 @@ export default function LecturePractice() {
             style={{ left: verseMenu.x, top: verseMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-[#2d5016] text-[#fdfaf3] rounded-xl shadow-2xl border border-[#c9a959]/50 overflow-hidden min-w-[190px]">
-              <div className="px-3 py-1.5 text-[11px] font-bold text-[#c9a959] border-b border-[#4a7c23] flex items-center justify-between">
+            <div className="bg-[var(--ds-green)] text-[var(--ds-bg)] rounded-xl shadow-2xl border border-[var(--ds-gold)]/50 overflow-hidden min-w-[190px]">
+              <div className="px-3 py-1.5 text-[11px] font-bold text-[var(--ds-gold)] border-b border-[var(--ds-sage)] flex items-center justify-between">
                 <span>Verset {verseMenu.verseKey}</span>
-                <button onClick={() => setVerseMenu(null)} className="text-[#c9a959] hover:text-white px-1">✕</button>
+                <button onClick={() => setVerseMenu(null)} className="text-[var(--ds-gold)] hover:text-white px-1">✕</button>
               </div>
               <button
                 onClick={() => readFromVerse(verseMenu.verseKey)}
-                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2"
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--ds-green-deep)] flex items-center gap-2"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                 Lire depuis ce verset
               </button>
               <button
                 onClick={() => { setVerseLayer({ verseKey: verseMenu.verseKey, tab: 'trans' }); setVerseMenu(null); }}
-                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2 border-t border-[#4a7c23]"
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--ds-green-deep)] flex items-center gap-2 border-t border-[var(--ds-sage)]"
               >
                 📖 Voir la traduction
               </button>
               <button
                 onClick={() => { setVerseLayer({ verseKey: verseMenu.verseKey, tab: 'tafsir' }); setVerseMenu(null); }}
-                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#1f3a0f] flex items-center gap-2 border-t border-[#4a7c23]"
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--ds-green-deep)] flex items-center gap-2 border-t border-[var(--ds-sage)]"
               >
                 📚 Afficher le tafsir
               </button>
@@ -1534,8 +1619,8 @@ export default function LecturePractice() {
             e.stopPropagation();
             animatedFlip('next');
           }}
-          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
-            canNext ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
+            canNext ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
           }`}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
@@ -1548,8 +1633,8 @@ export default function LecturePractice() {
             e.stopPropagation();
             animatedFlip('prev');
           }}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[#c9a959]/40 ${
-            canPrev ? 'bg-[#2d5016]/90 text-[#fdfaf3] hover:bg-[#2d5016]' : 'bg-[#2d5016]/30 text-[#fdfaf3]/40 cursor-not-allowed'
+          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
+            canPrev ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
           }`}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
@@ -1561,20 +1646,20 @@ export default function LecturePractice() {
         <div className="fixed inset-0 z-40 flex flex-col justify-end" onClick={closeVerseLayer}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-[#fdfaf3] rounded-t-2xl shadow-2xl border-t-2 border-[#c9a959] max-h-[70vh] flex flex-col"
+            className="relative bg-[var(--ds-bg)] rounded-t-2xl shadow-2xl border-t-2 border-[var(--ds-gold)] max-h-[70vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* En-tête + onglets */}
-            <div className="flex-none px-4 pt-3 pb-2 border-b border-[#c9a959]/40">
+            <div className="flex-none px-4 pt-3 pb-2 border-b border-[var(--ds-gold)]/40">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-[#2d5016]">Verset {verseLayer.verseKey}</span>
-                <button onClick={closeVerseLayer} className="text-[#2d5016] text-lg leading-none px-2">✕</button>
+                <span className="text-sm font-bold text-[var(--ds-green)]">Verset {verseLayer.verseKey}</span>
+                <button onClick={closeVerseLayer} className="text-[var(--ds-green)] text-lg leading-none px-2">✕</button>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setVerseLayer((l) => (l ? { ...l, tab: 'trans' } : l))}
                   className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                    verseLayer.tab === 'trans' ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016]' : 'text-[#2d5016] border-[#c9a959]'
+                    verseLayer.tab === 'trans' ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)]' : 'text-[var(--ds-green)] border-[var(--ds-gold)]'
                   }`}
                 >
                   📖 Traduction
@@ -1582,14 +1667,14 @@ export default function LecturePractice() {
                 <button
                   onClick={() => setVerseLayer((l) => (l ? { ...l, tab: 'tafsir' } : l))}
                   className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                    verseLayer.tab === 'tafsir' ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016]' : 'text-[#2d5016] border-[#c9a959]'
+                    verseLayer.tab === 'tafsir' ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)]' : 'text-[var(--ds-green)] border-[var(--ds-gold)]'
                   }`}
                 >
                   📚 Tafsir
                 </button>
                 <button
                   onClick={() => readFromVerse(verseLayer.verseKey)}
-                  className="ml-auto flex items-center gap-1.5 bg-[#c9a959] text-[#2d5016] font-bold rounded-full px-3 py-1 text-xs active:scale-95"
+                  className="ml-auto flex items-center gap-1.5 bg-[var(--ds-gold)] text-[var(--ds-green)] font-bold rounded-full px-3 py-1 text-xs active:scale-95"
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   Lire
@@ -1600,7 +1685,7 @@ export default function LecturePractice() {
             {/* Contenu */}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
               {verseLayer.tab === 'trans' ? (
-                <p className="text-[15px] text-[#2d5016] leading-relaxed max-w-3xl mx-auto">
+                <p className="text-[15px] text-[var(--ds-green)] leading-relaxed max-w-3xl mx-auto">
                   {trans?.[verseLayer.verseKey] ?? (
                     <span className="text-gray-400 text-sm">Chargement de la traduction…</span>
                   )}
@@ -1610,7 +1695,7 @@ export default function LecturePractice() {
                   <button
                     onClick={toggleTafsirAudio}
                     disabled={!tafsirText}
-                    className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border border-[#2d5016] text-[#2d5016] disabled:opacity-40"
+                    className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border border-[var(--ds-green)] text-[var(--ds-green)] disabled:opacity-40"
                   >
                     {tafsirPlaying ? '⏸ Pause' : '🔊 Écouter le tafsir'}
                   </button>
@@ -1633,25 +1718,25 @@ export default function LecturePractice() {
         <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center" onClick={() => setShowLpConfig(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-[#fdfaf3] rounded-t-2xl sm:rounded-2xl shadow-2xl border-2 border-[#c9a959] w-full sm:max-w-md max-h-[85vh] overflow-y-auto p-5"
+            className="relative bg-[var(--ds-bg)] rounded-t-2xl sm:rounded-2xl shadow-2xl border-2 border-[var(--ds-gold)] w-full sm:max-w-md max-h-[85vh] overflow-y-auto p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-[#2d5016]">👆 Comportement de l&apos;appui long</h2>
-              <button onClick={() => setShowLpConfig(false)} className="text-[#2d5016] text-lg leading-none px-2">✕</button>
+              <h2 className="text-base font-bold text-[var(--ds-green)]">👆 Comportement de l&apos;appui long</h2>
+              <button onClick={() => setShowLpConfig(false)} className="text-[var(--ds-green)] text-lg leading-none px-2">✕</button>
             </div>
             <p className="text-[12px] text-gray-500 mb-4">Maintiens le doigt sur un verset pour lancer l&apos;écoute avec ces réglages.</p>
 
             {/* Vitesse */}
             <div className="mb-4">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Vitesse de lecture</div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Vitesse de lecture</div>
               <div className="flex flex-wrap gap-1.5">
                 {LP_SPEEDS.map((s) => (
                   <button
                     key={s}
                     onClick={() => setLpConfig((c) => ({ ...c, rate: s }))}
                     className={`px-3 py-1 rounded-md text-sm font-bold border ${
-                      lpConfig.rate === s ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/40'
+                      lpConfig.rate === s ? 'bg-[var(--ds-green)] text-white border-[var(--ds-green)]' : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/40'
                     }`}
                   >
                     ×{s === 1.25 ? '1,25' : s === 1.5 ? '1,5' : s === 1.75 ? '1,75' : s === 2.5 ? '2,5' : s}
@@ -1662,7 +1747,7 @@ export default function LecturePractice() {
 
             {/* Portée */}
             <div className="mb-4">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Portée récitée</div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Portée récitée</div>
               <div className="flex flex-col gap-1.5">
                 {([
                   ['verse', 'Le verset uniquement'],
@@ -1674,7 +1759,7 @@ export default function LecturePractice() {
                     key={val}
                     onClick={() => setLpConfig((c) => ({ ...c, scope: val }))}
                     className={`text-left px-3 py-2 rounded-lg text-sm font-semibold border ${
-                      lpConfig.scope === val ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#2d5016] border-[#c9a959]/40'
+                      lpConfig.scope === val ? 'bg-[var(--ds-green)] text-white border-[var(--ds-green)]' : 'bg-white text-[var(--ds-green)] border-[var(--ds-gold)]/40'
                     }`}
                   >
                     {lpConfig.scope === val ? '● ' : '○ '}{label}
@@ -1684,7 +1769,7 @@ export default function LecturePractice() {
               {/* Nombre de pages (portée « plusieurs pages ») */}
               {lpConfig.scope === 'pages' && (
                 <div className="mt-2 pl-1">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">
                     Nombre de pages
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -1693,7 +1778,7 @@ export default function LecturePractice() {
                         key={n}
                         onClick={() => setLpConfig((c) => ({ ...c, pages: n }))}
                         className={`w-10 py-1 rounded-md text-sm font-bold border ${
-                          lpConfig.pages === n ? 'bg-[#2d5016] text-white border-[#2d5016]' : 'bg-white text-[#4a7c23] border-[#c9a959]/40'
+                          lpConfig.pages === n ? 'bg-[var(--ds-green)] text-white border-[var(--ds-green)]' : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/40'
                         }`}
                       >
                         {n}
@@ -1709,36 +1794,36 @@ export default function LecturePractice() {
 
             {/* Options traduction / tafsir */}
             <div className="flex flex-col gap-2">
-              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
-                <span className="text-sm font-semibold text-[#2d5016]">📖 Réciter aussi la traduction (français)</span>
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--ds-gold)]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[var(--ds-green)]">📖 Réciter aussi la traduction (français)</span>
                 <input
                   type="checkbox"
                   checked={lpConfig.french}
                   onChange={(e) => setLpConfig((c) => ({ ...c, french: e.target.checked }))}
-                  className="w-5 h-5 accent-[#2d5016]"
+                  className="w-5 h-5 accent-[var(--ds-green)]"
                 />
               </label>
-              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
-                <span className="text-sm font-semibold text-[#2d5016]">📚 Réciter aussi le tafsir (Ibn Kathir)</span>
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--ds-gold)]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[var(--ds-green)]">📚 Réciter aussi le tafsir (Ibn Kathir)</span>
                 <input
                   type="checkbox"
                   checked={lpConfig.tafsir}
                   onChange={(e) => setLpConfig((c) => ({ ...c, tafsir: e.target.checked }))}
-                  className="w-5 h-5 accent-[#2d5016]"
+                  className="w-5 h-5 accent-[var(--ds-green)]"
                 />
               </label>
-              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white cursor-pointer">
-                <span className="text-sm font-semibold text-[#2d5016]">🔁 Écouter en boucle la sélection</span>
+              <label className="flex items-center justify-between px-3 py-2 rounded-lg border border-[var(--ds-gold)]/40 bg-white cursor-pointer">
+                <span className="text-sm font-semibold text-[var(--ds-green)]">🔁 Écouter en boucle la sélection</span>
                 <input
                   type="checkbox"
                   checked={lpConfig.loop}
                   onChange={(e) => setLpConfig((c) => ({ ...c, loop: e.target.checked }))}
-                  className="w-5 h-5 accent-[#2d5016]"
+                  className="w-5 h-5 accent-[var(--ds-green)]"
                 />
               </label>
               {lpConfig.loop && (
-                <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[#c9a959]/40 bg-white">
-                  <span className="text-sm font-semibold text-[#2d5016]">
+                <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[var(--ds-gold)]/40 bg-white">
+                  <span className="text-sm font-semibold text-[var(--ds-green)]">
                     ⏱ Délai avant de relancer
                     <span className="block text-[11px] font-normal text-gray-500">en secondes (1 à 500)</span>
                   </span>
@@ -1751,7 +1836,7 @@ export default function LecturePractice() {
                       const n = Math.max(1, Math.min(500, Math.round(Number(e.target.value)) || 1));
                       setLpConfig((c) => ({ ...c, loopDelay: n }));
                     }}
-                    className="w-20 text-center px-2 py-1.5 rounded-lg border-2 border-[#c9a959]/40 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                    className="w-20 text-center px-2 py-1.5 rounded-lg border-2 border-[var(--ds-gold)]/40 focus:border-[var(--ds-gold)] outline-none font-bold text-[var(--ds-green)]"
                   />
                 </div>
               )}
@@ -1759,7 +1844,7 @@ export default function LecturePractice() {
 
             <button
               onClick={() => setShowLpConfig(false)}
-              className="w-full mt-5 py-2.5 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl active:scale-[0.98] transition-all"
+              className="w-full mt-5 py-2.5 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white font-bold rounded-xl active:scale-[0.98] transition-all"
             >
               OK
             </button>

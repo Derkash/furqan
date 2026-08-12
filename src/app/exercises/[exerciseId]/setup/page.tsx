@@ -7,6 +7,7 @@ import { toArabicNumbers } from '@/utils/arabicNumbers';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { unitToPageRange, MODE_LABELS, MODE_MAX, type RangeMode } from '@/utils/exercises/rangeToPages';
 import { loadHizbQuarters, unitToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
+import { PracticeShell } from '@/components/AppShell';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
 import { getSelfAssess, setSelfAssess } from '@/utils/exercises/prefs';
@@ -59,7 +60,7 @@ const TIMEOUT_OPTIONS: { value: number; label: string }[] = [
 function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">
         {label}
       </div>
       {children}
@@ -87,8 +88,8 @@ function SingleSelect({
             onClick={() => onChange(o.value)}
             className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
               active
-                ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
             }`}
           >
             {o.label}
@@ -119,8 +120,8 @@ function NumberSelect({
             onClick={() => onChange(o.value)}
             className={`flex-1 min-w-[52px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
               active
-                ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
             }`}
           >
             {o.label}
@@ -151,8 +152,8 @@ function MultiSelect({
             onClick={() => onToggle(o.value)}
             className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
               active
-                ? 'bg-[#4a7c23] text-white border-[#4a7c23] shadow-md'
-                : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)] shadow-md'
+                : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
             }`}
           >
             {o.label}
@@ -164,6 +165,14 @@ function MultiSelect({
 }
 
 export default function SetupPage() {
+  return (
+    <PracticeShell>
+      <SetupPageInner />
+    </PracticeShell>
+  );
+}
+
+function SetupPageInner() {
   const router = useRouter();
   const params = useParams();
   const exerciseId = params.exerciseId as string;
@@ -267,11 +276,11 @@ export default function SetupPage() {
 
   if (!isValidExerciseId(exerciseId)) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex items-center justify-center p-4">
+      <div className="min-h-full flex items-center justify-center p-4" style={{ fontFamily: 'var(--ds-font)' }}>
         <div className="text-center">
           <p className="text-red-600 mb-4">Exercice non trouvé</p>
-          <Link href="/exercises" className="text-[#2d5016] underline">
-            Retour aux exercices
+          <Link href="/revision" className="ds-btn-ghost inline-block px-4 py-2 text-sm">
+            Retour à la révision
           </Link>
         </div>
       </div>
@@ -392,19 +401,23 @@ export default function SetupPage() {
   const pageCount = hasPageRange ? Math.abs(endPage! - startPage!) + 1 : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] p-4 pb-12" dir="ltr">
+    <div className="min-h-full p-4 pb-12" dir="ltr" style={{ fontFamily: 'var(--ds-font)' }}>
       <div className="max-w-md mx-auto">
-        <Link
-          href="/exercises"
-          className="text-[#4a7c23] text-sm hover:underline mb-4 inline-block"
+        <button
+          type="button"
+          onClick={() => router.push('/revision')}
+          className="ds-btn-ghost inline-flex items-center gap-1.5 px-4 py-2 text-sm mb-4"
         >
-          ← Retour aux exercices
-        </Link>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          Révision
+        </button>
 
-        <div className="bg-white rounded-2xl shadow-lg p-5 border border-[#c9a959]/20">
-          <h1 className="text-xl font-bold text-[#2d5016] mb-1">{exercise.name}</h1>
+        <div className="ds-card p-5">
+          <h1 className="text-xl font-extrabold text-[var(--ds-green)] mb-1">{exercise.name}</h1>
           <p
-            className="text-[#7a8b3e] font-semibold text-sm mb-3"
+            className="text-[var(--ds-sage)] font-semibold text-sm mb-3"
             dir="rtl"
             style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}
           >
@@ -430,8 +443,8 @@ export default function SetupPage() {
                           }}
                           className={`flex-1 min-w-[68px] py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
                             active
-                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                              ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                              : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
                           }`}
                         >
                           {MODE_LABELS[m]}
@@ -445,7 +458,7 @@ export default function SetupPage() {
                   <select
                     value={gotoValue ?? ''}
                     onChange={(e) => setGotoValue(Number(e.target.value) || null)}
-                    className="w-full px-3 py-2.5 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-semibold text-[#2d5016] bg-white"
+                    className="w-full px-3 py-2.5 rounded-lg border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none font-semibold text-[var(--ds-green)] bg-white"
                   >
                     <option value="">— Choisir une sourate —</option>
                     {(units?.chapters ?? []).map((c) => (
@@ -462,18 +475,18 @@ export default function SetupPage() {
                     value={gotoValue ?? ''}
                     onChange={(e) => setGotoValue(Number(e.target.value) || null)}
                     placeholder={`${MODE_LABELS[gotoMode]} (1–${MODE_MAX[gotoMode]})`}
-                    className="w-full text-center px-3 py-2.5 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                    className="w-full text-center px-3 py-2.5 rounded-lg border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none font-bold text-[var(--ds-green)]"
                   />
                 )}
 
-                <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
-                  <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
+                <div className="bg-[var(--ds-bg)] border border-[var(--ds-gold)]/30 rounded-xl p-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-[var(--ds-gold)] font-bold">
                     Page de départ
                   </div>
-                  <div className="text-lg font-bold text-[#2d5016] mt-1">
+                  <div className="text-lg font-bold text-[var(--ds-green)] mt-1">
                     {gotoStartPage != null ? toArabicNumbers(gotoStartPage) : '—'}
                   </div>
-                  <div className="text-xs text-[#7a8b3e] mt-0.5">
+                  <div className="text-xs text-[var(--ds-sage)] mt-0.5">
                     Ensuite : feuilletage libre sur tout le Mushaf
                   </div>
                 </div>
@@ -483,16 +496,16 @@ export default function SetupPage() {
                 <RangePicker value={range} onChange={setRange} chapters={units?.chapters ?? []} />
 
                 {/* Récap de la plage en pages */}
-                <div className="bg-[#fdfaf3] border border-[#c9a959]/30 rounded-xl p-3 text-center">
-                  <div className="text-[10px] uppercase tracking-widest text-[#c9a959] font-bold">
+                <div className="bg-[var(--ds-bg)] border border-[var(--ds-gold)]/30 rounded-xl p-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-[var(--ds-gold)] font-bold">
                     Plage de pages
                   </div>
-                  <div className="text-lg font-bold text-[#2d5016] mt-1">
+                  <div className="text-lg font-bold text-[var(--ds-green)] mt-1">
                     {hasPageRange
                       ? `${Math.min(startPage!, endPage!)} → ${Math.max(startPage!, endPage!)}`
                       : '—'}
                   </div>
-                  <div className="text-xs text-[#7a8b3e] mt-0.5">
+                  <div className="text-xs text-[var(--ds-sage)] mt-0.5">
                     {hasPageRange
                       ? `${toArabicNumbers(pageCount)} page${pageCount > 1 ? 's' : ''}`
                       : 'Saisissez un début et une fin'}
@@ -541,8 +554,8 @@ export default function SetupPage() {
                           onClick={() => setAnswerMode(o.value)}
                           className={`flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
                             active
-                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                              ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                              : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
                           }`}
                         >
                           {o.label}
@@ -597,8 +610,8 @@ export default function SetupPage() {
                           onClick={() => setDirection(o.value)}
                           className={`flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
                             active
-                              ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                              : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                              ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                              : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
                           }`}
                         >
                           {o.label}
@@ -620,8 +633,8 @@ export default function SetupPage() {
                     et/ou le dernier. Laisse vide = n&apos;importe quel verset de la page.
                   </p>
                 </OptionGroup>
-                <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 bg-[#fdfaf3] cursor-pointer">
-                  <span className="text-sm font-semibold text-[#2d5016]">
+                <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] cursor-pointer">
+                  <span className="text-sm font-semibold text-[var(--ds-green)]">
                     Afficher le contexte à la révélation
                     <span className="block text-[11px] font-normal text-gray-400">
                       Montre aussi le 1er, le milieu et le dernier verset de la page
@@ -631,7 +644,7 @@ export default function SetupPage() {
                     type="checkbox"
                     checked={revealContext}
                     onChange={(e) => setRevealContext(e.target.checked)}
-                    className="w-5 h-5 accent-[#2d5016] flex-none"
+                    className="w-5 h-5 accent-[var(--ds-green)] flex-none"
                   />
                 </label>
               </>
@@ -639,8 +652,8 @@ export default function SetupPage() {
 
             {/* Auto-évaluation « Trouvé/Raté » — désactivée par défaut, réactivable */}
             {(isAudioQuiz || isSequential || isPageNumber || isVerseStart || isRecitation) && (
-              <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 bg-[#fdfaf3] cursor-pointer">
-                <span className="text-sm font-semibold text-[#2d5016]">
+              <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] cursor-pointer">
+                <span className="text-sm font-semibold text-[var(--ds-green)]">
                   Me demander si j&apos;ai bien répondu
                   <span className="block text-[11px] font-normal text-gray-400">
                     Trouvé / Raté après chaque question (mémorise tes fautes)
@@ -653,7 +666,7 @@ export default function SetupPage() {
                     setSelfAssessOn(e.target.checked);
                     setSelfAssess(e.target.checked);
                   }}
-                  className="w-5 h-5 accent-[#2d5016] flex-none"
+                  className="w-5 h-5 accent-[var(--ds-green)] flex-none"
                 />
               </label>
             )}
@@ -665,7 +678,7 @@ export default function SetupPage() {
                   <button
                     type="button"
                     onClick={() => setQuestionCount((c) => Math.max(1, c - 5))}
-                    className="w-10 h-10 rounded-lg border-2 border-[#c9a959]/30 text-[#2d5016] font-bold hover:border-[#c9a959]"
+                    className="w-10 h-10 rounded-lg border-2 border-[var(--ds-gold)]/30 text-[var(--ds-green)] font-bold hover:border-[var(--ds-gold)]"
                   >
                     −
                   </button>
@@ -675,12 +688,12 @@ export default function SetupPage() {
                     max={200}
                     value={questionCount}
                     onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="flex-1 text-center px-3 py-2 rounded-lg border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none font-bold text-[#2d5016]"
+                    className="flex-1 text-center px-3 py-2 rounded-lg border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none font-bold text-[var(--ds-green)]"
                   />
                   <button
                     type="button"
                     onClick={() => setQuestionCount((c) => Math.min(200, c + 5))}
-                    className="w-10 h-10 rounded-lg border-2 border-[#c9a959]/30 text-[#2d5016] font-bold hover:border-[#c9a959]"
+                    className="w-10 h-10 rounded-lg border-2 border-[var(--ds-gold)]/30 text-[var(--ds-green)] font-bold hover:border-[var(--ds-gold)]"
                   >
                     +
                   </button>
@@ -692,7 +705,7 @@ export default function SetupPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] hover:from-[#4a7c23] hover:to-[#2d5016] text-white font-bold rounded-xl transition-all text-base shadow-lg active:scale-[0.98]"
+              className="w-full py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] hover:from-[var(--ds-sage)] hover:to-[var(--ds-green)] text-white font-bold rounded-xl transition-all text-base shadow-lg active:scale-[0.98]"
             >
               Commencer
             </button>

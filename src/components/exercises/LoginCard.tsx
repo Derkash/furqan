@@ -60,8 +60,8 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
               onClick={() => switchMode(t.value)}
               className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
                 mode === t.value
-                  ? 'bg-[#2d5016] text-[#fdfaf3] border-[#2d5016] shadow-md'
-                  : 'bg-white text-[#4a7c23] border-[#c9a959]/30 hover:border-[#c9a959]'
+                  ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                  : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
               }`}
             >
               {t.label}
@@ -77,7 +77,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] block mb-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] block mb-1">
               Identifiant
             </label>
             <input
@@ -85,11 +85,11 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              className="w-full px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none text-[#1a1a1a]"
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none text-[#1a1a1a]"
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] block mb-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] block mb-1">
               Mot de passe
             </label>
             <input
@@ -97,7 +97,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className="w-full px-3 py-2.5 rounded-xl border-2 border-[#c9a959]/30 focus:border-[#c9a959] outline-none text-[#1a1a1a]"
+              className="w-full px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none text-[#1a1a1a]"
             />
           </div>
 
@@ -106,7 +106,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] hover:from-[#4a7c23] hover:to-[#2d5016] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] hover:from-[var(--ds-sage)] hover:to-[var(--ds-green)] text-white font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting
               ? 'Veuillez patienter…'
@@ -117,7 +117,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
         </form>
 
         <div className="text-center mt-4">
-          <Link href="/exercises" className="text-[#4a7c23] text-sm hover:underline">
+          <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline">
             ← Retour aux exercices
           </Link>
         </div>

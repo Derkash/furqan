@@ -82,11 +82,11 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
               setTotal(getVocab().length);
               if (n === 0) onEmpty?.();
             }}
-            className="px-4 py-2 bg-[#2d5016] text-white rounded-lg text-sm font-bold"
+            className="px-4 py-2 bg-[var(--ds-green)] text-white rounded-lg text-sm font-bold"
           >
             Importer mon lexique
           </button>
-          <button onClick={() => onEmpty?.()} className="px-4 py-2 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-lg text-sm font-bold">
+          <button onClick={() => onEmpty?.()} className="px-4 py-2 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-lg text-sm font-bold">
             Enregistrer des mots
           </button>
         </div>
@@ -99,7 +99,7 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
     const dueCount = dueVocab().length;
     return (
       <Centered>
-        <p className="text-[#2d5016] text-lg font-bold mb-1">Prêt à réviser ?</p>
+        <p className="text-[var(--ds-green)] text-lg font-bold mb-1">Prêt à réviser ?</p>
         <p className="text-sm text-gray-500 mb-4">
           {toArabicNumbers(dueCount)} mot{dueCount > 1 ? 's' : ''} à revoir aujourd&apos;hui ·{' '}
           {toArabicNumbers(total)} au total
@@ -111,13 +111,13 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
           <button
             onClick={() => start(false)}
             disabled={dueCount === 0}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white rounded-xl text-sm font-bold disabled:opacity-40"
+            className="px-5 py-2.5 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white rounded-xl text-sm font-bold disabled:opacity-40"
           >
             Réviser ({toArabicNumbers(Math.min(dueCount, 30))})
           </button>
           <button
             onClick={() => start(true)}
-            className="px-5 py-2.5 border-2 border-[#c9a959]/40 text-[#4a7c23] rounded-xl text-sm font-bold hover:border-[#c9a959]"
+            className="px-5 py-2.5 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-xl text-sm font-bold hover:border-[var(--ds-gold)]"
           >
             Tout mélanger
           </button>
@@ -133,13 +133,13 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
   if (done) {
     return (
       <Centered>
-        <p className="text-2xl font-bold text-[#2d5016] mb-1">Session terminée 🎉</p>
-        <p className="text-[#4a7c23] mb-4">
+        <p className="text-2xl font-bold text-[var(--ds-green)] mb-1">Session terminée 🎉</p>
+        <p className="text-[var(--ds-sage)] mb-4">
           {toArabicNumbers(done.known)}/{toArabicNumbers(done.reviewed)} su
         </p>
         <button
           onClick={() => start(dueOnly ? false : true)}
-          className="px-5 py-2.5 bg-[#2d5016] text-white rounded-xl text-sm font-bold"
+          className="px-5 py-2.5 bg-[var(--ds-green)] text-white rounded-xl text-sm font-bold"
         >
           Continuer
         </button>
@@ -164,9 +164,9 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
           </span>
           <DirToggle dir={dir} setDir={setDir} compact />
         </div>
-        <div className="h-1.5 bg-[#c9a959]/20 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[var(--ds-gold)]/20 rounded-full overflow-hidden">
           <div
-            className="h-full bg-[#4a7c23] transition-all"
+            className="h-full bg-[var(--ds-sage)] transition-all"
             style={{ width: `${((idx) / queue.length) * 100}%` }}
           />
         </div>
@@ -177,30 +177,30 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
         <button
           type="button"
           onClick={() => setRevealed(true)}
-          className="w-full max-w-md bg-white rounded-3xl shadow-lg border-2 border-[#c9a959]/30 p-8 text-center min-h-[240px] flex flex-col items-center justify-center gap-4"
+          className="w-full max-w-md bg-white rounded-3xl shadow-lg border-2 border-[var(--ds-gold)]/30 p-8 text-center min-h-[240px] flex flex-col items-center justify-center gap-4"
         >
           {front.arabic ? (
-            <span dir="rtl" className="text-[#2d5016]" style={{ fontFamily: "'Amiri',serif", fontSize: '3em', lineHeight: 1.4 }}>
+            <span dir="rtl" className="text-[var(--ds-green)]" style={{ fontFamily: "'Amiri',serif", fontSize: '3em', lineHeight: 1.4 }}>
               {front.text}
             </span>
           ) : (
-            <span className="text-[#2d5016] text-2xl font-semibold">{front.text}</span>
+            <span className="text-[var(--ds-green)] text-2xl font-semibold">{front.text}</span>
           )}
 
           {!revealed ? (
             <span className="text-xs text-gray-400">Touche pour voir la réponse</span>
           ) : (
-            <div className="border-t border-[#c9a959]/30 pt-4 w-full">
+            <div className="border-t border-[var(--ds-gold)]/30 pt-4 w-full">
               {dir === 'ar2fr' ? (
-                <span className="text-[#4a7c23] text-xl font-semibold">{back}</span>
+                <span className="text-[var(--ds-sage)] text-xl font-semibold">{back}</span>
               ) : (
-                <span dir="rtl" className="text-[#4a7c23]" style={{ fontFamily: "'Amiri',serif", fontSize: '2.4em' }}>
+                <span dir="rtl" className="text-[var(--ds-sage)]" style={{ fontFamily: "'Amiri',serif", fontSize: '2.4em' }}>
                   {back}
                 </span>
               )}
               {current.root && (
                 <div className="mt-2">
-                  <span dir="rtl" className="text-[11px] text-[#7a5d2c] bg-[#c9a959]/15 rounded-full px-2 py-0.5" style={{ fontFamily: "'Amiri',serif" }}>
+                  <span dir="rtl" className="text-[11px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-2 py-0.5" style={{ fontFamily: "'Amiri',serif" }}>
                     {current.root.split('').join(' ')}
                   </span>
                 </div>
@@ -222,7 +222,7 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
             </button>
             <button
               onClick={() => grade(true)}
-              className="flex-1 py-3 rounded-xl bg-[#2d5016] text-white font-bold active:scale-95 transition-all"
+              className="flex-1 py-3 rounded-xl bg-[var(--ds-green)] text-white font-bold active:scale-95 transition-all"
             >
               ✅ Je savais
             </button>
@@ -230,7 +230,7 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
         ) : (
           <button
             onClick={() => setRevealed(true)}
-            className="w-full max-w-md mx-auto block py-3 rounded-xl border-2 border-[#c9a959]/40 text-[#4a7c23] font-bold"
+            className="w-full max-w-md mx-auto block py-3 rounded-xl border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] font-bold"
           >
             Voir la réponse
           </button>
@@ -250,13 +250,13 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function DirToggle({ dir, setDir, compact }: { dir: Dir; setDir: (d: Dir) => void; compact?: boolean }) {
   return (
-    <div className={`inline-flex rounded-full bg-[#c9a959]/15 p-0.5 ${compact ? '' : 'mt-1'}`}>
+    <div className={`inline-flex rounded-full bg-[var(--ds-gold)]/15 p-0.5 ${compact ? '' : 'mt-1'}`}>
       {(['ar2fr', 'fr2ar'] as Dir[]).map((d) => (
         <button
           key={d}
           onClick={() => setDir(d)}
           className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
-            dir === d ? 'bg-[#2d5016] text-white' : 'text-[#7a5d2c]'
+            dir === d ? 'bg-[var(--ds-green)] text-white' : 'text-[#7a5d2c]'
           }`}
         >
           {d === 'ar2fr' ? 'ع → fr' : 'fr → ع'}

@@ -73,7 +73,7 @@ function NumField({
 }) {
   return (
     <div className="flex-1 min-w-0">
-      <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1">{label}</label>
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1">{label}</label>
       <input
         type="number"
         inputMode="numeric"
@@ -82,7 +82,7 @@ function NumField({
         placeholder={`1–${max}`}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        className="w-full px-3 py-2 text-center font-semibold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl bg-white focus:outline-none focus:border-[#2d5016]"
+        className="w-full px-3 py-2 text-center font-semibold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl bg-white focus:outline-none focus:border-[var(--ds-green)]"
       />
     </div>
   );
@@ -101,11 +101,11 @@ function SurahSelect({
 }) {
   return (
     <div className="flex-1 min-w-0">
-      <label className="block text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1">{label}</label>
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full px-2 py-2 text-sm font-semibold text-[#2d5016] border-2 border-[#c9a959]/40 rounded-xl bg-white focus:outline-none focus:border-[#2d5016]"
+        className="w-full px-2 py-2 text-sm font-semibold text-[var(--ds-green)] border-2 border-[var(--ds-gold)]/40 rounded-xl bg-white focus:outline-none focus:border-[var(--ds-green)]"
       >
         {chapters.length === 0 && <option value={value}>Sourate {value}</option>}
         {chapters.map((c) => (
@@ -182,11 +182,11 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3" dir="ltr" onClick={onClose}>
       <div
-        className="bg-[#fdfaf3] rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto border-2 border-[#c9a959]"
+        className="bg-[var(--ds-bg)] rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto border-2 border-[var(--ds-gold)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* En-tête */}
-        <div className="sticky top-0 bg-[#2d5016] text-white px-4 py-3 flex items-center justify-between">
+        <div className="sticky top-0 bg-[var(--ds-green)] text-white px-4 py-3 flex items-center justify-between">
           <span className="font-bold">Configurer la lecture</span>
           <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -196,14 +196,14 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
         <div className="p-4 space-y-4">
           {/* Type de plage */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Plage à réciter</p>
-            <div className="flex gap-1 p-1 bg-[#2d5016]/5 rounded-xl">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Plage à réciter</p>
+            <div className="flex gap-1 p-1 bg-[var(--ds-green)]/5 rounded-xl">
               {MODES.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => changeMode(m.id)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    d.selMode === m.id ? 'bg-[#2d5016] text-[#fdfaf3] shadow' : 'text-[#4a7c23] hover:bg-white/50'
+                    d.selMode === m.id ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] shadow' : 'text-[var(--ds-sage)] hover:bg-white/50'
                   }`}
                 >
                   {m.label}
@@ -239,7 +239,7 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
           {/* Page : aller jusqu'à la fin du juz / hizb / sourate (masque le champ Fin) */}
           {isPage && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Ou jusqu&apos;à la fin de…</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Ou jusqu&apos;à la fin de…</p>
               <div className="flex gap-1.5">
                 {([
                   ['juz', 'Fin du juz'],
@@ -250,7 +250,7 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
                     key={b}
                     onClick={() => set({ endBoundary: d.endBoundary === b ? 'none' : b })}
                     className={`flex-1 py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all ${
-                      d.endBoundary === b ? 'bg-[#2d5016] text-[#fdfaf3]' : 'bg-white border border-[#c9a959]/30 text-[#2d5016]'
+                      d.endBoundary === b ? 'bg-[var(--ds-green)] text-[var(--ds-bg)]' : 'bg-white border border-[var(--ds-gold)]/30 text-[var(--ds-green)]'
                     }`}
                   >
                     {label}
@@ -267,14 +267,14 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
 
           {/* Répéter chaque verset */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Répéter chaque verset</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Répéter chaque verset</p>
             <div className="flex gap-1.5 flex-wrap">
               {VERSE_REPEATS.map((n) => (
                 <button
                   key={n}
                   onClick={() => set({ verseRepeat: n })}
                   className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
-                    d.verseRepeat === n ? 'bg-[#4a7c23] text-white' : 'bg-white border border-[#c9a959]/30 text-[#2d5016]'
+                    d.verseRepeat === n ? 'bg-[var(--ds-sage)] text-white' : 'bg-white border border-[var(--ds-gold)]/30 text-[var(--ds-green)]'
                   }`}
                 >
                   ×{n}
@@ -285,14 +285,14 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
 
           {/* Répéter toute la sélection */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#c9a959] mb-1.5">Répéter toute la sélection</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] mb-1.5">Répéter toute la sélection</p>
             <div className="flex gap-1.5 flex-wrap">
               {SEL_REPEATS.map((n) => (
                 <button
                   key={n}
                   onClick={() => set({ selectionRepeat: n })}
                   className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
-                    d.selectionRepeat === n ? 'bg-[#4a7c23] text-white' : 'bg-white border border-[#c9a959]/30 text-[#2d5016]'
+                    d.selectionRepeat === n ? 'bg-[var(--ds-sage)] text-white' : 'bg-white border border-[var(--ds-gold)]/30 text-[var(--ds-green)]'
                   }`}
                 >
                   {n === 0 ? '∞ boucle' : `×${n}`}
@@ -306,11 +306,11 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
             onClick={() => set({ french: !d.french })}
             disabled={d.byTheme}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all disabled:opacity-40 ${
-              d.french && !d.byTheme ? 'bg-[#4a7c23]/10 border-[#4a7c23]' : 'bg-white border-[#c9a959]/30'
+              d.french && !d.byTheme ? 'bg-[var(--ds-sage)]/10 border-[var(--ds-sage)]' : 'bg-white border-[var(--ds-gold)]/30'
             }`}
           >
-            <span className="text-sm font-bold text-[#2d5016]">🎧 Réciter le français après chaque verset</span>
-            <span className={`w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${d.french && !d.byTheme ? 'bg-[#4a7c23] justify-end' : 'bg-gray-300 justify-start'}`}>
+            <span className="text-sm font-bold text-[var(--ds-green)]">🎧 Réciter le français après chaque verset</span>
+            <span className={`w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${d.french && !d.byTheme ? 'bg-[var(--ds-sage)] justify-end' : 'bg-gray-300 justify-start'}`}>
               <span className="w-5 h-5 rounded-full bg-white shadow" />
             </span>
           </button>
@@ -319,14 +319,14 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
           <button
             onClick={() => set({ byTheme: !d.byTheme })}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
-              d.byTheme ? 'bg-[#4a7c23]/10 border-[#4a7c23]' : 'bg-white border-[#c9a959]/30'
+              d.byTheme ? 'bg-[var(--ds-sage)]/10 border-[var(--ds-sage)]' : 'bg-white border-[var(--ds-gold)]/30'
             }`}
           >
-            <span className="text-sm font-bold text-[#2d5016] text-left">
+            <span className="text-sm font-bold text-[var(--ds-green)] text-left">
               📖 Lecture par thème
               <span className="block text-[11px] font-normal text-gray-500">versets du thème, puis tafsir Ibn Kathir lu à voix haute</span>
             </span>
-            <span className={`shrink-0 w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${d.byTheme ? 'bg-[#4a7c23] justify-end' : 'bg-gray-300 justify-start'}`}>
+            <span className={`shrink-0 w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${d.byTheme ? 'bg-[var(--ds-sage)] justify-end' : 'bg-gray-300 justify-start'}`}>
               <span className="w-5 h-5 rounded-full bg-white shadow" />
             </span>
           </button>
@@ -335,7 +335,7 @@ export default function PlaybackConfig({ initial, chapters, units, currentSurah,
           <button
             onClick={launch}
             disabled={!valid}
-            className="w-full py-3 bg-gradient-to-r from-[#2d5016] to-[#4a7c23] text-white font-bold rounded-xl disabled:opacity-40 active:scale-[0.98] transition-all"
+            className="w-full py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] text-white font-bold rounded-xl disabled:opacity-40 active:scale-[0.98] transition-all"
           >
             ▶ Lancer la lecture
           </button>

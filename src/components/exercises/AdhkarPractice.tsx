@@ -27,8 +27,8 @@ type Session = 'matin' | 'soir';
 const AR_FONT = "'Amiri','Scheherazade New','Traditional Arabic',serif";
 
 const META: Record<Session, { label: string; arabic: string; icon: string; grad: string }> = {
-  matin: { label: 'Invocations du matin', arabic: 'أذكار الصباح', icon: '🌅', grad: 'from-[#c9a959] to-[#e0b968]' },
-  soir: { label: 'Invocations du soir', arabic: 'أذكار المساء', icon: '🌙', grad: 'from-[#2d5016] to-[#4a7c23]' },
+  matin: { label: 'Invocations du matin', arabic: 'أذكار الصباح', icon: '🌅', grad: 'from-[var(--ds-gold)] to-[#e0b968]' },
+  soir: { label: 'Invocations du soir', arabic: 'أذكار المساء', icon: '🌙', grad: 'from-[var(--ds-green)] to-[var(--ds-sage)]' },
 };
 
 /**
@@ -121,18 +121,18 @@ export default function AdhkarPractice() {
   // ---- Écran d'entrée ----
   if (!session) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-b from-[#fdfaf3] to-[#f4e9d0] flex flex-col" dir="ltr">
+      <div className="min-h-full bg-gradient-to-b from-[var(--ds-bg)] to-[var(--ds-sage-100)] flex flex-col" dir="ltr">
         <div className="px-4 pt-4">
-          <Link href="/exercises" className="text-[#4a7c23] text-sm hover:underline">
+          <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline">
             ← Retour aux exercices
           </Link>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-5 gap-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-[#2d5016]" dir="rtl" style={{ fontFamily: AR_FONT }}>
+            <h1 className="text-3xl font-bold text-[var(--ds-green)]" dir="rtl" style={{ fontFamily: AR_FONT }}>
               أذكار الصباح والمساء
             </h1>
-            <p className="text-[#7a8b3e] font-semibold mt-1">Invocations du matin et du soir</p>
+            <p className="text-[var(--ds-sage)] font-semibold mt-1">Invocations du matin et du soir</p>
           </div>
           <div className="w-full max-w-sm flex flex-col gap-4">
             {(['matin', 'soir'] as Session[]).map((s) => (
@@ -157,7 +157,7 @@ export default function AdhkarPractice() {
               </button>
             ))}
           </div>
-          {!data && <p className="text-[#4a7c23]/70 text-sm">Chargement…</p>}
+          {!data && <p className="text-[var(--ds-sage)]/70 text-sm">Chargement…</p>}
         </div>
       </div>
     );
@@ -165,26 +165,26 @@ export default function AdhkarPractice() {
 
   // ---- Écran d'une invocation ----
   return (
-    <div className="h-[100dvh] bg-[#fdfaf3] flex flex-col overflow-hidden" dir="ltr">
+    <div className="h-full bg-[var(--ds-bg)] flex flex-col overflow-hidden" dir="ltr">
       {/* Barre */}
-      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
         <button onClick={() => setSession(null)} className="text-sm hover:underline whitespace-nowrap">
           ← {meta!.icon}
         </button>
         <span className="text-sm font-medium truncate">{card?.label ?? meta!.label}</span>
-        <span className="text-xs font-bold bg-[#1f3a0f] rounded-full px-2.5 py-1 whitespace-nowrap">
+        <span className="text-xs font-bold bg-[var(--ds-green-deep)] rounded-full px-2.5 py-1 whitespace-nowrap">
           {index + 1} / {total}
         </span>
       </div>
 
       {/* Progression */}
-      <div className="flex-none h-1 bg-[#f4e9d0]">
-        <div className="h-full bg-[#c9a959] transition-all" style={{ width: `${total ? ((index + 1) / total) * 100 : 0}%` }} />
+      <div className="flex-none h-1 bg-[var(--ds-sage-100)]">
+        <div className="h-full bg-[var(--ds-gold)] transition-all" style={{ width: `${total ? ((index + 1) / total) * 100 : 0}%` }} />
       </div>
 
       {card?.note && (
         <div className="flex-none text-center py-1.5">
-          <span className="inline-block text-[11px] font-bold text-[#7a5d2c] bg-[#c9a959]/20 rounded-full px-3 py-1">
+          <span className="inline-block text-[11px] font-bold text-[#7a5d2c] bg-[var(--ds-gold)]/20 rounded-full px-3 py-1">
             {card.note}
           </span>
         </div>
@@ -201,18 +201,18 @@ export default function AdhkarPractice() {
                 return (
                   <div
                     key={su.name}
-                    className="flex items-center justify-between gap-3 bg-white rounded-2xl border-2 border-[#c9a959]/40 px-4 py-3 shadow-sm"
+                    className="flex items-center justify-between gap-3 bg-white rounded-2xl border-2 border-[var(--ds-gold)]/40 px-4 py-3 shadow-sm"
                   >
                     <div className="min-w-0">
-                      <div dir="rtl" className="font-bold text-[#2d5016] leading-tight" style={{ fontFamily: AR_FONT, fontSize: 'clamp(1.5rem,7vw,2.4rem)' }}>
+                      <div dir="rtl" className="font-bold text-[var(--ds-green)] leading-tight" style={{ fontFamily: AR_FONT, fontSize: 'clamp(1.5rem,7vw,2.4rem)' }}>
                         {su.name}
                       </div>
-                      <div className="text-xs text-[#7a8b3e]">{su.fr}</div>
+                      <div className="text-xs text-[var(--ds-sage)]">{su.fr}</div>
                     </div>
                     <button
                       onClick={() => setSurahCounts((arr) => arr.map((v, j) => (j === i ? Math.min(su.count, v + 1) : v)))}
                       className={`flex-none w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 active:scale-95 transition-all ${
-                        finished ? 'bg-[#2d5016] text-white border-[#c9a959]' : 'bg-[#fdfaf3] text-[#2d5016] border-[#c9a959]'
+                        finished ? 'bg-[var(--ds-green)] text-white border-[var(--ds-gold)]' : 'bg-[var(--ds-bg)] text-[var(--ds-green)] border-[var(--ds-gold)]'
                       }`}
                     >
                       <span className="text-2xl font-bold tabular-nums leading-none">{c}</span>
@@ -235,7 +235,7 @@ export default function AdhkarPractice() {
               <button
                 onClick={() => setCounted((c) => Math.min(card.count ?? 1, c + 1))}
                 className={`w-28 h-28 rounded-full flex flex-col items-center justify-center shadow-lg border-4 active:scale-95 transition-all ${
-                  done ? 'bg-[#2d5016] text-white border-[#c9a959]' : 'bg-white text-[#2d5016] border-[#c9a959]'
+                  done ? 'bg-[var(--ds-green)] text-white border-[var(--ds-gold)]' : 'bg-white text-[var(--ds-green)] border-[var(--ds-gold)]'
                 }`}
               >
                 <span className="text-5xl font-bold tabular-nums leading-none">{counted}</span>
@@ -245,37 +245,37 @@ export default function AdhkarPractice() {
                 <button onClick={() => setCounted(0)} className="font-bold text-[#7a3030] px-3 py-1 rounded-full border border-[#7a3030]/30">
                   ↺ Réinitialiser
                 </button>
-                {done ? <span className="font-bold text-[#2d5016]">✓ Terminé</span> : <span className="text-gray-400">Touche pour compter</span>}
+                {done ? <span className="font-bold text-[var(--ds-green)]">✓ Terminé</span> : <span className="text-gray-400">Touche pour compter</span>}
               </div>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex-none px-4 py-3 border-t border-[#c9a959]/30 bg-[#fdfaf3] flex items-center gap-2">
+          <div className="flex-none px-4 py-3 border-t border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] flex items-center gap-2">
             <button
               onClick={() => go(-1)}
               disabled={index === 0}
-              className="px-3 py-2.5 rounded-xl text-sm font-bold border-2 border-[#c9a959]/40 text-[#2d5016] disabled:opacity-30 active:scale-95"
+              className="px-3 py-2.5 rounded-xl text-sm font-bold border-2 border-[var(--ds-gold)]/40 text-[var(--ds-green)] disabled:opacity-30 active:scale-95"
             >
               ‹ Préc.
             </button>
             <button
               onClick={() => setShowTrans(true)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 border-[#2d5016] text-[#2d5016] active:scale-95 flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 border-[var(--ds-green)] text-[var(--ds-green)] active:scale-95 flex items-center justify-center gap-1.5"
             >
               📖 Traduction
             </button>
             {index < total - 1 ? (
               <button
                 onClick={() => go(1)}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#2d5016] active:scale-95 shadow-md"
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[var(--ds-green)] active:scale-95 shadow-md"
               >
                 Suivant ›
               </button>
             ) : (
               <button
                 onClick={() => setSession(null)}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#2d5016] active:scale-95 shadow-md"
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[var(--ds-green)] active:scale-95 shadow-md"
               >
                 Terminer ✓
               </button>
@@ -289,12 +289,12 @@ export default function AdhkarPractice() {
         <div className="fixed inset-0 z-40 flex flex-col justify-end" onClick={() => setShowTrans(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-[#fdfaf3] rounded-t-2xl shadow-2xl border-t-2 border-[#c9a959] max-h-[70vh] flex flex-col"
+            className="relative bg-[var(--ds-bg)] rounded-t-2xl shadow-2xl border-t-2 border-[var(--ds-gold)] max-h-[70vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex-none px-4 pt-3 pb-2 border-b border-[#c9a959]/40 flex items-center justify-between">
-              <span className="text-sm font-bold text-[#2d5016]">Traduction</span>
-              <button onClick={() => setShowTrans(false)} className="text-[#2d5016] text-lg leading-none px-2">
+            <div className="flex-none px-4 pt-3 pb-2 border-b border-[var(--ds-gold)]/40 flex items-center justify-between">
+              <span className="text-sm font-bold text-[var(--ds-green)]">Traduction</span>
+              <button onClick={() => setShowTrans(false)} className="text-[var(--ds-green)] text-lg leading-none px-2">
                 ✕
               </button>
             </div>
