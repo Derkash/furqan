@@ -209,7 +209,7 @@ function ReadMode() {
 
   const begin = () => {
     if (startPage == null || endPage == null) return;
-    setPage(Math.min(startPage, endPage) % 2 === 0 ? Math.min(startPage, endPage) + 1 : Math.min(startPage, endPage));
+    setPage(Math.min(startPage, endPage));
     setStarted(true);
   };
 

@@ -109,7 +109,7 @@ export default function LecturePractice() {
   const { verseMap } = useVerseMap();
   const recorder = useAudioRecorder(); // enregistrement micro + réécoute
 
-  const [page, setPage] = useState(startPage % 2 === 0 ? startPage + 1 : startPage);
+  const [page, setPage] = useState(startPage);
   // Mémorise la dernière page lue : la sidebar « Lecture » rentre directement dedans.
   useEffect(() => {
     try {
@@ -1167,7 +1167,7 @@ export default function LecturePractice() {
                 onClick={() => {
                   const p = Math.max(1, Math.min(604, Number(gotoPage) || 0));
                   if (p) {
-                    setPage(p % 2 === 0 ? p + 1 : p);
+                    setPage(p);
                     setGotoPage('');
                   }
                 }}
