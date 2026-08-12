@@ -402,7 +402,7 @@ function SetupPageInner() {
 
   return (
     <div className="h-full overflow-y-auto p-4 pb-12" dir="ltr" style={{ fontFamily: 'var(--ds-font)' }}>
-      <div className="max-w-md mx-auto">
+      <div className="max-w-5xl mx-auto">
         <button
           type="button"
           onClick={() => router.push('/revision')}
@@ -425,7 +425,7 @@ function SetupPageInner() {
           </p>
           <p className="text-gray-500 text-sm mb-5">{exercise.description}</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-4 md:items-start">
             {isLecture ? (
               <>
                 {/* Lecture : aller à une destination, puis feuilletage libre. */}
@@ -701,11 +701,11 @@ function SetupPageInner() {
               </OptionGroup>
             )}
 
-            {error && <p className="text-red-600 text-sm text-center">{error}</p>}
+            {error && <p className="text-red-600 text-sm text-center md:col-span-2">{error}</p>}
 
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] hover:from-[var(--ds-sage)] hover:to-[var(--ds-green)] text-white font-bold rounded-xl transition-all text-base shadow-lg active:scale-[0.98]"
+              className="w-full py-3 md:col-span-2 bg-gradient-to-r from-[var(--ds-green)] to-[var(--ds-sage)] hover:from-[var(--ds-sage)] hover:to-[var(--ds-green)] text-white font-bold rounded-xl transition-all text-base shadow-lg active:scale-[0.98]"
             >
               Commencer
             </button>

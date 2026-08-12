@@ -1335,7 +1335,7 @@ export default function LecturePractice() {
       {/* Mushaf — le « livre » ouvert sur le canvas vert */}
       <div
         ref={mushafAreaRef}
-        className="book-centered flex-1 min-h-0 relative select-none overflow-hidden px-2 py-2 md:px-3"
+        className="book-centered flex-1 min-h-0 relative select-none overflow-hidden"
         style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
@@ -1346,8 +1346,12 @@ export default function LecturePractice() {
       >
         <div
           ref={flipWrapRef}
-          className="w-full h-full will-change-transform"
+          className="w-full h-full will-change-transform flex justify-center overflow-hidden"
           style={{ filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.35))' }}
+        >
+        <div
+          className="h-full flex-none max-w-none"
+          style={orientation === 'landscape' ? { aspectRatio: '1518 / 1100' } : { width: '100%' }}
         >
           <MushafDoublePage
             leftPageVerses={left}
@@ -1367,6 +1371,7 @@ export default function LecturePractice() {
             onTap={() => {}}
           />
         </div>
+        </div>
 
         {/* Plein écran : bouton flottant pour sortir */}
         {isFs && (
@@ -1384,8 +1389,8 @@ export default function LecturePractice() {
             réécoute — sinon rien (le panneau de gauche pilote tout). */}
         {(playing || sessionActive || recorder.recording || recorder.audioUrl) && (
           <div
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-full pl-2.5 pr-2.5 py-2 w-[min(96%,700px)]"
-            style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+            className="ds-rise absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-full pl-2.5 pr-2.5 py-2 w-[min(96%,700px)]"
+            style={{ bottom: 'calc(8px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >

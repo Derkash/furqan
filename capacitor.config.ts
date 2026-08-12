@@ -12,6 +12,11 @@ const config: CapacitorConfig = {
     // (progression, stats) est rattaché à l'origine et serait perdu.
     iosScheme: 'https',
   },
+  ios: {
+    // Pas de scroll/rebond de la WebView elle-même : sensation d'app native,
+    // écran FIXE. Les zones défilantes internes (listes) gardent leur scroll CSS.
+    scrollEnabled: false,
+  },
 };
 
 export default config;

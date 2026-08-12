@@ -95,9 +95,25 @@ html.capacitor .ds-page {
   padding-top: env(safe-area-inset-top);
 }
 
+/* Écran FIXE : jamais de rebond/défilement du document lui-même (sensation
+   d'app, pas de page web). Les conteneurs internes gèrent leur propre scroll. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 /* Zone « livre » (Lecture) : double page centrée verticalement sur le canvas. */
 .book-centered .mushaf-page-wrapper {
   align-items: center;
+}
+
+/* Barre transiente : monte du bas. */
+@keyframes ds-rise {
+  from { transform: translate(-50%, 120%); opacity: 0.4; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.ds-rise {
+  animation: ds-rise 0.28s ease;
 }
 
 /* Champs de saisie : contenu français/numérique par défaut. Sans ça ils
