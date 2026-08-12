@@ -930,18 +930,16 @@ export default function LecturePractice() {
     setTimeout(finish, 260); // filet de sécurité si transitionend n'arrive pas
   }
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  // Logique de geste PARTAGÉE (souris via Pointer Events, tactile via Touch
+  // Events : WebKit iOS annule les pointer events en plein glissement, d'où
+  // un swipe mort sur iPad/iPhone alors qu'il marchait ailleurs).
+  const gestureStart = (x: number, y: number, target: EventTarget | null) => {
     if (captureMode || swipe.current.animating) return;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* certains navigateurs peuvent refuser — le glissement reste fonctionnel */
-    }
-    const el = (e.target as HTMLElement).closest('[data-verse]');
+    const el = (target as HTMLElement | null)?.closest?.('[data-verse]');
     // Glissement : autorisé partout sur le Mushaf (même hors d'un mot).
     swipe.current = {
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: x,
+      startY: y,
       dx: 0,
       active: true,
       dragging: false,
@@ -955,7 +953,7 @@ export default function LecturePractice() {
     const verseKey = el?.getAttribute('data-verse');
     if (!el || !verseKey || !Number.isFinite(page) || markingMode) return;
     longPressFired.current = false;
-    pressStart.current = { x: e.clientX, y: e.clientY, page, verseKey };
+    pressStart.current = { x, y, page, verseKey };
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       pressTimer.current = null;
@@ -963,11 +961,11 @@ export default function LecturePractice() {
     }, 450);
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const gestureMove = (x: number, y: number) => {
     const s = swipe.current;
     if (s.active && !s.animating) {
-      const dx = e.clientX - s.startX;
-      const dy = e.clientY - s.startY;
+      const dx = x - s.startX;
+      const dy = y - s.startY;
       if (!s.dragging && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
         // Bascule en mode glissement : annule l'appui long et ferme les overlays.
         s.dragging = true;
@@ -985,10 +983,10 @@ export default function LecturePractice() {
     }
     // Sinon : annule l'appui long si le doigt bouge trop.
     const p = pressStart.current;
-    if (p && (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12)) clearPress();
+    if (p && (Math.abs(x - p.x) > 12 || Math.abs(y - p.y) > 12)) clearPress();
   };
 
-  const onPointerUp = () => {
+  const gestureEnd = () => {
     clearPress();
     const s = swipe.current;
     if (s.active && s.dragging) {
@@ -1003,6 +1001,36 @@ export default function LecturePractice() {
     s.active = false;
     s.dragging = false;
   };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return; // tactile → Touch Events
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* certains navigateurs peuvent refuser — le glissement reste fonctionnel */
+    }
+    gestureStart(e.clientX, e.clientY, e.target);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return;
+    gestureMove(e.clientX, e.clientY);
+  };
+
+  const onPointerUp = (e?: React.PointerEvent<HTMLDivElement>) => {
+    if (e && e.pointerType === 'touch') return;
+    gestureEnd();
+  };
+
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    if (t) gestureStart(t.clientX, t.clientY, e.target);
+  };
+  const onTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    if (t) gestureMove(t.clientX, t.clientY);
+  };
+  const onTouchEnd = () => gestureEnd();
 
   // Feuilletage au trackpad : swipe horizontal à deux doigts (événements wheel).
   onWheelRef.current = (e: WheelEvent) => {
@@ -1343,10 +1371,14 @@ export default function LecturePractice() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
       >
         <div
           ref={flipWrapRef}
-          className="book-area w-full flex-1 min-h-0 will-change-transform flex justify-center items-center overflow-hidden"
+          className="book-area w-full flex-1 min-h-0 will-change-transform flex justify-center items-start overflow-hidden"
           style={{ filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.35))' }}
         >
         <div
@@ -1388,8 +1420,8 @@ export default function LecturePractice() {
             réécoute — sinon rien (le panneau de gauche pilote tout). */}
         {(playing || sessionActive || recorder.recording || recorder.audioUrl) && (
           <div
-            className="ds-rise-flow flex-none mx-auto my-1.5 flex items-center gap-2.5 md:gap-3 bg-white rounded-2xl px-3 py-1.5 w-[min(97%,900px)]"
-            style={{ marginBottom: 'calc(6px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+            className="ds-rise absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-2xl px-3 py-1.5 w-[min(97%,900px)]"
+            style={{ bottom: 'calc(4px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
