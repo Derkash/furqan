@@ -1336,7 +1336,7 @@ export default function LecturePractice() {
       <div
         ref={mushafAreaRef}
         className="book-centered flex-1 min-h-0 relative select-none overflow-hidden flex flex-col"
-        style={{ WebkitTouchCallout: 'none', touchAction: 'pan-y' }}
+        style={{ WebkitTouchCallout: 'none', touchAction: 'none' }}
         onClick={onMushafClick}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -1585,36 +1585,8 @@ export default function LecturePractice() {
           </div>
         )}
 
-        {/* Feuilletage — l'arabe se lit de DROITE à GAUCHE :
-            flèche de GAUCHE (‹) = page SUIVANTE, flèche de DROITE (›) = précédente. */}
-        <button
-          type="button"
-          aria-label="Pages suivantes"
-          disabled={!canNext}
-          onClick={(e) => {
-            e.stopPropagation();
-            animatedFlip('next');
-          }}
-          className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
-            canNext ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
-          }`}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
-        </button>
-        <button
-          type="button"
-          aria-label="Pages précédentes"
-          disabled={!canPrev}
-          onClick={(e) => {
-            e.stopPropagation();
-            animatedFlip('prev');
-          }}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 ${
-            canPrev ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)]' : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
-          }`}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-        </button>
+        {/* Feuilletage : au GLISSEMENT uniquement (RTL : glisser vers la droite =
+            page suivante). Les flèches ont été retirées à la demande. */}
       </div>
 
       {/* Layer verset : traduction ou tafsir Ibn Kathir */}
