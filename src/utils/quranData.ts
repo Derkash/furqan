@@ -4,8 +4,7 @@ import { toGlobalAyahNumber, parseWordLocation } from './ayahMapping';
 /**
  * URLs des APIs
  */
-const MUSHAF_CDN =
-  'https://raw.githubusercontent.com/zonetecde/mushaf-layout/refs/heads/main/mushaf';
+const MUSHAF_CDN = '/mushaf-layout';
 // CDN Quran Foundation (RECOMMANDÉ) - l'ancien fonts.quran.com peut ne plus fonctionner
 const QPC_FONTS_CDN = 'https://verses.quran.foundation/fonts/quran/hafs/v1/woff2';
 const AUDIO_CDN = 'https://cdn.islamic.network/quran/audio/128/ar.husary';

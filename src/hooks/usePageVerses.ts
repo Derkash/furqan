@@ -10,8 +10,9 @@ import type {
 } from '@/types';
 import { toGlobalAyahNumber, parseWordLocation, getVerseKey } from '@/utils/ayahMapping';
 
-const LAYOUT_BASE_URL =
-  'https://raw.githubusercontent.com/zonetecde/mushaf-layout/refs/heads/main/mushaf';
+// Layout servi en local (public/mushaf-layout) : nécessaire pour l'offline iPad
+// et supprime la dépendance au repo GitHub tiers zonetecde/mushaf-layout.
+const LAYOUT_BASE_URL = '/mushaf-layout';
 
 // Cache pour les données de layout
 const layoutCache = new Map<number, PageVerses>();

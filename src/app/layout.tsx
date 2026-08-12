@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AppInit from "@/components/AppInit";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className="antialiased">
+        <AppInit />
         {children}
       </body>
     </html>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiUrl } from '@/lib/apiUrl';
 
 // Tafsir Ibn Kathir (abrégé) en français.
 // 1. Sourates 1-7 et Juz 'Amma : fichiers statiques pré-traduits
@@ -35,7 +36,7 @@ export function fetchIbnKathir(verseKey: string): Promise<string | null> {
         } catch {
           // fichier statique illisible → on tente l'API
         }
-        const res = await fetch(`/api/ibn-kathir-fr?ayah=${verseKey}`);
+        const res = await fetch(apiUrl(`/api/ibn-kathir-fr?ayah=${verseKey}`));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return ((await res.json()).text as string | null) ?? null;
       })().catch(() => {

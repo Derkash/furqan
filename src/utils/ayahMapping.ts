@@ -1,3 +1,5 @@
+import { getLocalAudioUrl } from './audioStore';
+
 /**
  * Numéro global de ayah au début de chaque sourate
  * Index 0 = non utilisé, Index 1 = Sourate 1 (Al-Fatiha), etc.
@@ -192,9 +194,13 @@ export function getVerseKey(surah: number, verse: number): string {
 }
 
 /**
- * Retourne l'URL audio pour un verset (Al-Husary)
+ * Retourne l'URL audio pour un verset (Al-Husary).
+ * App iPad : sert le mp3 téléchargé en local s'il existe, sinon le CDN.
  * @param globalAyahNumber - Numéro global du verset (1-6236)
  */
 export function getAudioUrl(globalAyahNumber: number): string {
-  return `https://cdn.islamic.network/quran/audio/128/ar.husary/${globalAyahNumber}.mp3`;
+  return (
+    getLocalAudioUrl(globalAyahNumber) ??
+    `https://cdn.islamic.network/quran/audio/128/ar.husary/${globalAyahNumber}.mp3`
+  );
 }

@@ -42,6 +42,14 @@ next-env.d.ts
 /.next.nosync/
 scripts/.asbab-cache.json
 
+# build iPad : export statique (Capacitor) + artefacts iOS générés
+/.next-capacitor.nosync/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App/private/
+
 # Source personnelle du lexique (le seed dérivé est dans public/vocab-seed.json)
 ARAB_VOCAB.pdf
 public/morphology/.quran-morphology.txt

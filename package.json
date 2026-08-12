@@ -5,11 +5,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:ipad": "BUILD_TARGET=capacitor NEXT_PUBLIC_API_BASE_URL=https://almuraja3a.com next build && cap sync ios",
+    "open:ipad": "cap open ios",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/ios": "^8.5.0",
     "@supabase/supabase-js": "^2.110.2",
     "bing-translate-api": "^4.2.0",
     "msedge-tts": "^2.0.6",
@@ -18,6 +23,7 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

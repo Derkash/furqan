@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiUrl } from '@/lib/apiUrl';
 
 // Cache des audios déjà synthétisés (par texte) : la réécoute est instantanée.
 const audioCache = new Map<string, string>();
@@ -14,7 +15,7 @@ export function fetchTTS(text: string): Promise<string | null> {
   if (!pending.has(text)) {
     pending.set(
       text,
-      fetch('/api/tts', {
+      fetch(apiUrl('/api/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),

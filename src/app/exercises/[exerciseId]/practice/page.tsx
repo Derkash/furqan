@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
@@ -34,6 +34,16 @@ import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/voc
 import Link from 'next/link';
 
 export default function PracticePage() {
+  // Suspense requis par le prérendu statique (generateStaticParams / export
+  // Capacitor) : useSearchParams est utilisé plus bas dans MushafPractice.
+  return (
+    <Suspense fallback={null}>
+      <PracticeRouter />
+    </Suspense>
+  );
+}
+
+function PracticeRouter() {
   const params = useParams();
   const exerciseId = params.exerciseId as string;
 

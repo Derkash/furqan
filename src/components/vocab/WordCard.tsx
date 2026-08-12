@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { apiUrl } from '@/lib/apiUrl';
 import {
   getWordMorphology,
   getVerseText,
@@ -87,7 +88,7 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       const verseText = await getVerseText(verseKey).catch(() => '');
       if (id !== reqId.current) return;
       try {
-        const res = await fetch('/api/vocab-analyze', {
+        const res = await fetch(apiUrl('/api/vocab-analyze'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

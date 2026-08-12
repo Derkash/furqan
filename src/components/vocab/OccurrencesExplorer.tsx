@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { apiUrl } from '@/lib/apiUrl';
 import {
   getRootOccurrences,
   getVerseWords,
@@ -118,7 +119,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
             position: o.word,
           });
         }
-        const r = await fetch('/api/occurrence-info', {
+        const r = await fetch(apiUrl('/api/occurrence-info'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items, user: getCurrentUser() ?? undefined }),
