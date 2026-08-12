@@ -398,6 +398,9 @@ export default function MushafPage({
   const pageGeo = geometry?.[String(pageNumber)];
   const hasPageBg = !!pageGeo;
   const ins = pageGeo ?? (isOddPage ? AUTHENTIC_INSETS.odd : AUTHENTIC_INSETS.even);
+  // 0.0700 : calibré pour que la ligne QCF la plus longue tienne dans la boîte
+  // avec ~1,5 % de marge — le texte ne mord JAMAIS l'ornement.
+  const textFontSize = frameConfig?.textFontSize ?? (100 - ins.left - ins.right) * 0.07;
   const lineCount = data?.lines.length ?? 15;
 
   return (
@@ -657,7 +660,7 @@ export default function MushafPage({
                   <div key={line.line} style={rowStyle}>
                   <div
                     className="mushaf-line"
-                    style={{ fontFamily: `'${fontFamily}', serif`, fontSize: `${config.textFontSize}cqi` }}
+                    style={{ fontFamily: `'${fontFamily}', serif`, fontSize: `${textFontSize}cqi` }}
                   >
                     {(line.words ?? []).map((w, i) => {
                       const verseMaskHide = maskAll && !visibleVerses.has(w.verseKey) && !w.isAyahMarker;
