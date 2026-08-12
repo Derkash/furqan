@@ -149,10 +149,6 @@ export default function LecturePractice() {
   const recPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [recRate, setRecRate] = useState(1.5);
   const lastRecUrl = useRef<string | null>(null); // pour lancer la réécoute une seule fois
-  // Cluster de boutons flottants (play/pause + gros record rouge), déplaçable.
-  const clusterRef = useRef<HTMLDivElement | null>(null);
-  const [recCluster, setRecCluster] = useState<{ x: number; y: number } | null>(null);
-  const recDrag = useRef({ startX: 0, startY: 0, baseX: 0, baseY: 0, moved: false });
   // Configurateur de lecture.
   const [showConfig, setShowConfig] = useState(false);
   const [config, setConfig] = useState<PlayConfig>({
@@ -834,48 +830,6 @@ export default function LecturePractice() {
     recorder.start();
   }
 
-  // Déplacement du cluster de boutons flottants (poignée = le bouton record).
-  // Tap (sans déplacement) = démarre/arrête l'enregistrement.
-  function onRecPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    e.stopPropagation();
-    const area = mushafAreaRef.current?.getBoundingClientRect();
-    const cl = clusterRef.current?.getBoundingClientRect();
-    if (!area || !cl) return;
-    recDrag.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      baseX: cl.left - area.left,
-      baseY: cl.top - area.top,
-      moved: false,
-    };
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function onRecPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
-    const d = recDrag.current;
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
-    if (!d.moved && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-    d.moved = true;
-    const area = mushafAreaRef.current?.getBoundingClientRect();
-    if (!area) return;
-    const cw = clusterRef.current?.offsetWidth ?? 0;
-    const ch = clusterRef.current?.offsetHeight ?? 0;
-    const nx = Math.max(0, Math.min(area.width - cw, d.baseX + dx));
-    const ny = Math.max(0, Math.min(area.height - ch, d.baseY + dy));
-    setRecCluster({ x: nx, y: ny });
-  }
-
-  function onRecPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
-    e.stopPropagation();
-    if (!recDrag.current.moved) toggleRecord();
-    recDrag.current.moved = false;
-  }
-
   function togglePlay() {
     if (playing) {
       // Annule aussi une relance de boucle en attente.
@@ -1452,54 +1406,41 @@ export default function LecturePractice() {
           </button>
         )}
 
-        {/* Gros boutons flottants (déplaçables) : lecture/pause + enregistrement */}
-        <div
-          ref={clusterRef}
-          className="absolute z-30 flex items-center gap-4"
-          style={
-            recCluster
-              ? { left: recCluster.x, top: recCluster.y }
-              : { bottom: 20, left: '50%', transform: 'translateX(-50%)' }
-          }
-          onClick={(e) => e.stopPropagation()}
+        {/* Boutons FIXES (exigence utilisateur) : enregistrement à l'extrême
+            gauche en bas, lecture/pause à l'extrême droite en bas. Ils ne
+            bougent jamais — mode standard comme plein écran. */}
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); toggleRecord(); }}
+          aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
+          className={`absolute bottom-3 left-3 z-30 w-16 h-16 rounded-full flex items-center justify-center bg-red-600 text-white shadow-[0_6px_22px_rgba(220,38,38,0.5)] border-4 border-white active:scale-95 transition-all ${
+            recorder.recording ? 'animate-pulse' : ''
+          }`}
         >
-          {/* Lecture / Pause */}
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-            aria-label={playing ? 'Pause' : 'Lecture'}
-            className="w-16 h-16 rounded-full flex items-center justify-center bg-[#2d5016] text-[#c9a959] shadow-[0_6px_22px_rgba(0,0,0,0.4)] border-4 border-white active:scale-95 transition-all"
-          >
-            {playing ? (
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-            ) : (
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            )}
-          </button>
-          {/* Enregistrement / Stop — gros bouton rouge déplaçable */}
-          <button
-            type="button"
-            onPointerDown={onRecPointerDown}
-            onPointerMove={onRecPointerMove}
-            onPointerUp={onRecPointerUp}
-            onPointerCancel={onRecPointerUp}
-            aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
-            className={`w-20 h-20 rounded-full flex items-center justify-center bg-red-600 text-white shadow-[0_8px_28px_rgba(220,38,38,0.5)] border-4 border-white active:scale-95 transition-all touch-none ${
-              recorder.recording ? 'animate-pulse' : ''
-            }`}
-          >
-            {recorder.recording ? (
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-            ) : (
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            )}
-          </button>
-        </div>
+          {recorder.recording ? (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+          ) : (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" x2="12" y1="19" y2="22" />
+            </svg>
+          )}
+        </button>
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+          aria-label={playing ? 'Pause' : 'Lecture'}
+          className="absolute bottom-3 right-3 z-30 w-16 h-16 rounded-full flex items-center justify-center bg-[#2d5016] text-[#c9a959] shadow-[0_6px_22px_rgba(0,0,0,0.4)] border-4 border-white active:scale-95 transition-all"
+        >
+          {playing ? (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+          ) : (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          )}
+        </button>
 
         {selected && (
           <WordCard

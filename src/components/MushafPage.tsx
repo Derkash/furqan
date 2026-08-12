@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PageVerses } from '@/types';
 import BlurOverlay from './BlurOverlay';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { loadHizbQuarters, type HizbQuarter } from '@/utils/quranBounds';
 
 export interface FrameConfig {
   outerInsetH: number; // % from left/right of page where outer gold line sits
@@ -52,12 +51,34 @@ const AUTHENTIC_INSETS = {
 // dur » dans le cadre. Repasser à true pour réafficher les libellés de l'app.
 const SHOW_MARGIN_LABELS = false;
 
-/** Libellé du médaillon pour le quart q (1-240), comme dans le mushaf imprimé. */
-function quarterLabel(q: number): { title: string; hizb: number } {
-  const hizb = Math.floor((q - 1) / 4) + 1;
-  const pos = (q - 1) % 4;
-  const title = ['الحزب', 'ربع الحزب', 'نصف الحزب', 'ثلاثة أرباع الحزب'][pos];
-  return { title, hizb };
+// ---- Fonds par page (scans du vrai mushaf, texte coranique effacé) ----
+// public/mushaf-bg/page-XXX.webp : le scan d'origine de CHAQUE page avec ses
+// médaillons de hizb, cartouches, basmallah et étiquettes de marge d'époque —
+// seules les lignes de texte sont vidées (remplacées par le rendu QCF).
+// geometry.json = boîte intérieure du cadre par page (les scans bougent de
+// quelques pixels d'une page à l'autre). Pages 1-2 (enluminures pleine page) :
+// absentes → rendu générique (frame-odd/even + sprites).
+interface PageGeometry {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+let geometryCache: Record<string, PageGeometry> | null = null;
+let geometryPromise: Promise<Record<string, PageGeometry>> | null = null;
+
+function loadGeometry(): Promise<Record<string, PageGeometry>> {
+  if (geometryCache) return Promise.resolve(geometryCache);
+  if (!geometryPromise) {
+    geometryPromise = fetch('/mushaf-bg/geometry.json')
+      .then((r) => r.json())
+      .then((g: Record<string, PageGeometry>) => {
+        geometryCache = g;
+        return g;
+      })
+      .catch(() => ({}));
+  }
+  return geometryPromise;
 }
 
 interface MushafPageProps {
@@ -251,7 +272,7 @@ export default function MushafPage({
   const config: FrameConfig = { ...DEFAULT_FRAME, ...(frameConfig ?? {}) };
   const [data, setData] = useState<PageData | null>(null);
   const [chapters, setChapters] = useState<ChapterInfo[] | null>(chaptersCache);
-  const [quarters, setQuarters] = useState<HizbQuarter[] | null>(null);
+  const [geometry, setGeometry] = useState<Record<string, PageGeometry> | null>(geometryCache);
   const padded = String(pageNumber).padStart(3, '0');
   const fontFamily = `QCF_P${padded}`;
 
@@ -260,31 +281,13 @@ export default function MushafPage({
     loadChapters().then((list) => {
       if (!cancelled) setChapters(list);
     });
-    loadHizbQuarters().then((list) => {
-      if (!cancelled) setQuarters(list);
+    loadGeometry().then((g) => {
+      if (!cancelled) setGeometry(g);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  // Médaillons de hizb en marge : quart dont le verset COMMENCE sur cette page
-  // (position 1 du verset présente), positionné à la ligne de ce premier mot.
-  const pageQuarterMarks = useMemo(() => {
-    if (!data || !quarters) return [];
-    const marks: { line: number; title: string; hizb: number }[] = [];
-    for (const quarter of quarters) {
-      const verseKey = `${quarter.surah}:${quarter.ayah}`;
-      for (const line of data.lines) {
-        if (line.type !== 'content' || !line.words) continue;
-        if (line.words.some((w) => w.verseKey === verseKey && !w.isAyahMarker && w.position === 1)) {
-          marks.push({ line: line.line, ...quarterLabel(quarter.q) });
-          break;
-        }
-      }
-    }
-    return marks;
-  }, [data, quarters]);
 
   // Badge « numéro de page dans la sourate » : sourate du premier verset de la
   // page, position = page − première page de la sourate + 1 (sur total).
@@ -396,7 +399,12 @@ export default function MushafPage({
   // → pages adjacentes, pas d'espace vide entre elles
   const isOddPage = pageNumber % 2 === 1;
   const wrapperJustify = isOddPage ? 'flex-start' : 'flex-end';
-  const ins = isOddPage ? AUTHENTIC_INSETS.odd : AUTHENTIC_INSETS.even;
+  // Fond authentique propre à CETTE page (géométrie mesurée sur son scan) ;
+  // pages 1-2 (enluminures) : cadre générique + insets par parité.
+  const pageGeo = geometry?.[String(pageNumber)];
+  const hasPageBg = !!pageGeo;
+  const ins = pageGeo ?? (isOddPage ? AUTHENTIC_INSETS.odd : AUTHENTIC_INSETS.even);
+  const lineCount = data?.lines.length ?? 15;
 
   return (
     <div
@@ -545,9 +553,11 @@ export default function MushafPage({
         }
       `}</style>
       <div className="mushaf-page">
-        {/* Cadre authentique extrait des scans du Mushaf Medina Old */}
+        {/* Fond authentique : le scan de CETTE page (cadre, médaillons de hizb,
+            cartouches, basmallah, étiquettes de marge d'origine — texte vidé).
+            Pages 1-2 : cadre générique extrait des scans. */}
         <img
-          src={`/mushaf-frame/frame-${isOddPage ? 'odd' : 'even'}.png`}
+          src={hasPageBg ? `/mushaf-bg/page-${padded}.webp` : `/mushaf-frame/frame-${isOddPage ? 'odd' : 'even'}.png`}
           alt=""
           draggable={false}
           style={{
@@ -561,58 +571,6 @@ export default function MushafPage({
           }}
           aria-hidden
         />
-
-        {/* Médaillons de hizb dans la marge extérieure, au niveau du verset */}
-        {pageQuarterMarks.map((mark) => {
-          const lineCenter = ins.top + ((mark.line - 0.5) / 15) * (100 - ins.top - ins.bottom);
-          return (
-            <div
-              key={`hizb-${mark.line}`}
-              style={{
-                position: 'absolute',
-                top: `${lineCenter - 11.8}%`,
-                height: '23.6%',
-                width: '9.6%',
-                ...(isOddPage ? { right: '0.2%' } : { left: '0.2%' }),
-                zIndex: 1,
-                pointerEvents: 'none',
-              }}
-              aria-hidden
-            >
-              <img
-                src="/mushaf-frame/medallion.png"
-                alt=""
-                draggable={false}
-                style={{ width: '100%', height: '100%', userSelect: 'none' }}
-              />
-              {SHOW_MARGIN_LABELS && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '38%',
-                    bottom: '38%',
-                    left: '18%',
-                    right: '18%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    direction: 'rtl',
-                    textAlign: 'center',
-                    fontFamily: "'Amiri', 'Scheherazade New', serif",
-                    color: '#6b4f1d',
-                    fontWeight: 700,
-                    fontSize: mark.title.length > 10 ? '0.95cqi' : '1.25cqi',
-                    lineHeight: 1.15,
-                  }}
-                >
-                  <span>{mark.title}</span>
-                  <span>{toArabicNumbers(mark.hizb)}</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
 
         {/* Numéro de page relatif à la sourate : en haut à DROITE pour la page
             de droite (impaire), en haut à GAUCHE pour la page de gauche (paire) */}
@@ -642,70 +600,65 @@ export default function MushafPage({
             right: `${ins.right}%`,
             bottom: `${ins.bottom}%`,
             left: `${ins.left}%`,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
             zIndex: 2,
           }}
         >
           {data
             ? data.lines.map((line) => {
+                // Rangée à la position EXACTE de la grille du mushaf imprimé
+                // (le fond de page est le scan : l'alignement doit être strict).
+                const rowStyle: React.CSSProperties = {
+                  position: 'absolute',
+                  top: `${((line.line - 1) * 100) / lineCount}%`,
+                  height: `${100 / lineCount}%`,
+                  left: 0,
+                  right: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                };
                 if (line.type === 'empty') {
-                  return <div key={line.line} className="mushaf-line empty" />;
+                  return <div key={line.line} style={rowStyle} />;
                 }
                 if (line.type === 'announcement') {
-                  // Cartouche authentique (scan) : ornements aux extrémités,
-                  // nom de la sourate calligraphié par-dessus le centre vidé.
+                  // Fond par page : le cartouche calligraphié d'origine est déjà
+                  // dans le scan → rien à rendre. Pages 1-2 : sprite générique.
+                  if (hasPageBg) return <div key={line.line} style={rowStyle} />;
                   return (
-                    <div key={line.line} className="mushaf-authentic-row">
-                      <div style={{ position: 'relative', width: '100%' }}>
-                        <img
-                          src="/mushaf-frame/cartouche.png"
-                          alt=""
-                          draggable={false}
-                          style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
-                          aria-hidden
-                        />
-                        {SHOW_MARGIN_LABELS && (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              direction: 'rtl',
-                              fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif",
-                              fontSize: '3.1cqi',
-                              fontWeight: 700,
-                              color: '#4a3410',
-                              paddingBottom: '0.5cqi',
-                            }}
-                          >
-                            سُورَةُ {line.nameArabic}
-                          </span>
-                        )}
+                    <div key={line.line} style={rowStyle}>
+                      <div className="mushaf-authentic-row">
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          <img
+                            src="/mushaf-frame/cartouche.png"
+                            alt=""
+                            draggable={false}
+                            style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
+                            aria-hidden
+                          />
+                        </div>
                       </div>
                     </div>
                   );
                 }
                 if (line.type === 'basmala') {
-                  // Basmallah calligraphiée authentique (extraite du scan).
+                  if (hasPageBg) return <div key={line.line} style={rowStyle} />;
                   return (
-                    <div key={line.line} className="mushaf-authentic-row">
-                      <img
-                        src="/mushaf-frame/basmallah.png"
-                        alt={BASMALA_TEXT}
-                        draggable={false}
-                        style={{ width: '57%', height: 'auto', userSelect: 'none' }}
-                      />
+                    <div key={line.line} style={rowStyle}>
+                      <div className="mushaf-authentic-row">
+                        <img
+                          src="/mushaf-frame/basmallah.png"
+                          alt={BASMALA_TEXT}
+                          draggable={false}
+                          style={{ width: '57%', height: 'auto', userSelect: 'none' }}
+                        />
+                      </div>
                     </div>
                   );
                 }
                 // content
                 return (
+                  <div key={line.line} style={rowStyle}>
                   <div
-                    key={line.line}
                     className="mushaf-line"
                     style={{ fontFamily: `'${fontFamily}', serif`, fontSize: `${config.textFontSize}cqi` }}
                   >
@@ -755,11 +708,15 @@ export default function MushafPage({
                       );
                     })}
                   </div>
+                  </div>
                 );
               })
             : null}
         </div>
 
+        {/* Numéro de page : le fond par page porte déjà le sien (authentique) —
+            on ne le rend que pour les pages 1-2 (fond générique). */}
+        {!hasPageBg && (
         <div
           className="mushaf-page-number"
           style={{
@@ -778,6 +735,7 @@ export default function MushafPage({
         >
           {toArabicNumbers(pageNumber)}
         </div>
+        )}
 
         <BlurOverlay isActive={isBlurred} />
 
