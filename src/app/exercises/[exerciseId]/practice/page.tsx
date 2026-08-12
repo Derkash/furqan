@@ -196,6 +196,9 @@ function MushafPractice() {
 
   const startPage = Number(searchParams.get('start')) || 3;
   const endPage = Number(searchParams.get('end')) || 10;
+  // Bornes exactes au verset (hizb/juz/sourate), calculées au setup.
+  const startGlobal = Number(searchParams.get('vs')) || 0;
+  const endGlobal = Number(searchParams.get('ve')) || 0;
   const identifyParam = searchParams.get('identify');
   const revealParam = searchParams.get('reveal');
   const showParam = searchParams.get('show');
@@ -517,6 +520,8 @@ function MushafPractice() {
       exerciseId: exerciseId as ExerciseId,
       startPage,
       endPage,
+      startGlobal: startGlobal > 0 ? startGlobal : undefined,
+      endGlobal: endGlobal > 0 ? endGlobal : undefined,
       maxRounds: nParam ? Number(nParam) || undefined : undefined,
       identifyPosition: (identifyParam ?? undefined) as VersePositionType | undefined,
       revealAfter: parsePositions(revealParam),
@@ -530,7 +535,7 @@ function MushafPractice() {
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, ctxParam, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, startGlobal, endGlobal, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, ctxParam, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {

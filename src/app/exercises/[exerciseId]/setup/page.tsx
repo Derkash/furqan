@@ -6,6 +6,7 @@ import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exer
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { unitToPageRange, MODE_LABELS, MODE_MAX, type RangeMode } from '@/utils/exercises/rangeToPages';
+import { loadHizbQuarters, unitToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
 import { getSelfAssess, setSelfAssess } from '@/utils/exercises/prefs';
@@ -168,6 +169,17 @@ export default function SetupPage() {
   const exerciseId = params.exerciseId as string;
 
   const { data: units } = useQuranUnits();
+  // Quarts de hizb (bornes exactes au verset pour hizb/juz)
+  const [quarters, setQuarters] = useState<HizbQuarter[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadHizbQuarters().then((q) => {
+      if (!cancelled) setQuarters(q);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isAudioQuiz = exerciseId === 'audio-quiz';
   const isSequential = exerciseId === 'sequential';
@@ -320,6 +332,14 @@ export default function SetupPage() {
     }
 
     const query = new URLSearchParams({ start: String(lo), end: String(hi) });
+
+    // Bornes EXACTES au verset (hizb/juz/sourate) : les pages de bord
+    // contiennent des versets hors plage, l'exercice doit les exclure.
+    const bounds = unitToGlobalBounds(range.mode, range.start, range.end, quarters);
+    if (bounds) {
+      query.set('vs', String(bounds.startGlobal));
+      query.set('ve', String(bounds.endGlobal));
+    }
 
     // Nombre de questions (tous les exercices sauf Hifz, qui est une lecture libre)
     const count = Math.max(1, Math.min(200, Math.round(questionCount) || 1));

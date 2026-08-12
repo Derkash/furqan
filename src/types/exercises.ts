@@ -134,6 +134,13 @@ export interface ExerciseState {
 
 export interface ExerciseConfig extends QuizConfig {
   exerciseId: ExerciseId;
+  /**
+   * Bornes EXACTES de la plage en n° global de verset (modes hizb/juz/sourate).
+   * Les pages de bord contiennent des versets hors plage : quand ces bornes
+   * sont présentes, les tirages excluent ces versets (début/fin au verset près).
+   */
+  startGlobal?: number;
+  endGlobal?: number;
   /** Nombre de questions (tours) souhaité. Absent = toute la plage. */
   maxRounds?: number;
   /** Quiz audio : position du verset joué à l'audio à identifier. */

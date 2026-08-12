@@ -104,6 +104,28 @@ function pairRightPage(page: number): number {
   return Math.max(1, page % 2 === 1 ? page : page - 1);
 }
 
+/**
+ * Restreint les versets d'une page aux bornes EXACTES de la plage (hizb/juz/
+ * sourate, n° globaux calculés au setup). Les pages de bord contiennent des
+ * versets d'avant le début ou d'après la fin de la plage : sans ce filtre,
+ * les tirages « débordaient » du hizb demandé. L'affichage de la page reste
+ * complet — seuls les TIRAGES (générateurs d'étapes) sont bornés.
+ */
+function clipToGlobalBounds(pv: PageVerses, config: ExerciseConfig): PageVerses {
+  const { startGlobal, endGlobal } = config;
+  if (!startGlobal || !endGlobal) return pv;
+  const verses = pv.verses.filter(
+    (v) => v.globalNumber >= startGlobal && v.globalNumber <= endGlobal
+  );
+  if (verses.length === pv.verses.length) return pv;
+  return {
+    ...pv,
+    verses,
+    firstVerse: verses[0] ?? null,
+    lastVerse: verses[verses.length - 1] ?? null,
+  };
+}
+
 
 export function useExercise(): UseExerciseReturn {
   const [state, setState] = useState<ExerciseState>(initialState);
@@ -218,7 +240,7 @@ export function useExercise(): UseExerciseReturn {
       // pickRandomPage, donc on l'utilise telle quelle — pas besoin d'un second tirage
       // entre gauche/droite qui sortirait des pages que recentPagesRef ne connaît pas.
       const pageToUse = state.progress.currentPage;
-      const pageVerses = await fetchPageVerses(pageToUse);
+      const pageVerses = clipToGlobalBounds(await fetchPageVerses(pageToUse), state.config);
       // Récupérer les données du verse-map pour les positions précises
       const verseMapData = getVerseMapPage(pageToUse);
       const steps = generator(pageVerses, pageToUse, state.config, verseMapData);

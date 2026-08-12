@@ -4,6 +4,7 @@
 
 import { toGlobalAyahNumber, fromGlobalAyahNumber } from '@/utils/ayahMapping';
 import { unitToPageRange, type QuranUnits, type RangeMode } from '@/utils/exercises/rangeToPages';
+import { unitToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
 
 export type SelMode = 'verse' | RangeMode; // verse | page | hizb | juz | surah
 
@@ -47,11 +48,17 @@ export const DEFAULT_CONFIG: PlayConfig = {
   byTheme: false,
 };
 
-/** Liste ordonnée des versets couverts par la configuration. */
+/**
+ * Liste ordonnée des versets couverts par la configuration.
+ * `quarters` (quarts de hizb) borne hizb/juz/sourate au VERSET exact : sans
+ * lui, la sélection couvrait des pages entières et débordait avant/après la
+ * plage demandée.
+ */
 export function buildSelection(
   cfg: PlayConfig,
   units: QuranUnits | null,
-  versePage: Record<string, number>
+  versePage: Record<string, number>,
+  quarters: HizbQuarter[] | null = null
 ): SelVerse[] {
   const toSel = (g: number): SelVerse => {
     const { surah, verse } = fromGlobalAyahNumber(g);
@@ -69,7 +76,15 @@ export function buildSelection(
     return out;
   }
 
-  // Modes page/hizb/juz/sourate → plage de pages → tous les versets de ces pages.
+  // Modes hizb/juz/sourate : bornes EXACTES au verset si disponibles.
+  const bounds = unitToGlobalBounds(cfg.selMode as RangeMode, cfg.unitStart, cfg.unitEnd, quarters);
+  if (bounds) {
+    const exact: SelVerse[] = [];
+    for (let g = bounds.startGlobal; g <= bounds.endGlobal; g++) exact.push(toSel(g));
+    return exact;
+  }
+
+  // Mode page (ou bornes indisponibles) → plage de pages → tous les versets de ces pages.
   const { startPage, endPage } = unitToPageRange(cfg.selMode, cfg.unitStart, cfg.unitEnd, units);
   if (startPage == null || endPage == null) return [];
   const lo = Math.min(startPage, endPage);

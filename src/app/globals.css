@@ -7,6 +7,15 @@ html.capacitor .app-topbar {
   padding-top: calc(0.5rem + env(safe-area-inset-top));
 }
 
+/* Champs de saisie : contenu français/numérique par défaut. Sans ça ils
+   héritent du dir="rtl" du document (saisie et placeholder « en arabe »).
+   Un champ qui attend de l'arabe peut poser dir="rtl" explicitement. */
+input:not([dir]),
+textarea:not([dir]) {
+  direction: ltr;
+  text-align: left;
+}
+
 /* Police Unicode de fallback - TOUJOURS inclure */
 @font-face {
   font-family: 'UthmanicHafs';

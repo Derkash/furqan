@@ -12,6 +12,7 @@ import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { useVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
+import { loadHizbQuarters } from '@/utils/quranBounds';
 import {
   buildSelection,
   describeSelection,
@@ -660,7 +661,9 @@ export default function LecturePractice() {
 
   async function launch(cfg: PlayConfig) {
     const vpMap = await getVersePageMap();
-    const sel = buildSelection(cfg, units, vpMap);
+    // Quarts de hizb : bornes exactes au verset pour hizb/juz/sourate.
+    const quarters = await loadHizbQuarters();
+    const sel = buildSelection(cfg, units, vpMap, quarters);
     if (sel.length === 0) return;
     loopDelayRef.current = 0; // la lecture principale boucle sans délai (comportement inchangé)
     setConfig(cfg);

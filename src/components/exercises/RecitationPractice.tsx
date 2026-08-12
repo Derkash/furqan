@@ -52,6 +52,9 @@ export default function RecitationPractice() {
   const searchParams = useSearchParams();
   const startPage = Number(searchParams.get('start')) || 1;
   const endPage = Number(searchParams.get('end')) || startPage;
+  // Bornes exactes au verset (hizb/juz/sourate) : jamais de tirage hors plage.
+  const startGlobal = Number(searchParams.get('vs')) || 0;
+  const endGlobal = Number(searchParams.get('ve')) || 0;
   const maxRounds = Math.max(1, Number(searchParams.get('n')) || 10);
 
   // ---------- Connexion (cookie) ----------
@@ -161,6 +164,10 @@ export default function RecitationPractice() {
     try {
       let verse: VersePosition | null = null;
       const asked = askedVersesRef.current;
+      // Bornes exactes de la plage (hizb/juz/sourate) : les pages de bord
+      // contiennent des versets hors plage, on ne les tire JAMAIS.
+      const inBounds = (v: VersePosition) =>
+        !startGlobal || !endGlobal || (v.globalNumber >= startGlobal && v.globalNumber <= endGlobal);
 
       // ~50 % du temps : tirage pondéré parmi les versets en erreur de la plage
       // (en excluant ceux déjà demandés cette session).
@@ -170,7 +177,7 @@ export default function RecitationPractice() {
         const pick = pickPriorityVerse(priorities);
         if (pick) {
           const pv = await fetchPageVerses(pick.page);
-          verse = pv.verses.find((v) => v.verseKey === pick.verseKey) ?? null;
+          verse = pv.verses.find((v) => v.verseKey === pick.verseKey && inBounds(v)) ?? null;
         }
       }
 
@@ -179,7 +186,7 @@ export default function RecitationPractice() {
         for (let attempt = 0; attempt < 40 && !verse; attempt++) {
           const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
           const pv = await fetchPageVerses(page);
-          const candidates = pv.verses.filter((v) => !asked.has(v.verseKey));
+          const candidates = pv.verses.filter((v) => !asked.has(v.verseKey) && inBounds(v));
           if (candidates.length === 0) continue;
           verse = candidates[Math.floor(Math.random() * candidates.length)];
         }
@@ -188,10 +195,14 @@ export default function RecitationPractice() {
       // Plage entièrement parcourue → on repart à zéro pour pouvoir continuer.
       if (!verse) {
         asked.clear();
-        const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
-        const pv = await fetchPageVerses(page);
-        if (pv.verses.length === 0) throw new Error('page vide');
-        verse = pv.verses[Math.floor(Math.random() * pv.verses.length)];
+        for (let attempt = 0; attempt < 40 && !verse; attempt++) {
+          const page = startPage + Math.floor(Math.random() * (endPage - startPage + 1));
+          const pv = await fetchPageVerses(page);
+          const pool = pv.verses.filter(inBounds);
+          if (pool.length === 0) continue;
+          verse = pool[Math.floor(Math.random() * pool.length)];
+        }
+        if (!verse) throw new Error('plage vide');
       }
 
       asked.add(verse.verseKey);
@@ -216,7 +227,7 @@ export default function RecitationPractice() {
     } catch {
       setLoadError('Impossible de charger la page. Vérifiez votre connexion.');
     }
-  }, [startPage, endPage]);
+  }, [startPage, endPage, startGlobal, endGlobal]);
 
   // Premier tour au montage (après connexion).
   const startedRef = useRef(false);

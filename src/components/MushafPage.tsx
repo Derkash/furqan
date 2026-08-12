@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { PageVerses } from '@/types';
 import BlurOverlay from './BlurOverlay';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { loadHizbQuarters, type HizbQuarter } from '@/utils/quranBounds';
 
 export interface FrameConfig {
   outerInsetH: number; // % from left/right of page where outer gold line sits
@@ -26,7 +27,7 @@ export const DEFAULT_FRAME: FrameConfig = {
   textInsetH: 8.2,
   textInsetTop: 8.6,
   textInsetBottom: 9,
-  textFontSize: 5.35,
+  textFontSize: 5.15,
   pageNumberSize: 3.2,
   pageNumberBottom: 2.1,
   showPattern: true,
@@ -40,33 +41,16 @@ export const DEFAULT_FRAME: FrameConfig = {
 // reliure à gauche) et page paire (gauche du spread, reliure à droite).
 // Les insets ci-dessous = boîte intérieure du liseré or, mesurée sur les scans.
 const AUTHENTIC_INSETS = {
-  odd: { top: 12.65, bottom: 10.2, left: 7.8, right: 17.7 },
-  even: { top: 11.75, bottom: 11.2, left: 16.9, right: 8.6 },
+  odd: { top: 13.1, bottom: 10.7, left: 8.4, right: 18.2 },
+  even: { top: 12.2, bottom: 11.7, left: 17.5, right: 9.2 },
 } as const;
 
-// Médaillons de hizb : quart de départ par verset (fichier généré depuis les
-// métadonnées alquran.cloud — 240 quarts, {q, surah, ayah}).
-interface HizbQuarter {
-  q: number;
-  surah: number;
-  ayah: number;
-}
-let quartersCache: HizbQuarter[] | null = null;
-let quartersPromise: Promise<HizbQuarter[]> | null = null;
-
-function loadHizbQuarters(): Promise<HizbQuarter[]> {
-  if (quartersCache) return Promise.resolve(quartersCache);
-  if (!quartersPromise) {
-    quartersPromise = fetch('/qcf-data/hizb-quarters.json')
-      .then((r) => r.json())
-      .then((list: HizbQuarter[]) => {
-        quartersCache = list;
-        return list;
-      })
-      .catch(() => []);
-  }
-  return quartersPromise;
-}
+// Libellés rédigés par l'app (badge sourate en haut, numéro dans le médaillon
+// de hizb, nom de sourate dans le cartouche). Désactivés à la demande de
+// l'utilisateur — NB : les fonds extraits des scans ont été nettoyés de ces
+// textes (ils étaient propres à une page précise), donc rien n'est « écrit en
+// dur » dans le cadre. Repasser à true pour réafficher les libellés de l'app.
+const SHOW_MARGIN_LABELS = false;
 
 /** Libellé du médaillon pour le quart q (1-240), comme dans le mushaf imprimé. */
 function quarterLabel(q: number): { title: string; hizb: number } {
@@ -267,7 +251,7 @@ export default function MushafPage({
   const config: FrameConfig = { ...DEFAULT_FRAME, ...(frameConfig ?? {}) };
   const [data, setData] = useState<PageData | null>(null);
   const [chapters, setChapters] = useState<ChapterInfo[] | null>(chaptersCache);
-  const [quarters, setQuarters] = useState<HizbQuarter[] | null>(quartersCache);
+  const [quarters, setQuarters] = useState<HizbQuarter[] | null>(null);
   const padded = String(pageNumber).padStart(3, '0');
   const fontFamily = `QCF_P${padded}`;
 
@@ -601,36 +585,38 @@ export default function MushafPage({
                 draggable={false}
                 style={{ width: '100%', height: '100%', userSelect: 'none' }}
               />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '38%',
-                  bottom: '38%',
-                  left: '18%',
-                  right: '18%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  direction: 'rtl',
-                  textAlign: 'center',
-                  fontFamily: "'Amiri', 'Scheherazade New', serif",
-                  color: '#6b4f1d',
-                  fontWeight: 700,
-                  fontSize: mark.title.length > 10 ? '0.95cqi' : '1.25cqi',
-                  lineHeight: 1.15,
-                }}
-              >
-                <span>{mark.title}</span>
-                <span>{toArabicNumbers(mark.hizb)}</span>
-              </div>
+              {SHOW_MARGIN_LABELS && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '38%',
+                    bottom: '38%',
+                    left: '18%',
+                    right: '18%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    direction: 'rtl',
+                    textAlign: 'center',
+                    fontFamily: "'Amiri', 'Scheherazade New', serif",
+                    color: '#6b4f1d',
+                    fontWeight: 700,
+                    fontSize: mark.title.length > 10 ? '0.95cqi' : '1.25cqi',
+                    lineHeight: 1.15,
+                  }}
+                >
+                  <span>{mark.title}</span>
+                  <span>{toArabicNumbers(mark.hizb)}</span>
+                </div>
+              )}
             </div>
           );
         })}
 
         {/* Numéro de page relatif à la sourate : en haut à DROITE pour la page
             de droite (impaire), en haut à GAUCHE pour la page de gauche (paire) */}
-        {surahPageLabel && (
+        {SHOW_MARGIN_LABELS && surahPageLabel && (
           <div
             style={{
               position: 'absolute',
@@ -680,23 +666,25 @@ export default function MushafPage({
                           style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
                           aria-hidden
                         />
-                        <span
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            direction: 'rtl',
-                            fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif",
-                            fontSize: '3.1cqi',
-                            fontWeight: 700,
-                            color: '#4a3410',
-                            paddingBottom: '0.5cqi',
-                          }}
-                        >
-                          سُورَةُ {line.nameArabic}
-                        </span>
+                        {SHOW_MARGIN_LABELS && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              direction: 'rtl',
+                              fontFamily: "'Amiri', 'Scheherazade New', 'Traditional Arabic', serif",
+                              fontSize: '3.1cqi',
+                              fontWeight: 700,
+                              color: '#4a3410',
+                              paddingBottom: '0.5cqi',
+                            }}
+                          >
+                            سُورَةُ {line.nameArabic}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
