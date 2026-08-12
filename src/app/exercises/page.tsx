@@ -2,167 +2,276 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getAllExercises } from '@/utils/exercises/exerciseRegistry';
-import ExerciseCard from '@/components/exercises/ExerciseCard';
+import AppShell from '@/components/AppShell';
 import { isNativeApp } from '@/utils/audioStore';
+import { getCurrentUser } from '@/utils/exercises/userStats';
+import { computeHomeStats, DAILY_GOAL_VERSES, type HomeStats } from '@/utils/homeStats';
 
-export default function ExercisesPage() {
-  const exercises = getAllExercises();
-  // Affiché après montage seulement (évite un mismatch d'hydratation) :
-  // la gestion de l'audio hors ligne n'existe que dans l'app iPad.
+/**
+ * Accueil (design Application2) : salutation, progression du jour, reprise de
+ * la dernière session, accès rapides et sessions récentes. Les exercices
+ * eux-mêmes (setup + practice) sont inchangés.
+ */
+
+function ProgressRing({ percent }: { percent: number }) {
+  const r = 44;
+  const c = 2 * Math.PI * r;
+  const filled = (Math.min(100, Math.max(0, percent)) / 100) * c;
+  return (
+    <svg width="116" height="116" viewBox="0 0 116 116" aria-hidden>
+      <circle cx="58" cy="58" r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="11" />
+      <circle
+        cx="58"
+        cy="58"
+        r={r}
+        fill="none"
+        stroke="var(--ds-gold)"
+        strokeWidth="11"
+        strokeLinecap="round"
+        strokeDasharray={`${filled} ${c - filled}`}
+        transform="rotate(-90 58 58)"
+      />
+      <text
+        x="58"
+        y="58"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#fff"
+        fontSize="26"
+        fontWeight="800"
+        fontFamily="var(--ds-font)"
+      >
+        {Math.round(percent)}%
+      </text>
+    </svg>
+  );
+}
+
+const QUICK_ACCESS: { href: string; label: string; emojiFallback?: string; icon: React.ReactNode }[] = [
+  {
+    href: '/exercises/lecture/setup',
+    label: 'Lecture',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 7v14" />
+        <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/revision',
+    label: 'Révision',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12a9 9 0 1 0 3-6.7" />
+        <path d="M3 4v5h5" />
+      </svg>
+    ),
+  },
+  {
+    href: '/vocab',
+    label: 'Vocabulaire',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="8" height="8" rx="2" />
+        <rect x="13" y="13" width="8" height="8" rx="2" />
+        <path d="M13 7h4M7 13v4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/reperes',
+    label: 'Repères',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+    ),
+  },
+  {
+    href: '/adhkar',
+    label: 'Adhkâr',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard',
+    label: 'Progression',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+        <rect x="7" y="10" width="3" height="7" rx="1" />
+        <rect x="12" y="6" width="3" height="11" rx="1" />
+        <rect x="17" y="13" width="3" height="4" rx="1" />
+      </svg>
+    ),
+  },
+];
+
+export default function AccueilPage() {
+  const [stats, setStats] = useState<HomeStats | null>(null);
+  const [user, setUser] = useState<string | null>(null);
   const [showDownloads, setShowDownloads] = useState(false);
-  useEffect(() => setShowDownloads(isNativeApp()), []);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setStats(computeHomeStats());
+    setUser(getCurrentUser());
+    setShowDownloads(isNativeApp());
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const percent = stats ? Math.min(100, (stats.todayCount / DAILY_GOAL_VERSES) * 100) : 0;
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] pb-12"
-      style={{
-        minHeight: '100dvh',
-        WebkitOverflowScrolling: 'touch',
-      }}
-      dir="ltr"
-    >
-      {/* Header décoratif type Mushaf */}
-      <header className="relative pt-10 pb-8 px-5">
-        {/* Ornement décoratif en haut */}
-        <div className="flex justify-center mb-4">
-          <svg width="120" height="22" viewBox="0 0 120 22" aria-hidden>
-            <defs>
-              <pattern id="hpattern" patternUnits="userSpaceOnUse" width="14" height="22">
-                <path d="M7 3 L13 11 L7 19 L1 11 Z" fill="none" stroke="#c9a959" strokeWidth="0.8" />
-                <circle cx="7" cy="11" r="1.5" fill="#c9a959" />
-              </pattern>
-            </defs>
-            <rect x="10" y="0" width="100" height="22" fill="url(#hpattern)" />
-            <line x1="0" y1="11" x2="10" y2="11" stroke="#c9a959" strokeWidth="1" />
-            <line x1="110" y1="11" x2="120" y2="11" stroke="#c9a959" strokeWidth="1" />
-          </svg>
+    <AppShell>
+      {/* En-tête */}
+      <header className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="ds-title text-3xl md:text-4xl">
+            Assalâmu ’alaykum{user ? ` ${user}` : ''}
+          </h1>
+          <p className="text-[var(--ds-n600)] mt-1">
+            Qu’Allah facilite votre révision aujourd’hui.
+          </p>
         </div>
-
-        {/* Titre arabe principal */}
-        <h1 className="text-center text-[#2d5016] font-bold text-5xl tracking-tight" dir="rtl" style={{ fontFamily: "'Amiri', 'Scheherazade New', serif" }}>
-          المراجعة
-        </h1>
-
-        {/* Sous-titre latin */}
-        <p className="text-center text-[#7a8b3e] font-semibold text-lg mt-1 tracking-widest uppercase">
-          Al-Muraja3a
-        </p>
-
-        {/* Tagline */}
-        <p className="text-center text-[#4a7c23]/80 text-sm mt-3 max-w-xs mx-auto">
-          Révision et mémorisation du Saint Coran
-        </p>
-
-        {/* Petit séparateur en bas */}
-        <div className="flex items-center justify-center gap-3 mt-6">
-          <div className="h-px w-12 bg-gradient-to-r from-transparent to-[#c9a959]" />
-          <span className="text-[#c9a959] text-xs uppercase tracking-[0.3em] font-semibold">Exercices</span>
-          <div className="h-px w-12 bg-gradient-to-l from-transparent to-[#c9a959]" />
-        </div>
+        {stats && stats.streakDays > 0 && (
+          <span className="flex-none ds-card px-3.5 py-1.5 text-sm font-bold text-[var(--ds-n700)]">
+            🔥 {stats.streakDays} jour{stats.streakDays > 1 ? 's' : ''} de série
+          </span>
+        )}
       </header>
 
-      {/* Liste des exercices */}
-      <main className="px-4">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {/* Invocations du matin et du soir */}
-          <Link
-            href="/adhkar"
-            className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#2d5016] to-[#4a7c23] text-white shadow-lg active:scale-[0.99] transition-all"
-          >
-            <span className="text-4xl flex-none">🌅</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg">Invocations matin &amp; soir</h3>
-                <span className="text-lg" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
-                  أذكار
-                </span>
-              </div>
-              <p className="text-sm text-white/80 mt-0.5">Lecture &amp; révision des adhkâr, avec compteur et traduction</p>
-            </div>
-            <span className="text-2xl flex-none">🌙</span>
-          </Link>
-
-          {/* Lecture séquencée */}
-          <Link
-            href="/lecture-sequencee"
-            className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#4a7c23] to-[#2d5016] text-white shadow-lg active:scale-[0.99] transition-all"
-          >
-            <span className="text-4xl flex-none">⏱️</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg">Lecture séquencée</h3>
-                <span className="text-lg" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
-                  تلاوة متدرجة
-                </span>
-              </div>
-              <p className="text-sm text-white/80 mt-0.5">Le récitateur lit, un intervalle pour réciter, puis on continue</p>
-            </div>
-          </Link>
-
-          {/* Repères Début / Milieu / Fin (niveaux 0→8) */}
-          <Link
-            href="/reperes"
-            className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#2f5496] to-[#1f3a63] text-white shadow-lg active:scale-[0.99] transition-all"
-          >
-            <span className="text-4xl flex-none">📑</span>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-lg">Repères — Début · Milieu · Fin</h3>
-              <p className="text-sm text-white/80 mt-0.5">Retrouve les repères de chaque page par sourate, difficulté 0→8</p>
-            </div>
-          </Link>
-
-          {exercises.map((exercise, idx) => (
-            <ExerciseCard key={exercise.id} exercise={exercise} index={idx} />
-          ))}
-
-          {/* Vocabulaire */}
-          <Link
-            href="/vocab"
-            className="group flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#c9a959]/40 text-[#4a7c23] font-semibold text-sm hover:border-[#c9a959] hover:bg-white/60 transition-all"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 7v14" />
-              <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
-            </svg>
-            Vocabulaire — capture &amp; racines
-          </Link>
-
-          {/* Audio hors ligne (app iPad uniquement) */}
-          {showDownloads && (
-            <Link
-              href="/telechargements"
-              className="group flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#c9a959]/40 text-[#4a7c23] font-semibold text-sm hover:border-[#c9a959] hover:bg-white/60 transition-all"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v12" />
-                <path d="m7 10 5 5 5-5" />
-                <path d="M5 21h14" />
-              </svg>
-              Audio hors ligne — téléchargements
-            </Link>
-          )}
-
-          {/* Tableau de bord de maîtrise */}
-          <Link
-            href="/dashboard"
-            className="group flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#c9a959]/40 text-[#4a7c23] font-semibold text-sm hover:border-[#c9a959] hover:bg-white/60 transition-all"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v16a2 2 0 0 0 2 2h16" />
-              <rect x="7" y="10" width="3" height="7" rx="1" />
-              <rect x="12" y="6" width="3" height="11" rx="1" />
-              <rect x="17" y="13" width="3" height="4" rx="1" />
-            </svg>
-            Tableau de bord — maîtrise &amp; fautes
-          </Link>
+      {/* Progression du jour + Reprendre */}
+      <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 mb-8">
+        <div
+          className="rounded-[24px] p-6 flex items-center gap-5 text-white"
+          style={{ background: 'var(--ds-green)', boxShadow: 'var(--ds-shadow-md)' }}
+        >
+          <ProgressRing percent={percent} />
+          <div className="min-w-0">
+            <p className="ds-kicker" style={{ color: 'var(--ds-gold-100)' }}>
+              Aujourd’hui
+            </p>
+            <p className="text-xl md:text-2xl font-extrabold mt-0.5">Votre révision</p>
+            <p className="text-sm text-white/80 mt-1">
+              {stats
+                ? `${stats.todayCount} / ${DAILY_GOAL_VERSES} versets travaillés`
+                : '— / ' + DAILY_GOAL_VERSES + ' versets'}
+              {stats?.todayAccuracy != null && ` · ${stats.todayAccuracy} % de réussite`}
+            </p>
+          </div>
         </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="mt-10 text-center text-[#4a7c23]/60 text-xs">
-        <p dir="rtl" className="font-arabic">بارك الله فيك</p>
+        <div className="ds-card p-6 flex flex-col justify-center">
+          <p className="ds-kicker">Reprendre</p>
+          <p className="text-xl md:text-2xl font-extrabold text-[var(--ds-text)] mt-1">
+            {stats?.lastExerciseLabel ? `${stats.lastExerciseLabel}` : 'Commencer une révision'}
+          </p>
+          <p className="text-sm text-[var(--ds-n600)] mt-1">
+            {stats?.lastExerciseLabel
+              ? 'Votre dernière session — la plage et les réglages sont mémorisés.'
+              : 'Choisissez un mode de révision adapté à votre mémorisation.'}
+          </p>
+          <div className="flex items-center gap-2.5 mt-4">
+            <Link
+              href={stats?.lastExerciseId ? `/exercises/${stats.lastExerciseId}/setup` : '/revision'}
+              className="ds-btn-gold px-5 py-2.5 text-sm"
+            >
+              {stats?.lastExerciseId ? 'Reprendre la session' : 'Commencer'}
+            </Link>
+            <Link href="/revision" className="ds-btn-ghost px-5 py-2.5 text-sm">
+              Autres modes
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Accès rapide + Sessions récentes */}
+      <div className="grid md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-8">
+        <section>
+          <p className="ds-kicker mb-3">Accès rapide</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {QUICK_ACCESS.map((q) => (
+              <Link
+                key={q.href}
+                href={q.href}
+                className="ds-card p-4 hover:shadow-[var(--ds-shadow-md)] transition-shadow"
+              >
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-green)]">
+                  {q.icon}
+                </span>
+                <p className="font-bold text-[15px] mt-2.5">{q.label}</p>
+              </Link>
+            ))}
+            {showDownloads && (
+              <Link
+                href="/telechargements"
+                className="ds-card p-4 hover:shadow-[var(--ds-shadow-md)] transition-shadow"
+              >
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-[var(--ds-gold-100)] text-[var(--ds-gold-700)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                </span>
+                <p className="font-bold text-[15px] mt-2.5">Audio hors ligne</p>
+              </Link>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <p className="ds-kicker mb-3">Sessions récentes</p>
+          {stats && stats.recent.length > 0 ? (
+            <div className="space-y-2.5">
+              {stats.recent.map((s) => (
+                <Link
+                  key={`${s.exerciseId}-${s.at}`}
+                  href={`/exercises/${s.exerciseId}/setup`}
+                  className="ds-card flex items-center gap-3 px-4 py-3 hover:shadow-[var(--ds-shadow-md)] transition-shadow"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[15px] truncate">
+                      {s.label} — {s.count} verset{s.count > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-[var(--ds-n600)]">{s.dayLabel}</p>
+                  </div>
+                  <span className="flex-none text-xs font-extrabold bg-[var(--ds-sage-100)] text-[var(--ds-green)] rounded-full px-2.5 py-1">
+                    {s.accuracy}%
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="ds-card px-4 py-5 text-sm text-[var(--ds-n600)]">
+              Vos sessions apparaîtront ici.
+              {!user && (
+                <>
+                  {' '}
+                  <Link href="/dashboard" className="font-bold text-[var(--ds-gold-700)] underline">
+                    Connectez-vous
+                  </Link>{' '}
+                  pour mémoriser votre progression.
+                </>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Pied */}
+      <footer className="mt-12 text-center text-[var(--ds-n500)] text-xs">
+        <p dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }} className="text-base">
+          بارك الله فيك
+        </p>
       </footer>
-    </div>
+    </AppShell>
   );
 }

@@ -44,8 +44,8 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm w-full border border-[#c9a959]/20">
+    <div className="min-h-[70dvh] bg-[var(--ds-bg)] flex items-center justify-center p-4" style={{ fontFamily: 'var(--ds-font)' }}>
+      <div className="ds-card p-6 max-w-sm w-full">
         {/* Onglets Connexion / Inscription */}
         <div className="flex gap-1.5 mb-5">
           {(

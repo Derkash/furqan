@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import LoginCard from '@/components/exercises/LoginCard';
+import AppShell from '@/components/AppShell';
 import {
   aggregateMistakesByWord,
   getCurrentUser,
@@ -254,15 +254,17 @@ export default function DashboardPage() {
       .slice(0, 12);
   }, [stats]);
 
-  if (!checked) return <div className="min-h-screen bg-[#fdfaf3]" />;
+  if (!checked) return <div className="ds-page" />;
   if (!user) {
     return (
-      <LoginCard
-        onLoggedIn={(u) => {
-          setUser(u);
-          setStats(loadStats(u));
-        }}
-      />
+      <AppShell>
+        <LoginCard
+          onLoggedIn={(u) => {
+            setUser(u);
+            setStats(loadStats(u));
+          }}
+        />
+      </AppShell>
     );
   }
 
@@ -273,34 +275,30 @@ export default function DashboardPage() {
   const maxType = Math.max(1, ...Object.values(byType));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] via-[#fdfaf3] to-[#f4e9d0] pb-12" dir="ltr">
+    <AppShell>
+    <div className="pb-6" dir="ltr">
       {/* Header */}
-      <header className="pt-8 pb-6 px-5">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <Link href="/exercises" className="text-[#4a7c23] text-sm hover:underline">
-              ← Exercices
-            </Link>
-            <button
-              onClick={() => {
-                logout();
-                setUser(null);
-                setStats(null);
-              }}
-              className="text-xs text-gray-400 hover:text-gray-600 underline"
-            >
-              Se déconnecter
-            </button>
-          </div>
-          <h1 className="text-center text-[#2d5016] font-bold text-3xl">Tableau de bord</h1>
-          <p className="text-center text-[#7a8b3e] text-sm mt-1">
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="ds-title text-3xl md:text-4xl">Progression</h1>
+          <p className="text-[var(--ds-n600)] mt-1">
             Maîtrise et fautes — <span className="font-semibold">{user}</span>
           </p>
         </div>
+        <button
+          onClick={() => {
+            logout();
+            setUser(null);
+            setStats(null);
+          }}
+          className="ds-btn-ghost flex-none px-4 py-2 text-sm"
+        >
+          Se déconnecter
+        </button>
       </header>
 
-      <main className="px-4">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <main>
+        <div className="max-w-3xl space-y-4">
           {/* Tuiles de synthèse */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatTile label="Fautes déclarées" value={toArabicNumbers(totalMistakes)} accent="#b91c1c" />
@@ -422,5 +420,6 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+    </AppShell>
   );
 }

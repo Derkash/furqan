@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import AppShell from '@/components/AppShell';
 import {
   initAudioStore,
   isNativeApp,
@@ -148,17 +149,19 @@ export default function TelechargementsPage() {
 
   if (ready && !isNativeApp()) {
     return (
-      <div className="min-h-screen bg-[#fdfaf3] flex flex-col items-center justify-center gap-4 px-6 text-center" dir="ltr">
-        <p className="text-[#2d5016] font-semibold text-lg">
-          Le téléchargement hors ligne est réservé à l&apos;app iPad.
-        </p>
-        <p className="text-[#4a7c23]/80 text-sm max-w-md">
-          Sur le web, l&apos;audio est streamé directement depuis le CDN — rien à télécharger.
-        </p>
-        <Link href="/exercises" className="text-[#c9a959] font-semibold underline">
-          Retour aux exercices
-        </Link>
-      </div>
+      <AppShell>
+        <div className="flex flex-col items-center justify-center gap-3 py-24 text-center" dir="ltr">
+          <p className="font-extrabold text-lg text-[var(--ds-green)]">
+            Le téléchargement hors ligne est réservé à l&apos;app iPad.
+          </p>
+          <p className="text-[var(--ds-n600)] text-sm max-w-md">
+            Sur le web, l&apos;audio est streamé directement depuis le CDN — rien à télécharger.
+          </p>
+          <Link href="/exercises" className="ds-btn-ghost px-5 py-2 text-sm mt-2">
+            Retour à l&apos;accueil
+          </Link>
+        </div>
+      </AppShell>
     );
   }
 
@@ -178,17 +181,15 @@ export default function TelechargementsPage() {
     });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdfaf3] to-[#f4e9d0] pb-12" dir="ltr">
-      <header className="pt-8 pb-6 px-5 max-w-2xl mx-auto">
-        <Link href="/exercises" className="inline-block text-sm text-[#4a7c23] underline">
-          ← Retour aux exercices
-        </Link>
-        <h1 className="text-[#2d5016] font-bold text-3xl mt-3">Audio hors ligne</h1>
-        <p className="text-[#4a7c23]/80 text-sm mt-2">
+    <AppShell>
+    <div className="pb-6" dir="ltr">
+      <header className="mb-6 max-w-2xl">
+        <h1 className="ds-title text-3xl md:text-4xl">Audio hors ligne</h1>
+        <p className="text-[var(--ds-n600)] text-sm mt-2">
           Télécharge la récitation arabe (Al-Husary) et sa traduction française lue (Youssouf
           Leclerc) pour travailler sans connexion. Le tafsir écrit est déjà intégré à l&apos;app.
         </p>
-        <p className="text-[#c9a959] text-xs mt-2 font-semibold">
+        <p className="ds-kicker mt-2">
           {grandTotal} fichiers téléchargés · ≈ {estimateSize(grandTotal)} · {TOTAL_AYAHS} versets
           par récitation
         </p>
@@ -233,9 +234,9 @@ export default function TelechargementsPage() {
         )}
       </header>
 
-      <main className="px-4">
-        <div className="max-w-2xl mx-auto space-y-2">
-          {!ready && <p className="text-center text-[#4a7c23]/60 text-sm">Chargement…</p>}
+      <main>
+        <div className="max-w-2xl space-y-2">
+          {!ready && <p className="text-center text-[var(--ds-n500)] text-sm">Chargement…</p>}
           {chapters.map((c) => {
             const range = ranges.get(c.id)!;
             const isPriority = PRIORITY_SURAHS.includes(c.id);
@@ -296,5 +297,6 @@ export default function TelechargementsPage() {
         </div>
       </main>
     </div>
+    </AppShell>
   );
 }
