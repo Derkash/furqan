@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:ipad": "BUILD_TARGET=capacitor NEXT_PUBLIC_API_BASE_URL=https://almuraja3a.com next build && cap sync ios",
+    "build:ipad": "BUILD_TARGET=capacitor NEXT_PUBLIC_API_BASE_URL=https://almuraja3a.com next build && cap sync ios && xattr -cr ios/App/App",
     "open:ipad": "cap open ios",
     "start": "next start",
     "lint": "eslint"

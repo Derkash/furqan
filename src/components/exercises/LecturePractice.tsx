@@ -1171,7 +1171,7 @@ export default function LecturePractice() {
   return (
     <div ref={rootRef} className={`h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`}>
       {/* Barre */}
-      <div className={`flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2 ${isFs ? 'hidden' : ''}`}>
+      <div dir="ltr" className={`app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2 ${isFs ? 'hidden' : ''}`}>
         <Link href="/exercises/lecture/setup" className="text-sm hover:underline whitespace-nowrap">
           ← Retour
         </Link>

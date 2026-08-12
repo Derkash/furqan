@@ -15,6 +15,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Nécessaire pour que env(safe-area-inset-*) soit renseigné dans l'app iPad
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

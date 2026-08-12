@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* App iPad (classe posée par AppInit quand on tourne dans Capacitor) :
+   la WebView passe SOUS la barre d'état iPadOS — on décale les barres
+   supérieures des exercices de la hauteur de la zone sûre. */
+html.capacitor .app-topbar {
+  padding-top: calc(0.5rem + env(safe-area-inset-top));
+}
+
 /* Police Unicode de fallback - TOUJOURS inclure */
 @font-face {
   font-family: 'UthmanicHafs';

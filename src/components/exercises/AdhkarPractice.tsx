@@ -167,7 +167,7 @@ export default function AdhkarPractice() {
   return (
     <div className="h-[100dvh] bg-[#fdfaf3] flex flex-col overflow-hidden" dir="ltr">
       {/* Barre */}
-      <div className="flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
+      <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-3 py-2 flex items-center justify-between gap-2">
         <button onClick={() => setSession(null)} className="text-sm hover:underline whitespace-nowrap">
           ← {meta!.icon}
         </button>

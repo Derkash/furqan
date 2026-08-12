@@ -10,6 +10,8 @@
  * et si l'édition change d'identifiant côté serveur, la découverte s'adapte.
  */
 
+import { getLocalFrenchAudioUrl } from './audioStore';
+
 const EDITIONS_API = 'https://api.alquran.cloud/v1/edition?format=audio&language=fr';
 const CDN = 'https://cdn.islamic.network/quran/audio';
 // Débits proposés par le CDN, du meilleur au plus léger (on essaie dans l'ordre).
@@ -70,7 +72,15 @@ export async function resolveFrenchEdition(): Promise<string | null> {
  * Liste ordonnée d'URL candidates (par débit) pour un verset donné, dans
  * l'édition française résolue. À essayer successivement : si un débit n'existe
  * pas pour cette édition (404), on passe au suivant.
+ * App iPad : le mp3 téléchargé en local passe en tête s'il existe.
  */
 export function frenchAyahUrls(edition: string, globalNumber: number): string[] {
+  const remote = BITRATES.map((b) => `${CDN}/${b}/${edition}/${globalNumber}.mp3`);
+  const local = getLocalFrenchAudioUrl(globalNumber);
+  return local ? [local, ...remote] : remote;
+}
+
+/** URL candidates pour TÉLÉCHARGER un verset français (débits du CDN). */
+export function frenchDownloadUrls(edition: string, globalNumber: number): string[] {
   return BITRATES.map((b) => `${CDN}/${b}/${edition}/${globalNumber}.mp3`);
 }

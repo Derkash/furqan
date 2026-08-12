@@ -51,10 +51,6 @@
 	<array>
 		<string>armv7</string>
 	</array>
-	<key>UIRequiresFullScreen</key>
-	<true/>
-	<key>UIDesignRequiresCompatibility</key>
-	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Le micro sert à enregistrer ta récitation pour la réécouter et repérer tes erreurs (exercice Récitation).</string>
 	<key>UISupportedInterfaceOrientations</key>

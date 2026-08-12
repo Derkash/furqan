@@ -775,7 +775,7 @@ function MushafPractice() {
     <div className="h-screen w-screen overflow-hidden bg-[#fdfaf3] flex flex-col overflow-locked">
       {/* Header avec progression */}
       {!fullscreen && (
-        <div className="flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
+        <div dir="ltr" className="app-topbar flex-none bg-[#2d5016] text-white px-4 py-2 flex items-center justify-between">
           <Link
             href={`/exercises/${exerciseId}/setup`}
             className="text-sm hover:underline"
