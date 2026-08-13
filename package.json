@@ -10,6 +10,10 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "browserslist": [
+    "iOS >= 15",
+    "Safari >= 15"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@capacitor/core": "^8.5.0",

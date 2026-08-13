@@ -116,9 +116,13 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
           </button>
         </form>
 
-        <div className="text-center mt-4">
-          <Link href="/exercises" className="text-[var(--ds-sage)] text-sm hover:underline">
+        <div className="text-center mt-4 space-y-1.5">
+          <Link href="/exercises" className="block text-[var(--ds-sage)] text-sm hover:underline">
             ← Retour aux exercices
+          </Link>
+          {/* Information requise à l'endroit de la création de compte (5.1.1) */}
+          <Link href="/confidentialite" className="block text-[11px] text-[var(--ds-n500)] underline">
+            Politique de confidentialité
           </Link>
         </div>
       </div>

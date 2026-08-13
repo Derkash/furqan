@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import AppInit from "@/components/AppInit";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,6 +9,14 @@ export const metadata: Metadata = {
   description: "Application de révision et mémorisation du Coran avec Mushaf Medina (QCF V1) et audio Al-Husary",
   keywords: ["Quran", "Coran", "Mushaf", "Mémorisation", "Hifz", "Al-Husary", "Mouraja3a"],
   authors: [{ name: "Abdoul-khader" }],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -28,7 +37,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body className="antialiased">
         <AppInit />
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );
