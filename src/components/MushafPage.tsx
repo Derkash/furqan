@@ -39,6 +39,10 @@ export const DEFAULT_FRAME: FrameConfig = {
 // marges sont asymétriques et MIROIR entre page impaire (droite du spread,
 // reliure à gauche) et page paire (gauche du spread, reliure à droite).
 // Les insets ci-dessous = boîte intérieure du liseré or, mesurée sur les scans.
+// Marge de sécurité horizontale (% de largeur de page) ajoutée de CHAQUE côté
+// au texte, pour qu'il ne touche jamais le liseré du cadre (gauche et droite).
+const TEXT_SAFETY_H = 1.3;
+
 const AUTHENTIC_INSETS = {
   odd: { top: 13.1, bottom: 10.7, left: 8.4, right: 18.2 },
   even: { top: 12.2, bottom: 11.7, left: 17.5, right: 9.2 },
@@ -401,8 +405,11 @@ export default function MushafPage({
   // 0.0700 : calibré pour que la ligne QCF la plus longue tienne dans la boîte
   // avec ~1,5 % de marge — le texte ne mord JAMAIS l'ornement.
   // 0.0665 (au lieu de 0.07) : marge de sécurité pour que la ligne QCF la plus
-  // longue ne touche jamais l'ornement du cadre.
-  const textFontSize = frameConfig?.textFontSize ?? (100 - ins.left - ins.right) * 0.0665;
+  // longue ne touche jamais l'ornement du cadre. TEXT_SAFETY_H ajouté de chaque
+  // côté est retiré de la largeur utile pour rester cohérent.
+  const textFontSize =
+    frameConfig?.textFontSize ??
+    (100 - ins.left - ins.right - 2 * TEXT_SAFETY_H) * 0.0665;
   const lineCount = data?.lines.length ?? 15;
 
   return (
@@ -422,14 +429,14 @@ export default function MushafPage({
         }
         .mushaf-page {
           position: relative;
-          /* Scans rognés en haut/bas (marges vides) → 759×1060, pour zoomer le
-             contenu du cadre. */
-          aspect-ratio: 759 / 1060;
+          /* Scans rognés de 20px en haut (marge vide) → 759×1080, pour zoomer
+             un peu le contenu SANS toucher le bas (numéros de page préservés). */
+          aspect-ratio: 759 / 1080;
           /* Fit-contain : la page prend la plus grande taille possible dans le wrapper
              tout en gardant l'aspect-ratio. Indispensable pour que 2 pages côte à côte
              rentrent toujours dans l'écran, même en portrait étroit. */
-          width: min(100cqi, calc(100cqb * 759 / 1060));
-          height: min(100cqb, calc(100cqi * 1060 / 759));
+          width: min(100cqi, calc(100cqb * 759 / 1080));
+          height: min(100cqb, calc(100cqi * 1080 / 759));
           background: rgb(251, 247, 223); /* papier des scans du Mushaf */
           color: #1a1a1a;
           box-sizing: border-box;
@@ -601,9 +608,11 @@ export default function MushafPage({
           style={{
             position: 'absolute',
             top: `${ins.top}%`,
-            right: `${ins.right}%`,
+            // Marge de sécurité horizontale : le texte ne doit toucher NI le
+            // liseré gauche NI le droit (certaines pages étaient au ras à droite).
+            right: `${ins.right + TEXT_SAFETY_H}%`,
             bottom: `${ins.bottom}%`,
-            left: `${ins.left}%`,
+            left: `${ins.left + TEXT_SAFETY_H}%`,
             zIndex: 2,
           }}
         >
