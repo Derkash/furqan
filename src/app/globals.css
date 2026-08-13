@@ -113,8 +113,8 @@ body {
   container-type: size;
 }
 .book-box {
-  width: min(calc(100cqh * 1.38), calc(100cqw / 0.875));
-  aspect-ratio: 1518 / 1100;
+  width: min(calc(100cqh * 1.4321), calc(100cqw / 0.875));
+  aspect-ratio: 1518 / 1060;
   flex: none;
 }
 
