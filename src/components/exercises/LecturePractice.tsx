@@ -191,6 +191,23 @@ export default function LecturePractice() {
   // Layer de section du rail gauche (Réglages / Affichage), fermé par Valider.
   const [panelLayer, setPanelLayer] = useState<null | 'reglages' | 'affichage'>(null);
   const [railHidden, setRailHidden] = useState(railHiddenInitial);
+  // Volet de lecture (bandeau bas pleine largeur) : repliable sans stopper la lecture.
+  const [sheetHidden, setSheetHidden] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('almuraja3a:lecture:sheet-hidden') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSheet = () => {
+    setSheetHidden((h) => {
+      try {
+        window.localStorage.setItem('almuraja3a:lecture:sheet-hidden', !h ? '1' : '0');
+      } catch {}
+      return !h;
+    });
+  };
   const [gotoPage, setGotoPage] = useState('');
   const [config, setConfig] = useState<PlayConfig>(() => {
     const stored = loadJSON<PlayConfig>(LECTURE_PLAY_KEY);
@@ -1534,124 +1551,152 @@ export default function LecturePractice() {
           </button>
         )}
 
-        {/* Barre horizontale TRANSIENTE : visible pendant lecture / enregistrement /
-            réécoute — sinon rien (le panneau de gauche pilote tout). */}
-        {(playing || sessionActive || recorder.recording || recorder.audioUrl) && (
-          <div
-            className="ds-rise absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 md:gap-3 bg-white rounded-2xl px-3 py-1.5 w-[min(97%,900px)]"
-            style={{ bottom: 'calc(4px + env(safe-area-inset-bottom))', boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
+        {/* VOLET DE LECTURE : bandeau bas pleine largeur, compact, repliable
+            par languette (comme le menu de gauche) — le replier ne stoppe
+            JAMAIS la lecture ; il ne recouvre que la marge basse des pages. */}
+        {(playing || sessionActive || recorder.recording || recorder.audioUrl) &&
+          (sheetHidden ? (
             <button
               type="button"
-              onClick={toggleRecord}
-              aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
-              className={`flex-none w-11 h-11 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
-                recorder.recording ? 'animate-pulse' : ''
-              }`}
+              onClick={toggleSheet}
+              aria-label="Afficher le volet de lecture"
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 w-14 h-5 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)]"
+              style={{ marginBottom: 'env(safe-area-inset-bottom)', boxShadow: 'var(--ds-shadow-sm)' }}
             >
-              {recorder.recording ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
-              )}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
             </button>
-
-            {recorder.audioUrl && !recorder.recording ? (
-              <>
-                <audio
-                  ref={recPlayerRef}
-                  controls
-                  src={recorder.audioUrl}
-                  className="h-9 flex-1 min-w-0"
-                  onLoadedMetadata={(e) => {
-                    e.currentTarget.playbackRate = recRate;
-                  }}
-                />
-                <div className="flex items-center gap-1 flex-none">
-                  {[1, 1.5, 2].map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => {
-                        setRecRate(r);
-                        if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
-                      }}
-                      className={`px-2 py-1 rounded-full text-[11px] font-bold ${
-                        recRate === r ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
-                      }`}
-                    >
-                      ×{r === 1.5 ? '1,5' : r}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => recorder.clear()}
-                    aria-label="Effacer l'enregistrement"
-                    className="w-8 h-8 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-n700)] flex items-center justify-center"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 min-w-0 text-center">
-                <p className="text-[13px] font-bold text-[var(--ds-text)] truncate">
-                  {recorder.recording
-                    ? 'Enregistrement en cours…'
-                    : currentVerse
-                      ? `Verset ${currentVerse}`
-                      : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
-                </p>
-                {sessionActive && (
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-n500)] truncate">
-                    {describeSelection(config, selCount)}
-                    {config.french && frAvailable === false && ' · FR indisponible'}
-                    {tafsirLoading && ' · tafsir en préparation…'}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {sessionActive && (
+          ) : (
+            <div
+              className="ds-rise-flow absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[var(--ds-divider)] px-2.5 flex items-center gap-2"
+              style={{
+                paddingBottom: 'env(safe-area-inset-bottom)',
+                minHeight: 'calc(46px + env(safe-area-inset-bottom))',
+                fontFamily: 'var(--ds-font)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {/* Languette de repli */}
               <button
                 type="button"
-                onClick={stop}
-                aria-label="Arrêter la lecture"
-                className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
+                onClick={toggleSheet}
+                aria-label="Masquer le volet de lecture"
+                className="absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-5 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)]"
+                style={{ boxShadow: 'var(--ds-shadow-sm)' }}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={togglePlay}
-              aria-label={playing ? 'Pause' : 'Lecture'}
-              className="flex-none w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
-              style={{ background: 'var(--ds-green)' }}
-            >
-              {playing ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+
+              <button
+                type="button"
+                onClick={toggleRecord}
+                aria-label={recorder.recording ? "Arrêter l'enregistrement" : 'Enregistrer'}
+                className={`flex-none w-9 h-9 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
+                  recorder.recording ? 'animate-pulse' : ''
+                }`}
+              >
+                {recorder.recording ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                )}
+              </button>
+
+              {recorder.audioUrl && !recorder.recording ? (
+                <>
+                  <audio
+                    ref={recPlayerRef}
+                    controls
+                    src={recorder.audioUrl}
+                    className="h-8 flex-1 min-w-0"
+                    onLoadedMetadata={(e) => {
+                      e.currentTarget.playbackRate = recRate;
+                    }}
+                  />
+                  <div className="flex items-center gap-1 flex-none">
+                    {[1, 1.5, 2].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => {
+                          setRecRate(r);
+                          if (recPlayerRef.current) recPlayerRef.current.playbackRate = r;
+                        }}
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          recRate === r ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                        }`}
+                      >
+                        ×{r === 1.5 ? '1,5' : r}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => recorder.clear()}
+                      aria-label="Effacer l'enregistrement"
+                      className="w-7 h-7 rounded-full bg-[var(--ds-sage-100)] text-[var(--ds-n700)] flex items-center justify-center"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
+                    </button>
+                  </div>
+                </>
               ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                <div className="flex-1 min-w-0 text-center">
+                  <p className="text-[12px] font-bold text-[var(--ds-text)] truncate leading-tight">
+                    {recorder.recording
+                      ? 'Enregistrement en cours…'
+                      : currentVerse
+                        ? `Verset ${currentVerse}`
+                        : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
+                  </p>
+                  {sessionActive && (
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--ds-n500)] truncate leading-tight">
+                      {describeSelection(config, selCount)}
+                      {config.french && frAvailable === false && ' · FR indisponible'}
+                      {tafsirLoading && ' · tafsir en préparation…'}
+                    </p>
+                  )}
+                </div>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={() => flip('next')}
-              className="flex-none hidden sm:flex items-center gap-1 pl-3 pr-2 py-2 rounded-full text-[12px] font-bold text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)] transition-colors"
-            >
-              <span className="text-left leading-tight">
-                Page suivante
-                <span className="block text-[10px] text-[var(--ds-n500)]">{toArabicNumbers(Math.min(604, pair.leftPage + 1))}</span>
-              </span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-            </button>
-          </div>
-        )}
+
+              {sessionActive && (
+                <button
+                  type="button"
+                  onClick={stop}
+                  aria-label="Arrêter la lecture"
+                  className="flex-none w-8 h-8 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={togglePlay}
+                aria-label={playing ? 'Pause' : 'Lecture'}
+                className="flex-none w-9 h-9 rounded-full flex items-center justify-center text-white active:scale-95 transition-all"
+                style={{ background: 'var(--ds-green)' }}
+              >
+                {playing ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => flip('next')}
+                aria-label="Page suivante"
+                className="flex-none flex items-center gap-1 pl-2 pr-1.5 py-1.5 rounded-full text-[11px] font-bold text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)] transition-colors"
+              >
+                <span className="hidden sm:block text-left leading-tight">
+                  Page suiv.
+                  <span className="block text-[9px] text-[var(--ds-n500)]">{toArabicNumbers(Math.min(604, pair.leftPage + 1))}</span>
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+              </button>
+            </div>
+          ))}
 
         {selected && (
           <WordCard
