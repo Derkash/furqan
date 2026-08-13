@@ -21,7 +21,7 @@ const MODEL = 'claude-haiku-4-5';
 
 // Accès à Claude RÉSERVÉ à certains comptes (par défaut : derkash) pour éviter
 // que l'ouverture au public ne génère des coûts. Les autres → mode gratuit.
-const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash')
+const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash,abdoulkhader')
   .split(',')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);

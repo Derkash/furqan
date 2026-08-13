@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 45;
 
 // Accès à Claude réservé à certains comptes (par défaut : derkash) — voir vocab-analyze.
-const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash')
+const CLAUDE_USERS = (process.env.CLAUDE_USERS || 'derkash,abdoulkhader')
   .split(',')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);

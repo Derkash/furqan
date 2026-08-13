@@ -71,7 +71,7 @@ function mergeProgress(a: VocabEntry, b: VocabEntry): VocabEntry {
 // le local doit être REMPLACÉ par le distant, sans remonter les anciennes
 // entrées locales (sinon les doublons purgés ressusciteraient).
 const RESET_KEY = 'almuraja3a:vocab-remote-reset:';
-const RESET_VERSION = '2026-08-clean';
+const RESET_VERSION = '2026-08-clean-2';
 
 export async function hydrateVocab(username: string): Promise<void> {
   const remote = await fetchVocabRemote(username);
