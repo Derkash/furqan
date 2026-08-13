@@ -17,6 +17,23 @@ function warn(context: string, error: unknown) {
 
 // ---------- Auth distante ----------
 
+/** Suppression du compte distant (App Store 5.1.1(v)) — hash exigé. */
+export async function deleteAccountRemote(
+  username: string,
+  passwordHash: string
+): Promise<boolean | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('app_delete_account', {
+    p_username: username,
+    p_password_hash: passwordHash,
+  });
+  if (error) {
+    warn('deleteAccountRemote', error);
+    return null;
+  }
+  return data as boolean;
+}
+
 export async function registerRemote(
   username: string,
   passwordHash: string

@@ -195,6 +195,55 @@ export function logout() {
   setUserCookie(null);
 }
 
+/**
+ * SUPPRESSION DE COMPTE (App Store 5.1.1(v) : obligatoire dès qu'une app
+ * permet de créer un compte). Vérifie le mot de passe, efface toutes les
+ * données locales du compte, puis supprime le compte distant (best-effort —
+ * la RPC app_delete_account exige le même hash que app_login).
+ */
+export async function deleteAccount(
+  username: string,
+  password: string
+): Promise<{ ok: boolean; error?: string }> {
+  const creds = validateCredentials(username, password);
+  if ('error' in creds) return { ok: false, error: creds.error };
+
+  // Le compte local stocke directement le hash du mot de passe (cf. register).
+  const raw = isBrowser() ? window.localStorage.getItem(creds.key) : null;
+  if (!raw) return { ok: false, error: 'Compte introuvable sur cet appareil' };
+  if (raw !== creds.hash) return { ok: false, error: 'Mot de passe incorrect' };
+
+  // Distant d'abord (best-effort : hors ligne, la suppression locale suffit
+  // et le compte distant sera orphelin mais inaccessible sans le mot de passe).
+  try {
+    const { deleteAccountRemote } = await import('./progressSync');
+    await deleteAccountRemote(creds.name, creds.hash);
+  } catch {
+    /* hors ligne / Supabase absent */
+  }
+
+  // Purge locale : compte, stats, vocabulaire, drapeaux et sauvegardes.
+  if (isBrowser()) {
+    const user = creds.name;
+    const prefixes = [
+      `almuraja3a:vocab:${user}`,
+      `almuraja3a:vocab-seeded:${user}`,
+      `almuraja3a:vocab-anchor-mig:${user}`,
+      `almuraja3a:vocab-backup:${user}:`,
+    ];
+    window.localStorage.removeItem(creds.key);
+    window.localStorage.removeItem(STATS_PREFIX + user);
+    const toRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && prefixes.some((p) => k === p || k.startsWith(p))) toRemove.push(k);
+    }
+    toRemove.forEach((k) => window.localStorage.removeItem(k));
+  }
+  setUserCookie(null);
+  return { ok: true };
+}
+
 // ---------- Statistiques ----------
 
 const EMPTY_STATS: UserStats = { wordMistakes: [], verseResults: [] };

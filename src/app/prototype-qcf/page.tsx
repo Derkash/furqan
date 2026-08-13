@@ -1,5 +1,10 @@
 'use client';
 
+// Outil de calibration DÉVELOPPEUR : jamais accessible dans l'app publiée
+// (App Store 2.1 — pas de contenu de développement dans une app soumise).
+
+import { useRouter } from 'next/navigation';
+import { isNativeApp } from '@/utils/audioStore';
 import { useEffect, useMemo, useState } from 'react';
 
 interface Word {
@@ -22,6 +27,12 @@ interface PageData {
 const AVAILABLE_PAGES = [86, 91];
 
 export default function PrototypeQcfPage() {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const protoRouter = useRouter();
+  useEffect(() => {
+    if (isNativeApp()) protoRouter.replace('/exercises');
+  }, [protoRouter]);
+
   const [pageNumber, setPageNumber] = useState(86);
   const [data, setData] = useState<PageData | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());

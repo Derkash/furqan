@@ -5,6 +5,7 @@ import LoginCard from '@/components/exercises/LoginCard';
 import AppShell from '@/components/AppShell';
 import {
   aggregateMistakesByWord,
+  deleteAccount,
   getCurrentUser,
   loadStats,
   logout,
@@ -179,6 +180,9 @@ function SectionCard({ title, children }: { title: string; children: React.React
 export default function DashboardPage() {
   const [user, setUser] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -285,17 +289,64 @@ export default function DashboardPage() {
             Maîtrise et fautes — <span className="font-semibold">{user}</span>
           </p>
         </div>
-        <button
-          onClick={() => {
-            logout();
-            setUser(null);
-            setStats(null);
-          }}
-          className="ds-btn-ghost flex-none px-4 py-2 text-sm"
-        >
-          Se déconnecter
-        </button>
+        <div className="flex flex-col items-end gap-2 flex-none">
+          <button
+            onClick={() => {
+              logout();
+              setUser(null);
+              setStats(null);
+            }}
+            className="ds-btn-ghost px-4 py-2 text-sm"
+          >
+            Se déconnecter
+          </button>
+          <button
+            onClick={() => setDeleting((v) => !v)}
+            className="text-xs font-bold text-red-700 underline"
+          >
+            Supprimer mon compte…
+          </button>
+        </div>
       </header>
+
+      {/* Suppression de compte (App Store 5.1.1(v)) : mot de passe + confirmation */}
+      {deleting && (
+        <div className="ds-card p-4 mb-6 max-w-md border-red-200">
+          <p className="font-bold text-red-700 text-sm mb-1">Supprimer définitivement mon compte</p>
+          <p className="text-xs text-[var(--ds-n600)] mb-3">
+            Toutes vos données (fautes, progression, vocabulaire) seront effacées de cet appareil
+            et de la sauvegarde en ligne. Cette action est irréversible.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Mot de passe"
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-[var(--ds-divider)] text-sm outline-none focus:border-red-400"
+            />
+            <button
+              onClick={async () => {
+                if (!user) return;
+                setDeleteError(null);
+                const res = await deleteAccount(user, deletePassword);
+                if (res.ok) {
+                  setUser(null);
+                  setStats(null);
+                  setDeleting(false);
+                  setDeletePassword('');
+                } else {
+                  setDeleteError(res.error ?? 'Suppression impossible');
+                }
+              }}
+              className="flex-none px-4 py-2 rounded-full text-sm font-bold text-white bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all"
+            >
+              Supprimer
+            </button>
+          </div>
+          {deleteError && <p className="text-xs text-red-600 mt-2">{deleteError}</p>}
+        </div>
+      )}
 
       <main>
         <div className="max-w-3xl space-y-4">

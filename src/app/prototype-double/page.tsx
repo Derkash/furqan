@@ -1,6 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+// Outil de calibration DÉVELOPPEUR : jamais accessible dans l'app publiée
+// (App Store 2.1 — pas de contenu de développement dans une app soumise).
+
+import { useRouter } from 'next/navigation';
+import { isNativeApp } from '@/utils/audioStore';
+import { useEffect, useState } from 'react';
 import MushafPage, { DEFAULT_FRAME, type FrameConfig } from '@/components/MushafPage';
 
 const PAGE_PRESETS = [
@@ -46,6 +51,12 @@ function Nudge({ label, value, step, min, max, unit, arrows, onChange }: NudgePr
 }
 
 export default function PrototypeDoublePage() {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const protoRouter = useRouter();
+  useEffect(() => {
+    if (isNativeApp()) protoRouter.replace('/exercises');
+  }, [protoRouter]);
+
   const [preset, setPreset] = useState(PAGE_PRESETS[1]);
   const [gap, setGap] = useState(16);
   const [pageWidth, setPageWidth] = useState(42);
