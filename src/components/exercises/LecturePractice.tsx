@@ -13,6 +13,7 @@ import { useVerseMap } from '@/hooks/useVerseMap';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 import { resolveFrenchEdition, frenchAyahUrls } from '@/utils/frenchRecitation';
 import { loadHizbQuarters } from '@/utils/quranBounds';
+import { hapticLight, hapticMedium } from '@/utils/haptics';
 import {
   buildSelection,
   describeSelection,
@@ -884,6 +885,7 @@ export default function LecturePractice() {
   // Enregistrement micro : démarrer/arrêter. On coupe toute lecture pour ne pas
   // s'enregistrer par-dessus la récitation.
   function toggleRecord() {
+    hapticMedium();
     if (recorder.recording) {
       recorder.stop();
       return;
@@ -916,6 +918,7 @@ export default function LecturePractice() {
   }
 
   function flip(dir: 'prev' | 'next') {
+    hapticLight();
     stop();
     setSelected(null);
     setVerseMenu(null);
@@ -1265,6 +1268,7 @@ export default function LecturePractice() {
           {/* Numéro de page : saisie directe sur le rail (Entrée ou sortie du champ) */}
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={604}
             value={gotoPage}
@@ -1539,7 +1543,7 @@ export default function LecturePractice() {
               type="button"
               onClick={toggleSheet}
               aria-label="Afficher le volet de lecture"
-              className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 w-14 h-5 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)]"
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 w-20 h-6 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)] after:absolute after:-inset-3 after:content-['']"
               style={{ marginBottom: 'env(safe-area-inset-bottom)', boxShadow: 'var(--ds-shadow-sm)' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
@@ -1560,7 +1564,7 @@ export default function LecturePractice() {
                 type="button"
                 onClick={toggleSheet}
                 aria-label="Masquer le volet de lecture"
-                className="absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-5 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)]"
+                className="absolute -top-6 left-1/2 -translate-x-1/2 w-20 h-6 rounded-t-xl bg-white/95 border border-b-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)] after:absolute after:-inset-3 after:content-['']"
                 style={{ boxShadow: 'var(--ds-shadow-sm)' }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>

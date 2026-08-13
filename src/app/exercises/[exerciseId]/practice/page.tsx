@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { PracticeShell } from '@/components/AppShell';
+import { hapticLight } from '@/utils/haptics';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
 import { useAudio } from '@/hooks/useAudio';
@@ -1299,6 +1300,7 @@ function MushafPractice() {
               onClick={(e) => {
                 e.stopPropagation();
                 setPopover(null);
+                hapticLight();
                 flipPair('prev');
               }}
               className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
@@ -1320,6 +1322,7 @@ function MushafPractice() {
               onClick={(e) => {
                 e.stopPropagation();
                 setPopover(null);
+                hapticLight();
                 flipPair('next');
               }}
               className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
