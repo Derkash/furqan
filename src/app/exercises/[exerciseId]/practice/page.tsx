@@ -57,6 +57,14 @@ function PracticeRouter() {
       </div>
     );
   }
+  // Hifz : rail de pilotage dédié (comme la Lecture) — pas de coque générale.
+  if (exerciseId === 'hifz') {
+    return (
+      <div className="h-dvh w-full overflow-hidden ds-page" dir="ltr">
+        <MushafPractice />
+      </div>
+    );
+  }
   // La récitation (micro + détection de fautes) a sa propre interface,
   // sans les pages Mushaf ni la machine à états des autres exercices.
   if (exerciseId === 'recitation') {
@@ -369,6 +377,8 @@ function MushafPractice() {
   }, []);
 
   const [lexiconMarks, setLexiconMarks] = useState<Map<string, string>>(new Map());
+  // Rail Hifz : layer de section (Réglages / Affichage), fermé par Valider.
+  const [hifzLayer, setHifzLayer] = useState<null | 'reglages' | 'affichage'>(null);
   useEffect(() => {
     let cancelled = false;
     const verseKeys = [
@@ -793,6 +803,140 @@ function MushafPractice() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col relative overflow-locked">
+      {/* ---- Rail Hifz (comme la Lecture) : icônes seules, layers avec Valider ---- */}
+      {isHifz && (
+        <aside dir="ltr" className="absolute left-0 inset-y-0 z-40 w-[60px] bg-white flex flex-col items-center overflow-y-auto py-3 gap-1.5 border-r border-[var(--ds-divider)]" style={{ fontFamily: 'var(--ds-font)' }}>
+          <Link href="/exercises" title="Accueil" className="flex flex-col items-center gap-0.5 mb-1.5">
+            <span className="text-[20px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
+              ع
+            </span>
+            <span className="text-[6px] font-extrabold tracking-[0.16em] text-[var(--ds-n600)]">MURAJA3A</span>
+          </Link>
+          <button
+            onClick={() => setHifzLayer(hifzLayer === 'reglages' ? null : 'reglages')}
+            title="Réglages"
+            className={`flex flex-col items-center gap-0.5 w-12 py-1.5 rounded-xl transition-colors ${
+              hifzLayer === 'reglages' ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
+            }`}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            <span className="text-[7px] font-bold uppercase tracking-wider">Réglages</span>
+          </button>
+          <button
+            onClick={() => setHifzLayer(hifzLayer === 'affichage' ? null : 'affichage')}
+            title="Affichage"
+            className={`flex flex-col items-center gap-0.5 w-12 py-1.5 rounded-xl transition-colors ${
+              hifzLayer === 'affichage' ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
+            }`}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <span className="text-[7px] font-bold uppercase tracking-wider">Affichage</span>
+          </button>
+          <span className="mt-1 text-[9px] font-extrabold text-[var(--ds-n500)] uppercase tracking-wider">Niv. {hifzLevel}</span>
+          <div className="w-8 h-px bg-[var(--ds-divider)] my-1" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (recorder.recording) stopRecording();
+              else startRecording();
+            }}
+            title={recorder.recording ? "Arrêter l'enregistrement" : 'S’enregistrer'}
+            className={`w-11 h-11 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-all ${
+              recorder.recording ? 'animate-pulse' : ''
+            }`}
+          >
+            {recorder.recording ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            )}
+          </button>
+        </aside>
+      )}
+      {isHifz && hifzLayer && (
+        <>
+          <button aria-label="Fermer" className="absolute inset-0 z-40 bg-black/25" onClick={() => setHifzLayer(null)} />
+          <div
+            dir="ltr"
+            className="absolute left-[64px] top-2 max-h-[calc(100%-16px)] z-50 w-[280px] max-w-[78vw] bg-white rounded-2xl p-4 overflow-y-auto flex flex-col"
+            style={{ boxShadow: 'var(--ds-shadow-lg)', fontFamily: 'var(--ds-font)' }}
+          >
+            {hifzLayer === 'reglages' && (
+              <div>
+                <p className="ds-kicker mb-2">Niveau de masquage</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setHifzLevel(lvl)}
+                      className={`min-w-[40px] py-2 rounded-xl text-sm font-bold transition-colors ${
+                        hifzLevel === lvl ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[var(--ds-n600)] mt-2">0 = tout visible · 8 = quasi tout masqué</p>
+              </div>
+            )}
+            {hifzLayer === 'affichage' && (
+              <div>
+                <p className="ds-kicker mb-2">Affichage</p>
+                <div className="flex flex-col gap-0.5">
+                  {[
+                    { label: 'Thèmes', active: showThemes, onClick: () => setShowThemes((t) => !t) },
+                    {
+                      label: '✍ Marquer',
+                      active: markingMode,
+                      onClick: () =>
+                        setMarkingMode((m) => {
+                          if (!m) setPopover(null);
+                          else setSelWords(new Map());
+                          return !m;
+                        }),
+                    },
+                    {
+                      label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
+                      active: showMistakes && mistakeWords.size > 0,
+                      onClick: () => setShowMistakes((s) => !s),
+                    },
+                    { label: 'Lexique', active: showLexicon, onClick: () => setShowLexicon((s) => !s) },
+                  ].map((t) => (
+                    <button
+                      key={t.label}
+                      onClick={t.onClick}
+                      className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] font-bold transition-colors ${
+                        t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)]/60'
+                      }`}
+                    >
+                      <span className="truncate">{t.label}</span>
+                      <span className={`flex-none w-8 h-[18px] rounded-full relative transition-colors ${t.active ? 'bg-[var(--ds-green)]' : 'bg-[var(--ds-n400)]'}`}>
+                        <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${t.active ? 'left-[16px]' : 'left-[2px]'}`} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={() => setHifzLayer(null)} className="ds-btn-gold w-full py-2.5 text-sm mt-4 flex-none">
+              Valider
+            </button>
+          </div>
+        </>
+      )}
       {/* Message d'étape : pilule flottante — seulement si aucun panneau ne guide déjà */}
       {currentStep && !fullscreen && !showQuestionPanel && (
         <div
@@ -836,120 +980,8 @@ function MushafPractice() {
         </div>
       )}
 
-      {/* Boutons de niveau Hifz (uniquement pour l'exercice Hifz, masqués en plein écran) */}
-      {isHifz && !fullscreen && (
-        <div className="flex-none bg-[var(--ds-green)]/95 text-white px-2 py-2 flex items-center justify-center gap-1 flex-wrap">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowThemes((t) => !t);
-            }}
-            title="Surligner les versets partageant le même tafsir (thèmes)"
-            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
-              showThemes
-                ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)] shadow-md'
-                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
-            }`}
-          >
-            Thèmes
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setMarkingMode((m) => {
-                if (!m) setPopover(null);
-                else setSelWords(new Map());
-                return !m;
-              });
-            }}
-            title="Marquer mes fautes : touchez les mots ratés, puis choisissez le type"
-            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-1 border ${
-              markingMode
-                ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] border-[var(--ds-gold)] shadow-md'
-                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
-            }`}
-          >
-            ✍ Marquer
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMistakes((s) => !s);
-            }}
-            title="Afficher/masquer les fautes déclarées"
-            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
-              showMistakes && mistakeWords.size > 0
-                ? 'bg-red-600 text-white border-red-600'
-                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
-            }`}
-          >
-            Fautes {mistakeWords.size > 0 ? `(${toArabicNumbers(mistakeWords.size)})` : ''}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowLexicon((s) => !s);
-            }}
-            title="Afficher/masquer les couleurs des mots de mon lexique"
-            className={`h-8 px-2.5 rounded-md text-xs font-bold transition-colors mr-2 border ${
-              showLexicon
-                ? 'bg-[var(--ds-sage)] text-white border-[var(--ds-sage)]'
-                : 'bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d]'
-            }`}
-          >
-            Lexique
-          </button>
-          <span className="text-xs uppercase tracking-wide text-[var(--ds-gold)] mr-2">Niveau</span>
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((lvl) => (
-            <button
-              key={lvl}
-              onClick={(e) => {
-                e.stopPropagation();
-                setHifzLevel(lvl);
-              }}
-              className={`min-w-[36px] h-8 px-2 rounded-md text-sm font-bold transition-colors ${
-                hifzLevel === lvl
-                  ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] shadow-md'
-                  : 'bg-[var(--ds-green)] hover:bg-[#3e6b1d] text-[var(--ds-gold)] border border-[var(--ds-sage)]'
-              }`}
-            >
-              {lvl}
-            </button>
-          ))}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setReadingMode(true);
-            }}
-            title="Plein écran"
-            className="h-8 px-2.5 rounded-md text-xs font-bold border bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d] ml-1"
-          >
-            ⛶
-          </button>
-        </div>
-      )}
-
       {/* Zone Mushaf */}
-      <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" onClick={handleMushafClick}>
-        {/* Bouton discret pour quitter le plein écran (Hifz) */}
-        {fullscreen && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setReadingMode(false);
-            }}
-            aria-label="Quitter le plein écran"
-            className="absolute right-2 top-2 z-30 w-10 h-10 rounded-full flex items-center justify-center bg-[var(--ds-green)]/70 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] shadow-lg border border-[var(--ds-gold)]/40 active:scale-95 transition-all"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-              <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-              <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-              <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-            </svg>
-          </button>
-        )}
+      <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" style={{ paddingLeft: isHifz ? 60 : 0 }} onClick={handleMushafClick}>
         <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
         <div className="book-box">
         <MushafDoublePage

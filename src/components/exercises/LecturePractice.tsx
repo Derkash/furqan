@@ -1327,15 +1327,6 @@ export default function LecturePractice() {
               </svg>
             )}
           </button>
-          <button
-            onClick={toggleFullscreen}
-            title="Plein écran"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--ds-n500)] hover:text-[var(--ds-green)] transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-            </svg>
-          </button>
           {recorder.error && <p className="text-[8px] text-red-600 text-center px-1">{recorder.error}</p>}
         </aside>
       )}
@@ -1538,18 +1529,6 @@ export default function LecturePractice() {
           />
         </div>
         </div>
-
-        {/* Plein écran : bouton flottant pour sortir */}
-        {isFs && (
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="absolute top-2 right-2 z-30 w-10 h-10 rounded-full bg-[var(--ds-green)]/90 text-[var(--ds-gold)] flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40"
-            aria-label="Quitter le plein écran"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 9 4 4m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4M15 15l5 5m0 0v-4m0 4h-4" /></svg>
-          </button>
-        )}
 
         {/* VOLET DE LECTURE : bandeau bas pleine largeur, compact, repliable
             par languette (comme le menu de gauche) — le replier ne stoppe

@@ -56,7 +56,11 @@ export default function RevisionPage() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {exercises.map((exercise) => (
-          <div key={exercise.id} className="ds-card p-5 flex flex-col">
+          <Link
+            key={exercise.id}
+            href={`/exercises/${exercise.id}/setup`}
+            className="ds-card p-5 flex flex-col hover:shadow-[var(--ds-shadow-md)] transition-shadow"
+          >
             <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-[var(--ds-sage-100)] text-xl">
               {ICON[exercise.id] ?? '📗'}
             </span>
@@ -72,15 +76,17 @@ export default function RevisionPage() {
             </div>
             <p className="text-sm text-[var(--ds-n600)] mt-1.5 flex-1">{exercise.description}</p>
             <div className="mt-4">
-              <Link href={`/exercises/${exercise.id}/setup`} className="ds-btn-ghost inline-block px-5 py-2 text-sm">
-                Commencer
-              </Link>
+              <span className="ds-btn-ghost inline-block px-5 py-2 text-sm">Commencer</span>
             </div>
-          </div>
+          </Link>
         ))}
 
         {EXTRA_MODES.map((mode) => (
-          <div key={mode.href} className="ds-card p-5 flex flex-col">
+          <Link
+            key={mode.href}
+            href={mode.href}
+            className="ds-card p-5 flex flex-col hover:shadow-[var(--ds-shadow-md)] transition-shadow"
+          >
             <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-[var(--ds-gold-100)] text-xl">
               {mode.icon}
             </span>
@@ -98,11 +104,9 @@ export default function RevisionPage() {
             </div>
             <p className="text-sm text-[var(--ds-n600)] mt-1.5 flex-1">{mode.description}</p>
             <div className="mt-4">
-              <Link href={mode.href} className="ds-btn-ghost inline-block px-5 py-2 text-sm">
-                Commencer
-              </Link>
+              <span className="ds-btn-ghost inline-block px-5 py-2 text-sm">Commencer</span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </AppShell>

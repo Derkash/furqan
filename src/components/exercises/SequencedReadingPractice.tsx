@@ -587,21 +587,10 @@ export default function SequencedReadingPractice() {
   const visible = revealed;
   return (
     <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col">
-      {/* Barre */}
-      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-3 py-2 flex items-center justify-between gap-2">
-        <button onClick={stop} className="text-sm hover:underline whitespace-nowrap">
-          ← Arrêter
-        </button>
-        <span className="text-sm font-medium">
-          Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
-        </span>
-        <span className="text-xs font-bold bg-[var(--ds-green-deep)] rounded-full px-2.5 py-1 whitespace-nowrap">
-          {chunkPos.i} / {chunkPos.total}
-        </span>
-      </div>
-
       {/* Mushaf (versets révélés accumulés) */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col">
+        <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
+        <div className="book-box">
         <MushafDoublePage
           leftPageVerses={left}
           rightPageVerses={right}
@@ -615,6 +604,8 @@ export default function SequencedReadingPractice() {
           loading={false}
           onTap={() => {}}
         />
+        </div>
+        </div>
 
         {/* Décompte plein cadre pendant l'intervalle */}
         {sub === 'gap' && (
@@ -630,62 +621,69 @@ export default function SequencedReadingPractice() {
         )}
       </div>
 
-      {/* Contrôles : vitesse en direct + gros boutons */}
-      <div className="flex-none bg-[var(--ds-green)] px-3 py-2.5 flex flex-col gap-2.5">
-        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-bold text-[var(--ds-gold)] mr-1">Vitesse</span>
+      {/* Contrôles : bandeau bas compact (marge basse des pages, jamais le texte) */}
+      <div
+        dir="ltr"
+        className="absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[var(--ds-divider)] px-2.5 flex items-center gap-2 flex-wrap justify-center"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          minHeight: 'calc(46px + env(safe-area-inset-bottom))',
+          fontFamily: 'var(--ds-font)',
+        }}
+      >
+        <button
+          onClick={stop}
+          aria-label="Arrêter"
+          title="Arrêter la session"
+          className="flex-none w-8 h-8 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-n700)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+        </button>
+        <span className="flex-none text-[11px] font-bold text-[var(--ds-n600)] whitespace-nowrap">
+          {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)} · {chunkPos.i}/{chunkPos.total}
+        </span>
+        <div className="flex items-center gap-1 flex-none">
           {SPEEDS.map((s) => (
             <button
               key={s}
               onClick={() => setRate(s)}
-              className={`px-2.5 py-1 rounded-md text-[12px] font-bold ${
-                rate === s ? 'bg-[var(--ds-gold)] text-[var(--ds-green)]' : 'bg-[var(--ds-green-deep)] text-[var(--ds-gold)]'
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                rate === s ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
               }`}
             >
               {speedLabel(s)}
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={toggleLoop}
-            aria-label="Répéter en boucle"
-            title="Répéter en boucle la sélection en cours"
-            className={`flex-none w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border-2 active:scale-95 transition-all ${
-              loop ? 'bg-[var(--ds-gold)] text-[var(--ds-green)] border-[var(--ds-gold)]' : 'bg-[var(--ds-green-deep)] text-[var(--ds-gold)] border-[var(--ds-gold)]/40'
-            }`}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m17 2 4 4-4 4" />
-              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
-              <path d="m7 22-4-4 4-4" />
-              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
-            </svg>
-          </button>
-          <button
-            onClick={togglePause}
-            className="flex-1 max-w-[200px] py-3.5 rounded-2xl text-base font-bold text-[var(--ds-green)] bg-[var(--ds-gold)] active:scale-95 shadow-lg flex items-center justify-center gap-2"
-          >
-            {paused ? (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                Reprendre
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-                Pause
-              </>
-            )}
-          </button>
-          <button
-            onClick={skipToNext}
-            className="flex-1 max-w-[220px] py-3.5 rounded-2xl text-base font-bold text-white bg-[var(--ds-sage)] active:scale-95 shadow-lg flex items-center justify-center gap-2"
-          >
-            Suivant
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-          </button>
-        </div>
+        <button
+          onClick={toggleLoop}
+          aria-label="Répéter en boucle"
+          title="Répéter en boucle la sélection en cours"
+          className={`flex-none w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-all ${
+            loop ? 'bg-[var(--ds-gold)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-n700)]'
+          }`}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m17 2 4 4-4 4" />
+            <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+            <path d="m7 22-4-4 4-4" />
+            <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+          </svg>
+        </button>
+        <button
+          onClick={togglePause}
+          className="flex-none px-4 py-1.5 rounded-full text-[13px] font-bold text-white active:scale-95 transition-all"
+          style={{ background: 'var(--ds-gold)' }}
+        >
+          {paused ? '▶ Reprendre' : '⏸ Pause'}
+        </button>
+        <button
+          onClick={skipToNext}
+          className="flex-none px-4 py-1.5 rounded-full text-[13px] font-bold text-white active:scale-95 transition-all"
+          style={{ background: 'var(--ds-sage)' }}
+        >
+          Suivant ›
+        </button>
       </div>
     </div>
   );
