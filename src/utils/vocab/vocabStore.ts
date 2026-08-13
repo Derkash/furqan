@@ -424,69 +424,10 @@ const SEED_OWNER = 'derkash';
  * Renvoie le nombre de mots importés.
  */
 export async function seedVocabIfNeeded(): Promise<number> {
-  if (!isBrowser()) return 0;
-  if (getCurrentUser() !== SEED_OWNER) return 0;
-  migrateVocabAnchors(); // ré-ancre l'existant sur le lemme avant toute chose
-  const flagKey = SEEDED_PREFIX + userKey();
-  // Déjà à la bonne version → rien à faire.
-  if (window.localStorage.getItem(flagKey) === SEED_VERSION) return 0;
-
-  try {
-    const rows: SeedRow[] = await fetch('/vocab-seed.json').then((r) => r.json());
-    const list = getVocab();
-
-    // Reconstruit entièrement les entrées « seed » (les racines/formes ont pu
-    // être corrigées → l'ancre change). On CONSERVE la progression Leitner en
-    // la reliant par la traduction (gloss), stable d'une version à l'autre.
-    const prog = new Map<
-      string,
-      { box: number; seen: number; correct: number; lastReviewed?: string; addedAt: string }
-    >();
-    for (const e of list) {
-      if (e.source === 'seed') {
-        prog.set(e.gloss, {
-          box: e.box,
-          seen: e.seen,
-          correct: e.correct,
-          lastReviewed: e.lastReviewed,
-          addedAt: e.addedAt,
-        });
-      }
-    }
-
-    const kept = list.filter((e) => e.source !== 'seed'); // mots capturés / manuels
-    const ids = new Set(kept.map((e) => e.id));
-    const now = new Date().toISOString();
-    let count = 0;
-    for (const row of rows) {
-      const id = anchorOf(row.lemma, row.root, row.arabic);
-      if (ids.has(id)) continue; // même lemme qu'un mot déjà capturé
-      ids.add(id);
-      const p = prog.get(row.french);
-      kept.push({
-        id,
-        arabic: row.baseForm || row.arabic,
-        gloss: row.french,
-        root: row.root,
-        lemma: row.lemma,
-        baseForm: row.baseForm,
-        baseFormType: row.baseFormType,
-        source: 'seed',
-        addedAt: p?.addedAt ?? now,
-        box: p?.box ?? 0,
-        seen: p?.seen ?? 0,
-        correct: p?.correct ?? 0,
-        lastReviewed: p?.lastReviewed,
-      });
-      count++;
-    }
-    writeVocab(kept);
-    pushVocabBulk(getCurrentUser(), kept); // le lexique du compte inclut le seed
-    window.localStorage.setItem(flagKey, SEED_VERSION);
-    return count;
-  } catch {
-    return 0;
-  }
+  // Seed PDF DÉSACTIVÉ (2026-08-14) : il utilisait l'ancien format
+  // « madi mudari3 ». Le vocabulaire est passé à la forme coranique exacte
+  // (dédup par mot exact) ; on ne réimporte plus ce lexique historique.
+  return 0;
 }
 
 /** Force la ré-importation du lexique (ajoute les manquants, garde l'existant). */

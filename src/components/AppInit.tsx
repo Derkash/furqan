@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { initAudioStore, isNativeApp } from '@/utils/audioStore';
+import { getCurrentUser } from '@/utils/exercises/userStats';
+import { hydrateVocab } from '@/utils/vocab/vocabSync';
 
 /**
  * Initialisations côté client au démarrage. Dans l'app iPad (Capacitor) :
@@ -23,6 +25,12 @@ export default function AppInit() {
       // stockage indisponible : sans conséquence
     }
     initAudioStore();
+
+    // Resync du vocabulaire au démarrage pour l'utilisateur déjà connecté :
+    // applique le nettoyage distant (dédup + forme coranique exacte) sans
+    // devoir se reconnecter. No-op si Supabase absent.
+    const user = getCurrentUser();
+    if (user) hydrateVocab(user).catch(() => {});
   }, []);
 
   return null;

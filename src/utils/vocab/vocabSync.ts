@@ -66,9 +66,31 @@ function mergeProgress(a: VocabEntry, b: VocabEntry): VocabEntry {
  * (union par id, meilleure progression conservée), écrit en local, et repousse la
  * fusion pour faire converger le distant. À appeler APRÈS que le cookie user est posé.
  */
+// Réinitialisation « le distant fait autorité » (une fois par utilisateur) :
+// après le grand nettoyage du vocabulaire (dédup + forme coranique exacte),
+// le local doit être REMPLACÉ par le distant, sans remonter les anciennes
+// entrées locales (sinon les doublons purgés ressusciteraient).
+const RESET_KEY = 'almuraja3a:vocab-remote-reset:';
+const RESET_VERSION = '2026-08-clean';
+
 export async function hydrateVocab(username: string): Promise<void> {
   const remote = await fetchVocabRemote(username);
   if (remote == null) return; // Supabase absent/injoignable → on garde le local
+
+  const resetKey = RESET_KEY + username;
+  const needsReset =
+    typeof window !== 'undefined' && window.localStorage.getItem(resetKey) !== RESET_VERSION;
+  if (needsReset) {
+    // Le distant écrase le local ; on ne repousse rien (pas de résurrection).
+    setVocabList(remote);
+    try {
+      window.localStorage.setItem(resetKey, RESET_VERSION);
+    } catch {
+      /* stockage indisponible */
+    }
+    return;
+  }
+
   const byId = new Map<string, VocabEntry>();
   for (const e of remote) byId.set(e.id, e);
   for (const e of getVocab()) {
