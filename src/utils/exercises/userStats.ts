@@ -65,20 +65,42 @@ function hashPassword(password: string): string {
   return h.toString(36);
 }
 
-// ---------- Session (cookie) ----------
+// ---------- Session (cookie + localStorage) ----------
+// La WebView iOS (Capacitor) perd parfois les cookies document.cookie d'une
+// navigation ou d'une relance à l'autre → la connexion « sautait ». Le
+// localStorage, lui, est fiable : on écrit les DEUX et on lit l'un OU l'autre
+// (en reposant le cookie s'il s'est évaporé).
+
+const SESSION_KEY = 'almuraja3a:session-user';
 
 export function getCurrentUser(): string | null {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
+  if (match) return decodeURIComponent(match[1]);
+  try {
+    const stored = window.localStorage.getItem(SESSION_KEY);
+    if (stored) {
+      document.cookie = `${COOKIE_NAME}=${encodeURIComponent(stored)}; path=/; max-age=31536000`;
+      return stored;
+    }
+  } catch {
+    /* stockage indisponible */
+  }
+  return null;
 }
 
 function setUserCookie(username: string | null) {
   if (typeof document === 'undefined') return;
   if (username === null) {
     document.cookie = `${COOKIE_NAME}=; path=/; max-age=0`;
+    try {
+      window.localStorage.removeItem(SESSION_KEY);
+    } catch {}
   } else {
     document.cookie = `${COOKIE_NAME}=${encodeURIComponent(username)}; path=/; max-age=31536000`;
+    try {
+      window.localStorage.setItem(SESSION_KEY, username);
+    } catch {}
   }
 }
 
