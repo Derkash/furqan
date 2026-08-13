@@ -236,7 +236,7 @@ export function RailToggle({
       type="button"
       onClick={onToggle}
       aria-label={hidden ? 'Afficher le menu' : 'Masquer le menu'}
-      className={`relative z-50 w-6 h-14 rounded-r-xl bg-white/90 border border-l-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)] hover:text-[var(--ds-green)] transition-colors after:absolute after:-inset-3 after:content-[''] ${className}`}
+      className={`z-50 w-6 h-14 rounded-r-xl bg-white/90 border border-l-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)] hover:text-[var(--ds-green)] transition-colors after:absolute after:-inset-3 after:content-[''] ${className}`}
       style={{ boxShadow: 'var(--ds-shadow-sm)' }}
     >
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

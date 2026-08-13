@@ -1266,20 +1266,7 @@ function MushafPractice() {
                   </svg>
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={startRecording}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white rounded-full px-4 py-2.5 shadow-lg font-bold text-sm active:scale-95 transition-all"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
-                S&apos;enregistrer
-              </button>
-            )}
+            ) : null /* bouton d'enregistrement : sur le rail Hifz */}
             {recorder.error && (
               <p className="mt-1 text-center text-[11px] text-red-600 bg-white/90 rounded-full px-3 py-0.5 shadow">
                 {recorder.error}
