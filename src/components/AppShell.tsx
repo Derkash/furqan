@@ -204,13 +204,68 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
  * Coque des écrans d'EXERCICE : barre de pilotage à gauche, contenu plein
  * écran (h-dvh). Le contenu gère lui-même ses barres et son fond.
  */
+const RAIL_HIDDEN_KEY = 'almuraja3a:rail-hidden';
+
+export function railHiddenInitial(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(RAIL_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function persistRailHidden(hidden: boolean) {
+  try {
+    window.localStorage.setItem(RAIL_HIDDEN_KEY, hidden ? '1' : '0');
+  } catch {}
+}
+
+/** Petite flèche pour replier/déplier le menu latéral (max d'espace au texte). */
+export function RailToggle({
+  hidden,
+  onToggle,
+  className = '',
+}: {
+  hidden: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={hidden ? 'Afficher le menu' : 'Masquer le menu'}
+      className={`z-50 w-5 h-12 rounded-r-xl bg-white/90 border border-l-0 border-[var(--ds-divider)] flex items-center justify-center text-[var(--ds-n600)] hover:text-[var(--ds-green)] transition-colors ${className}`}
+      style={{ boxShadow: 'var(--ds-shadow-sm)' }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        {hidden ? <path d="m9 6 6 6-6 6" /> : <path d="m15 6-6 6 6 6" />}
+      </svg>
+    </button>
+  );
+}
+
 export function PracticeShell({ children }: { children: React.ReactNode }) {
+  const [hidden, setHidden] = useState(railHiddenInitial);
+  const toggle = () => {
+    setHidden((h) => {
+      persistRailHidden(!h);
+      return !h;
+    });
+  };
+
   return (
     <div className="flex h-dvh overflow-hidden ds-page" dir="ltr">
-      <div className="flex-none hidden md:block">
-        <Sidebar />
+      {!hidden && (
+        <div className="flex-none hidden md:block">
+          <Sidebar />
+        </div>
+      )}
+      <div className="flex-1 min-w-0 h-dvh relative overflow-hidden">
+        <RailToggle hidden={hidden} onToggle={toggle} className="absolute left-0 top-1/2 -translate-y-1/2 hidden md:flex" />
+        {children}
       </div>
-      <div className="flex-1 min-w-0 h-dvh relative overflow-hidden">{children}</div>
     </div>
   );
 }

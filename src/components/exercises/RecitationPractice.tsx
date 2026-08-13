@@ -551,30 +551,6 @@ export default function RecitationPractice() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col overflow-locked">
-      {/* Header avec progression (même format que les autres exercices) */}
-      <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-4 py-2 flex items-center justify-between">
-        <Link
-            href="/exercises/recitation/setup"
-            aria-label="Retour"
-            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
-        <span className="text-sm font-medium">
-          Pages {toArabicNumbers(displayedPair.rightPage)}–{toArabicNumbers(displayedPair.leftPage)}{' '}
-          • Question {toArabicNumbers(Math.min(round, maxRounds))}/{toArabicNumbers(maxRounds)}
-          {phase === 'result' && (
-            <>
-              {' • '}
-              <span dir="ltr">Verset {target.verseKey}</span>
-            </>
-          )}
-        </span>
-        <span className="text-xs opacity-75">{user}</span>
-      </div>
-
       {/* Bandeau de consigne (même format que les autres exercices) */}
       <div className="flex-none bg-[var(--ds-green)]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
         {phase === 'listening' && (
@@ -655,7 +631,17 @@ export default function RecitationPractice() {
       )}
 
       {/* Zone Mushaf — identique aux autres exercices, pleine hauteur */}
-      <div className="flex-1 min-h-0 relative" onClick={handleZoneClick}>
+      <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" onClick={handleZoneClick}>
+        {/* Badge discret : progression de la session */}
+        <div
+          className="absolute top-1.5 right-2 z-20 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-[var(--ds-n700)]"
+          style={{ boxShadow: 'var(--ds-shadow-sm)', fontFamily: 'var(--ds-font)' }}
+        >
+          Question {toArabicNumbers(Math.min(round, maxRounds))}/{toArabicNumbers(maxRounds)}
+          {phase === 'result' && <span dir="ltr"> · {target.verseKey}</span>}
+        </div>
+        <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
+        <div className="book-box">
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
@@ -670,6 +656,8 @@ export default function RecitationPractice() {
           loading={false}
           onTap={handleTap}
         />
+        </div>
+        </div>
 
         {/* Gros bouton rouge : démarrer l'enregistrement (pages floutées) */}
         {phase === 'listening' && (

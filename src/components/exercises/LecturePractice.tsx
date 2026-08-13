@@ -36,6 +36,7 @@ import { playBeep } from '@/utils/beep';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
+import { RailToggle, railHiddenInitial, persistRailHidden } from '@/components/AppShell';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 function pairOf(page: number): PagePair {
@@ -189,6 +190,7 @@ export default function LecturePractice() {
   const [showConfig, setShowConfig] = useState(false);
   // Layer de section du rail gauche (Réglages / Affichage), fermé par Valider.
   const [panelLayer, setPanelLayer] = useState<null | 'reglages' | 'affichage'>(null);
+  const [railHidden, setRailHidden] = useState(railHiddenInitial);
   const [gotoPage, setGotoPage] = useState('');
   const [config, setConfig] = useState<PlayConfig>(() => {
     const stored = loadJSON<PlayConfig>(LECTURE_PLAY_KEY);
@@ -1204,7 +1206,7 @@ export default function LecturePractice() {
       {/* ---- Rail de pilotage (gauche) : ICÔNES SEULES — l'espace au texte.
            Réglages / Affichage s'ouvrent en LAYER avec bouton Valider ;
            écouter, enregistrer et plein écran sont des actions directes. ---- */}
-      {!isFs && (
+      {!isFs && !railHidden && (
         <aside dir="ltr" className="flex w-[60px] flex-none flex-col items-center bg-white overflow-y-auto py-3 gap-1.5 z-40">
           <Link href="/exercises" title="Accueil" className="flex flex-col items-center gap-0.5 mb-1.5">
             <span className="text-[20px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>
@@ -1443,6 +1445,18 @@ export default function LecturePractice() {
 
       {/* ---- Livre : rien d’autre que la double page ---- */}
       <div className="flex-1 min-w-0 h-full relative flex flex-col">
+        {!isFs && (
+          <RailToggle
+            hidden={railHidden}
+            onToggle={() => {
+              setRailHidden((h) => {
+                persistRailHidden(!h);
+                return !h;
+              });
+            }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 flex"
+          />
+        )}
       {/* Traduction française du verset en cours (Hamidullah).
           Hauteur FIXE + défilement interne : le texte varie d'un verset à l'autre
           mais ne repousse plus le mushaf (évite le « saut de page »). */}

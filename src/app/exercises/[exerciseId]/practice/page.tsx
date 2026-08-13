@@ -399,7 +399,8 @@ function MushafPractice() {
 
   // Marques combinées : lexique (sauf Hifz+Thèmes) + fautes/sélection Hifz (prioritaires).
   const combinedWordMarks = useMemo(() => {
-    const lexOn = isHifz ? showLexicon && !showThemes : true;
+    // Lexique visible en Hifz seulement (et en Lecture, qui a le sien).
+    const lexOn = isHifz ? showLexicon && !showThemes : false;
     const base = new Map<string, string>();
     if (lexOn) for (const [k, v] of lexiconMarks) base.set(k, v);
     if (hifzWordMarks) for (const [k, v] of hifzWordMarks) base.set(k, v);
@@ -791,78 +792,22 @@ function MushafPractice() {
   }
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col overflow-locked">
-      {/* Header avec progression */}
-      {!fullscreen && (
-        <div dir="ltr" className="app-topbar flex-none bg-[var(--ds-green)] text-white px-4 py-2 flex items-center justify-between">
-          <Link
-            href={`/exercises/${exerciseId}/setup`}
-            aria-label="Retour"
-            className="flex-none w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Link>
-          <span className="text-sm font-medium">
-            {exerciseId === 'hifz' ? (
-              <>
-                Pages {toArabicNumbers(pagePair.rightPage)}–{toArabicNumbers(pagePair.leftPage)}
-              </>
-            ) : (
-              <>
-                Page {toArabicNumbers(state.progress.currentPage)} • Question{' '}
-                {toArabicNumbers(state.progress.pagesCompleted + 1)}/
-                {toArabicNumbers(state.progress.totalRounds)}
-              </>
-            )}
-          </span>
-          {isHifz ? (
-            <button
-              type="button"
-              onClick={() => setReadingMode(true)}
-              aria-label="Mode lecture plein écran"
-              className="flex items-center gap-1 text-xs font-semibold text-[var(--ds-gold)] hover:text-[var(--ds-bg)] transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-                <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-              </svg>
-              Plein écran
-            </button>
-          ) : (
-            <span className="text-xs opacity-75">{exercise?.name}</span>
-          )}
-        </div>
-      )}
-
-      {/* Overlay avec message - sous la barre verte */}
-      {currentStep && !fullscreen && (
-        <div className="flex-none bg-[var(--ds-green)]/90 text-white px-4 py-1 flex items-center justify-center gap-2">
+    <div className="h-full w-full overflow-hidden bg-[var(--ds-bg)] flex flex-col relative overflow-locked">
+      {/* Message d'étape : pilule flottante — seulement si aucun panneau ne guide déjà */}
+      {currentStep && !fullscreen && !showQuestionPanel && (
+        <div
+          className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20 max-w-[94%] flex items-center gap-2 bg-white/95 rounded-full px-4 py-1.5"
+          style={{ boxShadow: 'var(--ds-shadow-md)', fontFamily: 'var(--ds-font)' }}
+        >
           {audio.isPlaying && (
-            <div className="flex gap-0.5">
-              <span
-                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
-                style={{ animationDelay: '0ms' }}
-              />
-              <span
-                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
-                style={{ animationDelay: '150ms' }}
-              />
-              <span
-                className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce"
-                style={{ animationDelay: '300ms' }}
-              />
+            <div className="flex gap-0.5 flex-none">
+              <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-0.5 h-3 bg-[var(--ds-gold)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           )}
-          <span className="text-base font-medium">
-            {currentStep.message.title}
-          </span>
-          <span className="text-[var(--ds-gold)] text-sm">
-            {currentStep.message.subtitle}
-          </span>
+          <span className="text-[13px] font-bold text-[var(--ds-text)] truncate">{currentStep.message.title}</span>
+          <span className="text-[12px] text-[var(--ds-n600)] truncate hidden sm:inline">{currentStep.message.subtitle}</span>
           {lastAudioVerse && (
             <button
               type="button"
@@ -871,7 +816,7 @@ function MushafPractice() {
                 audio.play(lastAudioVerse, audioSeconds > 0 ? audioSeconds : undefined);
               }}
               aria-label="Faire répéter le verset"
-              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--ds-gold)]/20 text-[var(--ds-gold)] hover:bg-[var(--ds-gold)]/35 active:scale-95 transition-all flex-shrink-0"
+              className="flex-none w-7 h-7 rounded-full flex items-center justify-center bg-[var(--ds-sage-100)] text-[var(--ds-green)] hover:bg-[var(--ds-sage-200)] active:scale-95 transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3 9v6h4l5 5V4L7 9H3z" />
@@ -880,12 +825,10 @@ function MushafPractice() {
             </button>
           )}
           {timedStep && countdown > 0 && (
-            <span className="ml-1 flex items-center gap-1 text-[var(--ds-gold)] text-sm font-bold tabular-nums flex-shrink-0">
+            <span className="flex-none flex items-center gap-1 text-[var(--ds-gold-700)] text-sm font-bold tabular-nums">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="13" r="8" />
                 <path d="M12 9v4l2 2" />
-                <path d="M5 3 2 6" />
-                <path d="m22 6-3-3" />
               </svg>
               {countdown}s
             </span>
@@ -973,11 +916,21 @@ function MushafPractice() {
               {lvl}
             </button>
           ))}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setReadingMode(true);
+            }}
+            title="Plein écran"
+            className="h-8 px-2.5 rounded-md text-xs font-bold border bg-[var(--ds-green)] text-[var(--ds-gold)] border-[var(--ds-sage)] hover:bg-[#3e6b1d] ml-1"
+          >
+            ⛶
+          </button>
         </div>
       )}
 
       {/* Zone Mushaf */}
-      <div className="flex-1 min-h-0 relative" onClick={handleMushafClick}>
+      <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" onClick={handleMushafClick}>
         {/* Bouton discret pour quitter le plein écran (Hifz) */}
         {fullscreen && (
           <button
@@ -997,6 +950,8 @@ function MushafPractice() {
             </svg>
           </button>
         )}
+        <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
+        <div className="book-box">
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
@@ -1015,6 +970,8 @@ function MushafPractice() {
           revealFraction={currentStep?.ui.revealFraction}
           onTap={handleTap}
         />
+        </div>
+        </div>
 
         {/* Question du quiz : en GRAND sur la moitié opposée à la page interrogée */}
         {showQuestionPanel && currentStep && (
