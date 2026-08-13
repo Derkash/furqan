@@ -182,13 +182,16 @@ function MobileNav() {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Hauteur FIXE + défilement INTERNE : le scroll natif de la WebView est
+  // désactivé (sensation d'app), donc les pages hautes (accueil, setups…)
+  // doivent défiler dans leur propre conteneur — indispensable sur iPhone.
   return (
-    <div className="ds-page" dir="ltr">
-      <div className="flex min-h-dvh">
-        <div className="sticky top-0 h-dvh hidden md:block">
+    <div className="ds-page h-dvh overflow-hidden" dir="ltr">
+      <div className="flex h-full">
+        <div className="h-full hidden md:block">
           <Sidebar />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 h-full overflow-y-auto">
           <MobileNav />
           <main className="px-5 md:px-9 py-6 md:py-8 max-w-[1100px]">{children}</main>
         </div>
