@@ -16,4 +16,31 @@ class MainViewController: CAPBridgeViewController {
     override var shouldAutorotate: Bool {
         return true
     }
+
+    // iPadOS 26 : régression Apple — quand le verrou de rotation est OFF, le
+    // système laisse passer le portrait malgré la déclaration paysage. On force
+    // activement le retour en paysage à chaque apparition / changement.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        forceLandscape()
+    }
+
+    override func viewWillTransition(
+        to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator
+    ) {
+        super.viewWillTransition(to: size, with: coordinator)
+        if size.height > size.width {
+            DispatchQueue.main.async { [weak self] in self?.forceLandscape() }
+        }
+    }
+
+    private func forceLandscape() {
+        setNeedsUpdateOfSupportedInterfaceOrientations()
+        if #available(iOS 16.0, *) {
+            guard let scene = view.window?.windowScene else { return }
+            scene.requestGeometryUpdate(
+                .iOS(interfaceOrientations: .landscape)
+            ) { _ in }
+        }
+    }
 }

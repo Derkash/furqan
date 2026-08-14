@@ -24,6 +24,7 @@ import {
   exportVocab,
   importVocab,
   autoLocalBackup,
+  bareForm,
   type VocabEntry,
 } from '@/utils/vocab/vocabStore';
 import { getCurrentUser } from '@/utils/exercises/userStats';
@@ -63,7 +64,7 @@ export default function VocabPage() {
 }
 
 function VocabPageInner() {
-  const [mode, setMode] = useState<Mode>('review');
+  const [mode, setMode] = useState<Mode>('list');
   const { data: units } = useQuranUnits();
 
   // Plage GLOBALE, visible et modifiable en permanence en haut.
@@ -382,12 +383,16 @@ function ListMode() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Recherche arabe INDÉPENDANTE des voyelles (harakat) : on compare les
+    // formes « nues » → taper un mot sans harakat le retrouve quand même.
+    const qBare = bareForm(query.trim());
     const list = q
       ? items.filter(
           (e) =>
             e.gloss.toLowerCase().includes(q) ||
-            e.arabic.includes(query.trim()) ||
-            (e.root && e.root.includes(query.trim()))
+            (qBare && bareForm(e.arabic).includes(qBare)) ||
+            (qBare && e.lemma && bareForm(e.lemma).includes(qBare)) ||
+            (qBare && e.root && bareForm(e.root).includes(qBare))
         )
       : items;
     // Tri par ORDRE D'APPARITION dans le Mushaf (depuis le début de Baqara),
