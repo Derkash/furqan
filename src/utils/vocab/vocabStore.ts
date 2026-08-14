@@ -81,36 +81,33 @@ export function anchorOf(
 
 export interface LexiconMatch {
   lemmas: Set<string>; // lemmes des entrées qui en ont un
-  roots: Set<string>; // racines des entrées SANS lemme (fallback historique)
-  forms: Set<string>; // formes nues des entrées sans lemme ni racine
+  forms: Set<string>; // formes nues des entrées SANS lemme (secours)
 }
 
 /** Construit les ensembles de correspondance à partir du lexique courant. */
 export function lexiconMatchSets(): LexiconMatch {
   const lemmas = new Set<string>();
-  const roots = new Set<string>();
   const forms = new Set<string>();
   for (const e of getVocab()) {
     if (e.lemma) lemmas.add(e.lemma.normalize('NFC'));
-    else if (e.root) roots.add(e.root);
-    else forms.add(bareForm(e.arabic));
+    else forms.add(bareForm(e.arabic)); // plus de repli par RACINE
   }
-  return { lemmas, roots, forms };
+  return { lemmas, forms };
 }
 
 /**
- * Vrai si un mot du Mushaf correspond à une entrée du lexique. On compare par
- * LEMME en priorité (jamais par racine quand le lemme est connu) → deux lexèmes
- * d'une même racine ne se surlignent pas l'un l'autre.
+ * Vrai si un mot du Mushaf correspond à une entrée du lexique. Règle STRICTE :
+ * même MOT — comparaison par LEMME (identité du mot ; gère damir/tawkid/harf
+ * collés et temps de verbe), sinon même forme nue pour les rares entrées sans
+ * lemme. JAMAIS par racine : une racine couvre des mots différents (كِتاب livre
+ * ≠ كاتِب scribe), ce qui surlignait des mots absents du vocabulaire.
  */
 export function matchesLexicon(
   sets: LexiconMatch,
   word: { lemma?: string; root?: string; form?: string }
 ): boolean {
   if (word.lemma && sets.lemmas.has(word.lemma.normalize('NFC'))) return true;
-  // Fallback racine : uniquement pour les entrées sans lemme.
-  if (word.root && sets.roots.has(word.root)) return true;
-  if (word.form && sets.forms.has(bareForm(word.form))) return true;
+  if (!word.lemma && word.form && sets.forms.has(bareForm(word.form))) return true;
   return false;
 }
 

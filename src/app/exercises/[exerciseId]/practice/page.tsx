@@ -370,8 +370,8 @@ function MushafPractice() {
   // dans TOUS les exercices — SAUF en Hifz quand la vision « Thèmes » est active.
   // (Le lemme, pas la racine : deux lexèmes d'une même racine ont des sens
   //  différents et ne doivent pas se surligner l'un l'autre.)
-  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
-  const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
+  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), forms: new Set() });
+  const lexSize = lexicon.lemmas.size + lexicon.forms.size;
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLexicon(lexiconMatchSets());

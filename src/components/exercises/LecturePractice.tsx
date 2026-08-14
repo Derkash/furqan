@@ -150,8 +150,8 @@ export default function LecturePractice() {
   const [right, setRight] = useState<PageVerses | null>(null);
   const [loading, setLoading] = useState(false);
   const [marks, setMarks] = useState<Map<string, string>>(new Map());
-  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), roots: new Set(), forms: new Set() });
-  const lexSize = lexicon.lemmas.size + lexicon.roots.size + lexicon.forms.size;
+  const [lexicon, setLexicon] = useState<LexiconMatch>({ lemmas: new Set(), forms: new Set() });
+  const lexSize = lexicon.lemmas.size + lexicon.forms.size;
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.rate ?? 2);
   const [currentVerse, setCurrentVerse] = useState<string | null>(null);
