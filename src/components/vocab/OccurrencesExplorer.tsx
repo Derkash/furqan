@@ -313,7 +313,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                       surligné comme dans le verset arabe (portion FR exacte du LLM). */}
                   {trans?.[o.verseKey] && (
                     <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
-                      {highlightFrench(trans[o.verseKey], inf?.frSpan || inf?.gloss || gloss || '').map((seg, i) =>
+                      {highlightFrench(trans[o.verseKey], inf?.frSpan ?? '', inf?.gloss ?? '', gloss ?? '').map((seg, i) =>
                         seg.hit ? (
                           <mark
                             key={i}
