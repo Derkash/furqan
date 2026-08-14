@@ -52,8 +52,11 @@ export interface FrSegment {
 export function highlightFrench(verse: string, frSpan: string): FrSegment[] {
   const stems = needleStems(frSpan || '');
   if (!stems.length) return [{ t: verse, hit: false }];
-  return verse.split(/(\s+)/).map((p) => {
-    if (!p || /^\s+$/.test(p)) return { t: p, hit: false };
+  // On découpe aussi sur les APOSTROPHES et TRAITS D'UNION : sinon « s'écarter »
+  // resterait un seul token (« secarter ») et ne matcherait pas le radical
+  // « ecarter ». Les séparateurs sont conservés comme segments non surlignés.
+  return verse.split(/(\s+|['’‑-]+)/).map((p) => {
+    if (!p || /^(\s+|['’‑-]+)$/.test(p)) return { t: p, hit: false };
     const st = stemOf(p);
     const hit =
       st.length >= 4 &&

@@ -55,7 +55,7 @@ async function getHamidullah(): Promise<Record<string, string>> {
 const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE d'OCCURRENCES (un mot dans un verset précis), avec la traduction française du verset. Pour CHAQUE occurrence, renvoie :
 - key : la clé fournie, inchangée.
 - gloss : la traduction française CONCRÈTE du MOT dans le sens qu'il a DANS CE VERSET précis (le sens peut varier d'un verset à l'autre), courte (1 à 6 mots), registre usuel (style Abdel-Nour). RÈGLE : traduis UNIQUEMENT le sens porté par le MOT lui-même (racine + schème + clitiques COLLÉS comme un pronom, ex. رزقناهم = « Nous les avons pourvus »). N'inclus JAMAIS le sens d'un élément EXTÉRIEUR au mot, qu'il vienne d'un autre mot du verset ou d'une particule de tête : négation (لا, ما, ألا…), interrogation (أ, هل…), emphase/tawkid (إنّ, قد, لام التوكيد, nūn de tawkid…), conjonction (و, ف), préposition (بِ, كَ, لِ), futur (سَ)… Donne le mot en forme neutre et affirmative.
-- frSpan : RECOPIE EXACTEMENT, tels qu'ils apparaissent dans la traduction française FOURNIE du verset, le ou les mots français qui rendent CE mot arabe. Ce doit être une portion CONTIGUË du texte, copiée à l'identique (mêmes lettres, mêmes accents, même casse) pour pouvoir la retrouver dans la phrase. N'inclus PAS les mots-outils voisins (« et », « de », « le »…) sauf s'ils font partie de l'expression traduisant le mot. Si le mot n'est PAS rendu explicitement dans la traduction (absorbé, sous-entendu), renvoie une chaîne VIDE "".
+- frSpan : RECOPIE, tels qu'ils apparaissent dans la traduction française FOURNIE du verset, le ou les mots français qui rendent CE mot arabe — ceux qui portent le sens que tu as mis dans "gloss", PAS un mot voisin. Copie-les à l'identique (mêmes lettres, accents, apostrophes) pour pouvoir les retrouver. Privilégie le MOT PLEIN (verbe, nom, adjectif) ; n'ajoute pas les mots-outils voisins sauf s'ils font partie de l'expression. Ex. dans « dans leur insouciance ils s'en détournent », pour مُعْرِضُونَ (se détourner) frSpan = « détournent » (surtout PAS « insouciance »). Si le mot n'est PAS rendu explicitement (absorbé, sous-entendu), renvoie une chaîne VIDE "".
 - note : UNE phrase courte sur ce que la forme/le wazn apporte au sens (ex. « forme X : demander l'action → demander pardon » ; passif, participe…). Concret.
 Réponds uniquement via le format structuré.`;
 
@@ -95,7 +95,7 @@ async function claudeBatch(
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const msg = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 1500,
+    max_tokens: 3500,
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: lines.join('\n') }],
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return new Response('Corps JSON invalide', { status: 400 });
   }
-  const items = (body.items ?? []).filter((it) => it?.key).slice(0, 60);
+  const items = (body.items ?? []).filter((it) => it?.key).slice(0, 90);
   const result: Record<string, { gloss: string; frSpan: string; note: string }> = {};
   const todo: Item[] = [];
   for (const it of items) {
