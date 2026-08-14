@@ -40,7 +40,7 @@ function writeMap<T>(key: string, map: Record<string, Timed<T>>, cap: number): v
 }
 
 const ANALYZE_KEY = 'almuraja3a:cache:wordanalyze:v1';
-const OCC_KEY = 'almuraja3a:cache:occinfo:v1';
+const OCC_KEY = 'almuraja3a:cache:occinfo:v2'; // v2 : ajout de frSpan
 const CAP = 4000;
 
 // ---- Analyse d'un mot (WordCard hors lexique) ----
@@ -66,6 +66,7 @@ export function setCachedAnalysis(k: string, v: WordAnalysisCache): void {
 
 export interface OccInfoCache {
   gloss: string;
+  frSpan: string; // portion exacte de la traduction FR qui rend le mot (à surligner)
   note: string;
 }
 

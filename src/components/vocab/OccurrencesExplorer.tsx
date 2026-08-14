@@ -54,8 +54,8 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
   // Traduction Hamidullah (verset → FR) + mots arabes par verset (pour surligner).
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   const [verseWords, setVerseWords] = useState<Record<string, { position: number; form: string }[]>>({});
-  // Info par forme/wazn (clé = lemme) : { gloss, note }. Claude si clé, sinon gratuit.
-  const [info, setInfo] = useState<Record<string, { gloss: string; note: string }>>({});
+  // Info par occurrence : { gloss, frSpan, note }. Claude si clé, sinon gratuit.
+  const [info, setInfo] = useState<Record<string, { gloss: string; frSpan: string; note: string }>>({});
 
   const { startPage, endPage } = useMemo(
     () => unitToPageRange(range.mode, range.start, range.end, units),
@@ -105,7 +105,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
       // Info par occurrence : traduction contextuelle + mini-explication.
       // 1) On lit d'abord le CACHE LOCAL (dispo hors ligne) ; 2) on ne demande à
       // l'API que les occurrences non encore connues ; 3) on met le cache à jour.
-      const cached: Record<string, { gloss: string; note: string }> = {};
+      const cached: Record<string, { gloss: string; frSpan: string; note: string }> = {};
       const synth = new Map<string, string>(); // infoKey (arabe) -> clé ASCII
       const items = [];
       for (const o of res) {
@@ -139,7 +139,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         });
         const data = await r.json();
         if (!cancelled && data?.info) {
-          const remapped: Record<string, { gloss: string; note: string }> = {};
+          const remapped: Record<string, { gloss: string; frSpan: string; note: string }> = {};
           for (const [ik, sk] of synth) if (data.info[sk]) remapped[ik] = data.info[sk];
           setInfo((prev) => ({ ...prev, ...remapped }));
           setCachedOccInfoBulk(remapped); // persiste pour l'hors-ligne
@@ -268,7 +268,6 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
       {!loading &&
         shown.map((o) => {
               const inf = info[infoKey(o)];
-              const occGloss = inf?.gloss;
               return (
                 <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[var(--ds-gold)]/20">
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -303,10 +302,10 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                   </p>
 
                   {/* Traduction Hamidullah du verset (contexte) — le mot ciblé
-                      surligné comme dans le verset arabe (repérage par radical). */}
+                      surligné comme dans le verset arabe (portion FR exacte du LLM). */}
                   {trans?.[o.verseKey] && (
                     <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
-                      {highlightFrench(trans[o.verseKey], occGloss || gloss || '').map((seg, i) =>
+                      {highlightFrench(trans[o.verseKey], inf?.frSpan || '').map((seg, i) =>
                         seg.hit ? (
                           <mark
                             key={i}
@@ -321,12 +320,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                     </p>
                   )}
 
-                  {/* Traduction DE CETTE forme (en gras) + mini-explication du wazn */}
-                  {(occGloss || gloss) && (
-                    <p className="text-[12px] text-[var(--ds-green)] mt-1">
-                      → <span className="font-bold">{occGloss || gloss}</span>
-                    </p>
-                  )}
+                  {/* Mini-explication du wazn (ce que la forme apporte au sens) */}
                   {inf?.note && (
                     <p className="text-[11px] text-gray-500 italic mt-0.5">{inf.note}</p>
                   )}

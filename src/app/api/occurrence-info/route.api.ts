@@ -31,7 +31,7 @@ interface Item {
   position?: number;
 }
 
-const cache = new Map<string, { gloss: string; note: string }>();
+const cache = new Map<string, { gloss: string; frSpan: string; note: string }>();
 
 // Clé de cache STABLE (identité linguistique de la forme), et non la clé
 // éphémère k0/k1… envoyée par le client — celle-ci est réutilisée d'une racine à
@@ -52,9 +52,10 @@ async function getHamidullah(): Promise<Record<string, string>> {
   return hamidullah ?? {};
 }
 
-const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE d'OCCURRENCES (un mot dans un verset précis). Pour CHAQUE occurrence, renvoie :
+const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE d'OCCURRENCES (un mot dans un verset précis), avec la traduction française du verset. Pour CHAQUE occurrence, renvoie :
 - key : la clé fournie, inchangée.
 - gloss : la traduction française CONCRÈTE du MOT dans le sens qu'il a DANS CE VERSET précis (le sens peut varier d'un verset à l'autre), courte (1 à 6 mots), registre usuel (style Abdel-Nour). RÈGLE : traduis UNIQUEMENT le sens porté par le MOT lui-même (racine + schème + clitiques COLLÉS comme un pronom, ex. رزقناهم = « Nous les avons pourvus »). N'inclus JAMAIS le sens d'un élément EXTÉRIEUR au mot, qu'il vienne d'un autre mot du verset ou d'une particule de tête : négation (لا, ما, ألا…), interrogation (أ, هل…), emphase/tawkid (إنّ, قد, لام التوكيد, nūn de tawkid…), conjonction (و, ف), préposition (بِ, كَ, لِ), futur (سَ)… Donne le mot en forme neutre et affirmative.
+- frSpan : RECOPIE EXACTEMENT, tels qu'ils apparaissent dans la traduction française FOURNIE du verset, le ou les mots français qui rendent CE mot arabe. Ce doit être une portion CONTIGUË du texte, copiée à l'identique (mêmes lettres, mêmes accents, même casse) pour pouvoir la retrouver dans la phrase. N'inclus PAS les mots-outils voisins (« et », « de », « le »…) sauf s'ils font partie de l'expression traduisant le mot. Si le mot n'est PAS rendu explicitement dans la traduction (absorbé, sous-entendu), renvoie une chaîne VIDE "".
 - note : UNE phrase courte sur ce que la forme/le wazn apporte au sens (ex. « forme X : demander l'action → demander pardon » ; passif, participe…). Concret.
 Réponds uniquement via le format structuré.`;
 
@@ -68,9 +69,10 @@ const SCHEMA = {
         properties: {
           key: { type: 'string' },
           gloss: { type: 'string' },
+          frSpan: { type: 'string' },
           note: { type: 'string' },
         },
-        required: ['key', 'gloss', 'note'],
+        required: ['key', 'gloss', 'frSpan', 'note'],
         additionalProperties: false,
       },
     },
@@ -79,7 +81,9 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
-async function claudeBatch(items: Item[]): Promise<Record<string, { gloss: string; note: string }>> {
+async function claudeBatch(
+  items: Item[]
+): Promise<Record<string, { gloss: string; frSpan: string; note: string }>> {
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const trans = await getHamidullah();
   const lines = items.map((it) => {
@@ -97,11 +101,11 @@ async function claudeBatch(items: Item[]): Promise<Record<string, { gloss: strin
     messages: [{ role: 'user', content: lines.join('\n') }],
   });
   const block = msg.content.find((b) => b.type === 'text');
-  const out: Record<string, { gloss: string; note: string }> = {};
+  const out: Record<string, { gloss: string; frSpan: string; note: string }> = {};
   if (block && block.type === 'text') {
     const parsed = JSON.parse(block.text);
     for (const r of parsed.results ?? []) {
-      if (r.key) out[r.key] = { gloss: r.gloss ?? '', note: r.note ?? '' };
+      if (r.key) out[r.key] = { gloss: r.gloss ?? '', frSpan: r.frSpan ?? '', note: r.note ?? '' };
     }
   }
   return out;
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
     return new Response('Corps JSON invalide', { status: 400 });
   }
   const items = (body.items ?? []).filter((it) => it?.key).slice(0, 60);
-  const result: Record<string, { gloss: string; note: string }> = {};
+  const result: Record<string, { gloss: string; frSpan: string; note: string }> = {};
   const todo: Item[] = [];
   for (const it of items) {
     const ck = cacheKey(it);
@@ -128,7 +132,7 @@ export async function POST(req: NextRequest) {
     try {
       const got = await claudeBatch(todo);
       for (const it of todo) {
-        const v = got[it.key] ?? { gloss: '', note: '' };
+        const v = got[it.key] ?? { gloss: '', frSpan: '', note: '' };
         cache.set(cacheKey(it), v);
         result[it.key] = v;
       }
@@ -138,11 +142,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Repli gratuit : traduction mot-à-mot (Quran.com→FR), sans note rédigée.
+  // Repli gratuit : traduction mot-à-mot (Quran.com→FR), sans note ni frSpan.
   for (const it of todo) {
     const gloss =
       it.verseKey && it.position ? await frenchWordGloss(it.verseKey, it.position) : '';
-    const v = { gloss, note: '' };
+    const v = { gloss, frSpan: '', note: '' };
     if (gloss) cache.set(cacheKey(it), v);
     result[it.key] = v;
   }
