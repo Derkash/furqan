@@ -6,6 +6,7 @@ import {
   getWordMorphology,
   getVerseText,
   describeMorphology,
+  stripLeadingParticles,
   type WordMorphology,
 } from '@/utils/vocab/morphology';
 import { addVocab, getVocabEntry, removeVocab, type VocabEntry } from '@/utils/vocab/vocabStore';
@@ -122,7 +123,9 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
   const handleAdd = () => {
     if (!morph) return;
     const res = addVocab({
-      arabic: analysis?.baseForm || morph.lemma || morph.form,
+      // Forme coranique EXACTE du mot, moins les particules attachées en tête
+      // (و, ف, بِ, أَ interrogatif…) qui n'appartiennent pas au mot.
+      arabic: stripLeadingParticles(morph),
       gloss: gloss || analysis?.frenchGloss || '',
       root: morph.root,
       lemma: morph.lemma,

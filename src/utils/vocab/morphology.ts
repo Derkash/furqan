@@ -29,6 +29,28 @@ export interface WordMorphology {
   suffixes?: { form: string }[];
 }
 
+// Préfixes CONSERVÉS dans la forme du lexique : l'article défini ال (fait
+// partie du nom) et une négation collée (rare, change le sens). Tout le reste
+// (و conj, ف, بِ/كَ/لِ prép, سَ futur, لَ emphase, أَ/ءَ interrogatif, يَٰ
+// vocatif…) est une particule qui n'appartient pas au mot → retiré.
+// IMPORTANT : on se fie à la SEGMENTATION du corpus, jamais à un motif — ainsi
+// le alif de اِصْطَفَىٰ (partie du mot) reste, mais le أَ de أَتُحَاجُّونَ
+// (particule interrogative) est retiré.
+const KEEP_PREFIX = new Set(['det', 'neg']);
+
+/** Forme du mot pour le lexique : sa forme coranique exacte MOINS les
+ *  particules attachées en tête (voir KEEP_PREFIX). */
+export function stripLeadingParticles(m: WordMorphology): string {
+  let out = m.form;
+  for (const p of m.prefixes ?? []) {
+    if (KEEP_PREFIX.has(p.type)) break; // on garde l'article/négation ET ce qui suit
+    if (out.startsWith(p.form)) out = out.slice(p.form.length);
+  }
+  // Diacritique orpheline laissée en tête après retrait d'un préfixe.
+  out = out.replace(/^[ً-ٰٕ]+/, '');
+  return out || m.form;
+}
+
 export interface RootEntry {
   lemmas: string[];
   count: number;
