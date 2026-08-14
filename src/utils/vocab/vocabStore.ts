@@ -25,6 +25,11 @@ export interface VocabEntry {
   lastReviewed?: string;
   seen: number;
   correct: number;
+  // Doublons de SENS fusionnés (même racine, même sens) : formes qu'on NE LISTE
+  // PAS séparément — on garde le verbe — mais qu'on surligne QUAND MÊME en
+  // lecture/hifz. Portés par l'entrée conservée (ex. أَعْرَضَ porte مُعْرِض).
+  aliasLemmas?: string[]; // lemmes des formes fusionnées
+  aliasForms?: string[]; // formes nues des formes fusionnées sans lemme
 }
 
 const PREFIX = 'almuraja3a:vocab:';
@@ -91,6 +96,10 @@ export function lexiconMatchSets(): LexiconMatch {
   for (const e of getVocab()) {
     if (e.lemma) lemmas.add(e.lemma.normalize('NFC'));
     else forms.add(bareForm(e.arabic)); // plus de repli par RACINE
+    // Alias (doublons de sens fusionnés) : surlignés en lecture/hifz au même
+    // titre que le mot conservé, bien qu'ils ne soient pas listés séparément.
+    for (const l of e.aliasLemmas ?? []) lemmas.add(l.normalize('NFC'));
+    for (const f of e.aliasForms ?? []) forms.add(bareForm(f));
   }
   return { lemmas, forms };
 }
@@ -204,7 +213,20 @@ export function getVocabEntry(
   arabic: string
 ): VocabEntry | null {
   const id = anchorOf(lemma, root, arabic);
-  return getVocab().find((e) => e.id === id) ?? null;
+  const list = getVocab();
+  const direct = list.find((e) => e.id === id);
+  if (direct) return direct;
+  // Résolution par ALIAS : une forme fusionnée (doublon de sens) renvoie
+  // l'entrée conservée (le verbe), pour éviter de re-créer le doublon.
+  const nl = lemma ? lemma.normalize('NFC') : undefined;
+  const bf = bareForm(arabic);
+  return (
+    list.find(
+      (e) =>
+        (nl && e.aliasLemmas?.some((l) => l.normalize('NFC') === nl)) ||
+        e.aliasForms?.some((f) => bareForm(f) === bf)
+    ) ?? null
+  );
 }
 
 export function updateVocab(id: string, patch: Partial<VocabEntry>): void {
