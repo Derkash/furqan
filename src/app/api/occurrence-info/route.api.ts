@@ -54,7 +54,7 @@ async function getHamidullah(): Promise<Record<string, string>> {
 
 const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE d'OCCURRENCES (un mot dans un verset précis). Pour CHAQUE occurrence, renvoie :
 - key : la clé fournie, inchangée.
-- gloss : la traduction française CONCRÈTE du MOT dans le sens qu'il a DANS CE VERSET précis (le sens peut varier d'un verset à l'autre), courte (1 à 6 mots), registre usuel (style Abdel-Nour). RÈGLES : (1) NE JAMAIS inclure une NÉGATION (« ne… pas », « sans ») si elle vient d'un mot SÉPARÉ du verset (ألا, لا, لم, ما, لن, غير…) — traduis le mot en forme AFFIRMATIVE ; (2) n'inclure que ce qui est réellement dans le mot (un pronom/particule COLLÉ peut être rendu, ex. رزقناهم = « Nous les avons pourvus »).
+- gloss : la traduction française CONCRÈTE du MOT dans le sens qu'il a DANS CE VERSET précis (le sens peut varier d'un verset à l'autre), courte (1 à 6 mots), registre usuel (style Abdel-Nour). RÈGLE : traduis UNIQUEMENT le sens porté par le MOT lui-même (racine + schème + clitiques COLLÉS comme un pronom, ex. رزقناهم = « Nous les avons pourvus »). N'inclus JAMAIS le sens d'un élément EXTÉRIEUR au mot, qu'il vienne d'un autre mot du verset ou d'une particule de tête : négation (لا, ما, ألا…), interrogation (أ, هل…), emphase/tawkid (إنّ, قد, لام التوكيد, nūn de tawkid…), conjonction (و, ف), préposition (بِ, كَ, لِ), futur (سَ)… Donne le mot en forme neutre et affirmative.
 - note : UNE phrase courte sur ce que la forme/le wazn apporte au sens (ex. « forme X : demander l'action → demander pardon » ; passif, participe…). Concret.
 Réponds uniquement via le format structuré.`;
 
