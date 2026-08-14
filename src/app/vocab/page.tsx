@@ -11,6 +11,7 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import ReviewTab from '@/components/vocab/ReviewTab';
+import MatchGame from '@/components/vocab/MatchGame';
 import { getRootFirstPage } from '@/utils/vocab/morphology';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
 import { MODE_LABELS } from '@/utils/exercises/rangeToPages';
@@ -34,7 +35,7 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
-type Mode = 'review' | 'capture' | 'list';
+type Mode = 'review' | 'match' | 'capture' | 'list';
 
 export default function VocabPage() {
   // Le vocabulaire est PERSONNEL : accès réservé aux comptes connectés.
@@ -96,6 +97,7 @@ function VocabPageInner() {
 
   const tabs: { id: Mode; label: string }[] = [
     { id: 'review', label: '🔁 Réviser' },
+    { id: 'match', label: '🎯 Associer' },
     { id: 'capture', label: '➕ Enregistrer' },
     { id: 'list', label: '📚 Lexique' },
   ];
@@ -156,6 +158,11 @@ function VocabPageInner() {
       {/* Contenu — se recale quand la plage change */}
       <div key={rangeKey} className="flex-1 min-h-0 flex flex-col">
         {mode === 'review' && <ReviewTab onEmpty={() => setMode('capture')} />}
+        {mode === 'match' && (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <MatchGame />
+          </div>
+        )}
         {mode === 'capture' && <ReadMode />}
         {mode === 'list' && <ListMode />}
       </div>

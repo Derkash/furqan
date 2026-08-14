@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <script>
+        window.FontAwesomeConfig = {
+          autoReplaceSvg: 'nest'
+        };
+      </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Al-Muraja3a — Exercice Vocabulaire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        arabic: ['Amiri', 'serif']
+                    },
+                    colors: {
+                        deepGreen: '#0B241E',
+                        cream: '#FAF9F6',
+                        gold: '#C5A059',
+                        darkText: '#0B241E',
+                        cardBg: '#FFFFFF',
+                        accentGreen: '#EBF2F0',
+                        success: '#10B981'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .progress-dot { width: 32px; height: 6px; border-radius: 99px; transition: all 0.3s; }
+        .word-card { transition: all 0.2s; cursor: pointer; }
+        .word-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .word-card.active { border-color: #0B241E; background-color: #EBF2F0; }
+        .arabic-card { transition: all 0.2s; cursor: pointer; border: 1.5px solid #0B241E; }
+        .arabic-card:hover { background-color: #EBF2F0; }
+    </style>
+</head>
+<body class="bg-[#FAF9F6] text-darkText font-sans min-h-[900px] flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-deepGreen text-white px-8 py-4 flex justify-between items-center shadow-lg">
+        <a href="Accueil__desktop.html" class="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center hover:bg-white/10 transition-all">
+            <i class="ph ph-caret-left text-xl"></i>
+        </a>
+        
+        <div class="flex flex-col items-center">
+            <div class="font-serif text-2xl italic leading-none">ع</div>
+            <div class="text-[10px] font-bold tracking-[0.3em] uppercase mt-1">Muraja3a</div>
+        </div>
+
+        <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10 transition-all text-sm font-medium">
+            <i class="ph ph-sign-out"></i>
+            Quitter
+        </button>
+    </header>
+
+    <!-- Content Area -->
+    <main class="flex-1 max-w-[1200px] mx-auto w-full px-8 py-10">
+        
+        <!-- Stats Bar -->
+        <div class="flex justify-between items-center mb-12">
+            <!-- Score -->
+            <div class="bg-white rounded-2xl p-4 flex items-center gap-4 border border-darkText/5 shadow-sm min-w-[140px]">
+                <div class="w-10 h-10 rounded-full bg-cream flex items-center justify-center text-gold">
+                    <i class="ph-fill ph-star text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold text-darkText/40 uppercase tracking-widest">Score</p>
+                    <p class="text-xl font-bold">210</p>
+                </div>
+            </div>
+
+            <!-- Instruction & Progress -->
+            <div class="flex flex-col items-center gap-6">
+                <h2 class="text-xl font-bold text-center">Associe chaque mot en français avec sa traduction en arabe</h2>
+                <div class="flex gap-1.5">
+                    <div class="progress-dot bg-deepGreen"></div>
+                    <div class="progress-dot bg-deepGreen"></div>
+                    <div class="progress-dot bg-deepGreen"></div>
+                    <div class="progress-dot bg-deepGreen"></div>
+                    <div class="progress-dot bg-deepGreen"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                    <div class="progress-dot bg-darkText/10"></div>
+                </div>
+            </div>
+
+            <!-- Attempts -->
+            <div class="bg-white rounded-2xl p-4 flex items-center gap-4 border border-darkText/5 shadow-sm min-w-[140px]">
+                <div>
+                    <p class="text-[10px] font-bold text-darkText/40 uppercase tracking-widest text-right">Essais</p>
+                    <p class="text-xl font-bold text-right">4/10</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-cream flex items-center justify-center text-deepGreen">
+                    <i class="ph ph-target text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Word Grid -->
+        <div class="grid grid-cols-6 gap-4 mb-16">
+            <!-- Row 1 -->
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">une récompense</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">chercher secours</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">se trouvent seuls</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">se sacrifie</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">s’est détourné</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">contraint</div>
+            <!-- Row 2 -->
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">volte-face</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">s’est enflé</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">âge moyen</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">prolongé en vie</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">favorise-nous</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">écarter du feu</div>
+            <!-- Row 3 -->
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">les plus attachés</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">quel mauvais</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">une orientation</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">expression malhonnête</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">a agi follement</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">il revient</div>
+            <!-- Row 4 -->
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">il bascule</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">se précipitent</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">se cachent</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">se lamentaient</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">groupe</div>
+            <div class="word-card bg-white rounded-xl border border-darkText/5 p-5 text-center text-sm font-medium shadow-sm">mécréants</div>
+        </div>
+
+        <!-- Choice Area -->
+        <div class="flex flex-col items-center gap-8">
+            <p class="text-darkText/60 font-medium italic">Clique d’abord sur un mot en arabe, puis sur sa traduction en français</p>
+            
+            <div class="grid grid-cols-4 gap-6 w-full max-w-[1000px]">
+                <!-- Card 1 -->
+                <div class="relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-deepGreen text-white rounded-full flex items-center justify-center text-[10px] font-bold z-10">1</div>
+                    <div class="arabic-card bg-white rounded-[24px] aspect-video flex items-center justify-center shadow-sm">
+                        <span class="font-arabic text-4xl leading-relaxed">أُضْطُرَّ</span>
+                    </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-deepGreen text-white rounded-full flex items-center justify-center text-[10px] font-bold z-10">2</div>
+                    <div class="arabic-card bg-white rounded-[24px] aspect-video flex items-center justify-center shadow-sm">
+                        <span class="font-arabic text-4xl leading-relaxed">يَشْرِي</span>
+                    </div>
+                </div>
+                <!-- Card 3 -->
+                <div class="relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-deepGreen text-white rounded-full flex items-center justify-center text-[10px] font-bold z-10">3</div>
+                    <div class="arabic-card bg-white rounded-[24px] aspect-video flex items-center justify-center shadow-sm">
+                        <span class="font-arabic text-4xl leading-relaxed">وَاسْتَعِينُوا</span>
+                    </div>
+                </div>
+                <!-- Card 4 -->
+                <div class="relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-deepGreen text-white rounded-full flex items-center justify-center text-[10px] font-bold z-10">4</div>
+                    <div class="arabic-card bg-white rounded-[24px] aspect-video flex items-center justify-center shadow-sm">
+                        <span class="font-arabic text-4xl leading-relaxed text-right">خَلَوْا</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white/50 backdrop-blur-sm border-t border-darkText/5 p-6 flex justify-between items-center sticky bottom-0">
+        <button class="flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-darkText/10 hover:bg-accentGreen transition-all font-bold text-sm shadow-sm">
+            <i class="ph ph-lightbulb"></i>
+            Aide
+        </button>
+
+        <p class="text-sm font-medium text-darkText/40">Associe tous les mots pour continuer</p>
+
+        <button disabled class="bg-darkText/10 text-darkText/30 px-10 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 cursor-not-allowed">
+            <i class="ph ph-check"></i>
+            Vérifier
+        </button>
+    </footer>
+
+</body>
+</html>
