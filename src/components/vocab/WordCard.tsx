@@ -10,6 +10,7 @@ import {
   type WordMorphology,
 } from '@/utils/vocab/morphology';
 import { addVocab, getVocabEntry, removeVocab, type VocabEntry } from '@/utils/vocab/vocabStore';
+import { getCachedAnalysis, setCachedAnalysis } from '@/utils/vocab/glossCache';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 
@@ -67,13 +68,15 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       setLoadingMorph(false);
       if (!m) return;
 
-      // Déjà dans le lexique → on réutilise l'analyse stockée, AUCUN appel API.
+      // Déjà dans le lexique (ou alias d'un doublon de sens) → on affiche la
+      // traduction STOCKÉE, AUCUN appel réseau. Le gloss suffit : les entrées
+      // nettoyées n'ont pas toujours de baseForm/nahw.
       const existing = getVocabEntry(m.lemma, m.root, m.form);
       setAlready(!!existing);
       setExistingId(existing?.id ?? null);
-      if (existing && existing.baseForm) {
+      if (existing) {
         setAnalysis({
-          baseForm: existing.baseForm,
+          baseForm: existing.baseForm || '',
           baseFormType: existing.baseFormType || '',
           frenchGloss: existing.gloss,
           nahw: existing.nahw || '',
@@ -84,7 +87,23 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
         return;
       }
 
-      // Analyse rédactionnelle (forme de base + gloss + nahw) via l'API.
+      // Hors lexique : cache LOCAL d'abord (dispo hors ligne), API en dernier.
+      const cacheKey = `${verseKey}:${position}`;
+      const cached = getCachedAnalysis(cacheKey);
+      if (cached) {
+        setAnalysis({
+          baseForm: cached.baseForm || '',
+          baseFormType: cached.baseFormType || '',
+          frenchGloss: cached.frenchGloss || '',
+          nahw: cached.nahw || '',
+          llm: true,
+          stored: true,
+        });
+        setGloss(cached.frenchGloss || '');
+        return;
+      }
+
+      // Analyse rédactionnelle (forme de base + gloss + nahw) via l'API (en ligne).
       setLoadingLLM(true);
       const verseText = await getVerseText(verseKey).catch(() => '');
       if (id !== reqId.current) return;
@@ -110,6 +129,12 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
         if (res.ok && data.baseForm) {
           setAnalysis(data);
           setGloss(data.frenchGloss || '');
+          setCachedAnalysis(cacheKey, {
+            baseForm: data.baseForm,
+            baseFormType: data.baseFormType,
+            frenchGloss: data.frenchGloss,
+            nahw: data.nahw,
+          });
         }
       } catch {
         /* réseau — on garde la morphologie seule */

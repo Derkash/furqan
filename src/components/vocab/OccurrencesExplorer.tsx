@@ -9,6 +9,8 @@ import {
   type RootOccurrence,
 } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { getCachedOccInfo, setCachedOccInfoBulk } from '@/utils/vocab/glossCache';
+import { highlightFrench } from '@/utils/vocab/frHighlight';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
 import { loadSharedRange } from '@/utils/exercises/sharedRange';
@@ -100,26 +102,36 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         keys.map(async (vk) => [vk, await getVerseWords(vk)] as const)
       );
       if (!cancelled) setVerseWords(Object.fromEntries(entries));
-      // Info par forme/wazn : traduction de la forme + mini-explication.
-      // Clés ASCII (k0, k1…) car Claude ne réécrit pas l'arabe à l'identique.
-      try {
-        const synth = new Map<string, string>(); // infoKey (arabe) -> clé ASCII
-        const items = [];
-        for (const o of res) {
-          const ik = infoKey(o);
-          if (synth.has(ik)) continue;
-          const sk = `k${synth.size}`;
-          synth.set(ik, sk);
-          items.push({
-            key: sk,
-            form: o.morph?.form,
-            root: o.morph?.root,
-            verbForm: o.morph?.verbForm,
-            pos: o.morph?.pos,
-            verseKey: o.verseKey,
-            position: o.word,
-          });
+      // Info par occurrence : traduction contextuelle + mini-explication.
+      // 1) On lit d'abord le CACHE LOCAL (dispo hors ligne) ; 2) on ne demande à
+      // l'API que les occurrences non encore connues ; 3) on met le cache à jour.
+      const cached: Record<string, { gloss: string; note: string }> = {};
+      const synth = new Map<string, string>(); // infoKey (arabe) -> clé ASCII
+      const items = [];
+      for (const o of res) {
+        const ik = infoKey(o);
+        if (synth.has(ik)) continue;
+        synth.set(ik, `k${synth.size}`);
+        const hit = getCachedOccInfo(ik);
+        if (hit) {
+          cached[ik] = hit;
+          continue; // déjà connu → pas de requête
         }
+        items.push({
+          key: synth.get(ik)!,
+          form: o.morph?.form,
+          root: o.morph?.root,
+          verbForm: o.morph?.verbForm,
+          pos: o.morph?.pos,
+          verseKey: o.verseKey,
+          position: o.word,
+        });
+      }
+      if (!cancelled && Object.keys(cached).length) {
+        setInfo((prev) => ({ ...prev, ...cached }));
+      }
+      if (items.length === 0) return; // tout en cache → rien à charger
+      try {
         const r = await fetch(apiUrl('/api/occurrence-info'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -129,10 +141,11 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         if (!cancelled && data?.info) {
           const remapped: Record<string, { gloss: string; note: string }> = {};
           for (const [ik, sk] of synth) if (data.info[sk]) remapped[ik] = data.info[sk];
-          setInfo(remapped);
+          setInfo((prev) => ({ ...prev, ...remapped }));
+          setCachedOccInfoBulk(remapped); // persiste pour l'hors-ligne
         }
       } catch {
-        /* réseau — on garde le sens de base */
+        /* réseau — on garde le sens de base (et le cache déjà chargé) */
       }
     });
     return () => {
@@ -289,15 +302,31 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
                     {!verseWords[o.verseKey] && (o.morph?.form ?? '')}
                   </p>
 
-                  {/* Traduction Hamidullah du verset (contexte) */}
+                  {/* Traduction Hamidullah du verset (contexte) — le mot ciblé
+                      surligné comme dans le verset arabe (repérage par radical). */}
                   {trans?.[o.verseKey] && (
-                    <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">{trans[o.verseKey]}</p>
+                    <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
+                      {highlightFrench(trans[o.verseKey], occGloss || gloss || '').map((seg, i) =>
+                        seg.hit ? (
+                          <mark
+                            key={i}
+                            className="bg-[var(--ds-gold)]/45 text-[var(--ds-green)] rounded px-0.5 font-semibold"
+                          >
+                            {seg.t}
+                          </mark>
+                        ) : (
+                          <span key={i}>{seg.t}</span>
+                        )
+                      )}
+                    </p>
                   )}
 
                   {/* Traduction DE CETTE forme (en gras) + mini-explication du wazn */}
-                  <p className="text-[12px] text-[var(--ds-green)] mt-1">
-                    → <span className="font-bold">{occGloss || gloss || '…'}</span>
-                  </p>
+                  {(occGloss || gloss) && (
+                    <p className="text-[12px] text-[var(--ds-green)] mt-1">
+                      → <span className="font-bold">{occGloss || gloss}</span>
+                    </p>
+                  )}
                   {inf?.note && (
                     <p className="text-[11px] text-gray-500 italic mt-0.5">{inf.note}</p>
                   )}
