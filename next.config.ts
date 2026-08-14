@@ -28,7 +28,24 @@ const nextConfig: NextConfig = {
         // serve les URL profondes (/exercises/…) depuis le système de fichiers.
         trailingSlash: true,
       }
-    : {}),
+    : {
+        // CORS des API routes : l'app Capacitor (origine https://localhost)
+        // appelle https://almuraja3a.com/api/* en cross-origin. Sans ces
+        // en-têtes, la WebView bloque la réponse (fetch rejeté) → les traductions
+        // /explications de mots n'arrivaient jamais sur l'appareil.
+        async headers() {
+          return [
+            {
+              source: "/api/:path*",
+              headers: [
+                { key: "Access-Control-Allow-Origin", value: "*" },
+                { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
+                { key: "Access-Control-Allow-Headers", value: "Content-Type" },
+              ],
+            },
+          ];
+        },
+      }),
 };
 
 export default nextConfig;
