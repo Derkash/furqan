@@ -114,7 +114,8 @@ On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, n
   • Reste fidèle à la manière dont HAMIDULLAH rend ce mot dans le verset fourni (aligne-toi sur son vocabulaire quand c'est ce mot précis qui est traduit).
   • Donne le sens du registre d'un dictionnaire arabe-français usuel comme l'ABDEL-NOUR (Abd An-Nour) : le mot courant, concret, celui qu'on emploie vraiment — PAS une traduction théorique, littérale ou étymologique.
   • Ex. préfère « semer la corruption / corrompre » à « détériorer » ; « craindre » à « appréhender par révérence ». Pas de calque morphologique.
-  • NE JAMAIS inclure une NÉGATION (« ne… pas », « sans ») si elle vient d'un mot SÉPARÉ du verset (ألا, لا, لم, ما, لن…) — donne le mot en forme AFFIRMATIVE.
+  • NE JAMAIS inclure une NÉGATION (« ne… pas », « sans ») si elle vient d'un mot SÉPARÉ du verset (ألا, لا, لم, ما, لن…) — donne le mot en forme AFFIRMATIVE. Ex : pour تَعُولُوا dans « أَلَّا تَعُولُوا », donne « être injuste / avoir trop de charges » (JAMAIS « ne pas être injuste »).
+  • NE JAMAIS rendre le sens des PARTICULES attachées en tête (و = « et », ف = « alors », بِ/كَ/لِ = « par/comme/pour », أَ/ءَ = « est-ce que », سَ = « futur »…) : traduis le MOT SEUL, sans ces particules.
 - nahw : UNE à DEUX phrases en français expliquant la forme fléchie telle qu'elle apparaît dans le verset — temps/mode, personne, et surtout les préfixes/particules (ex. « précédé de لا nāhiya, d'où le مجزوم », « و de coordination », « article défini », préposition attachée…). Concret et pédagogique, sans jargon inutile.
 
 Réponds uniquement via le format structuré demandé.`;
