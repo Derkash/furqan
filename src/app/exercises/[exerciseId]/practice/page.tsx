@@ -13,6 +13,7 @@ import { getExerciseDefinition, isValidExerciseId } from '@/utils/exercises/exer
 import MushafDoublePage from '@/components/MushafDoublePage';
 import RecitationPractice from '@/components/exercises/RecitationPractice';
 import LecturePractice from '@/components/exercises/LecturePractice';
+import WordCard from '@/components/vocab/WordCard';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
@@ -423,6 +424,13 @@ function MushafPractice() {
   const { data: quranUnits } = useQuranUnits();
   // popover = verset ouvert + côté du panneau (moitié OPPOSÉE à la page du verset).
   const [popover, setPopover] = useState<{ verseKey: string; side: 'left' | 'right' } | null>(null);
+  // Fiche MOT (traduction + occurrences), ouverte au tap d'un mot du lexique —
+  // comme en Lecture. side = moitié d'écran où l'ancrer.
+  const [selected, setSelected] = useState<{
+    verseKey: string;
+    position: number;
+    side: 'left' | 'right';
+  } | null>(null);
 
   // Tafsir français (Al-Mukhtasar) + sabab an-nuzûl du verset ouvert,
   // avec synthèse vocale française pour chaque section.
@@ -519,6 +527,25 @@ function MushafPractice() {
         else next.set(key, { verseKey, position: pos, page });
         return next;
       });
+      return;
+    }
+
+    // Mot du lexique surligné (hors marqueur de fin de verset) → fiche MOT
+    // (traduction stockée + occurrences), comme en Lecture. Priorité au popover
+    // de verset. Uniquement quand le surlignage lexique est visible.
+    const lexOn = showLexicon && !showThemes;
+    const pos = Number(el?.getAttribute('data-pos'));
+    const isMarker = el?.classList.contains('ayah-marker');
+    if (
+      lexOn &&
+      verseKey &&
+      !isMarker &&
+      Number.isFinite(pos) &&
+      lexiconMarks.get(`${verseKey}#${pos}`) === 'lexicon'
+    ) {
+      const page = Number(el?.getAttribute('data-page'));
+      setPopover(null);
+      setSelected({ verseKey, position: pos, side: page % 2 === 1 ? 'left' : 'right' });
       return;
     }
 
@@ -1324,6 +1351,22 @@ function MushafPractice() {
             </button>
           </>
         )}
+
+      {/* Fiche MOT du lexique (traduction stockée + occurrences), comme en Lecture. */}
+      {isHifz && selected && (
+        <WordCard
+          verseKey={selected.verseKey}
+          position={selected.position}
+          side={selected.side}
+          variant="sheet"
+          onClose={() => setSelected(null)}
+          onAdded={() => setLexicon(lexiconMatchSets())}
+          onRemoved={() => {
+            setLexicon(lexiconMatchSets()); // le mot retiré n'est plus surligné
+            setSelected(null);
+          }}
+        />
+      )}
 
       {isHifz && popover && (() => {
         const [sNum, aNum] = popover.verseKey.split(':').map(Number);
