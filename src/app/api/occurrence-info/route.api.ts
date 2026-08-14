@@ -52,10 +52,10 @@ async function getHamidullah(): Promise<Record<string, string>> {
   return hamidullah ?? {};
 }
 
-const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE de formes fléchies d'une même racine (rencontrées dans des versets). Pour CHAQUE forme, renvoie :
+const SYSTEM = `Tu aides un francophone à mémoriser le vocabulaire coranique. On te donne une LISTE d'OCCURRENCES (un mot dans un verset précis). Pour CHAQUE occurrence, renvoie :
 - key : la clé fournie, inchangée.
-- gloss : la traduction française CONCRÈTE de CETTE forme précise (pas de la racine), courte (1 à 6 mots), au registre usuel (style dictionnaire Abdel-Nour), fidèle au sens dans le verset fourni.
-- note : UNE phrase courte expliquant ce que la forme/le wazn apporte au sens (ex. « forme X : demander l'action → demander pardon » ; « forme IV, factitif : rendre corrompu » ; passif, participe, etc.). Concret, pas de jargon inutile.
+- gloss : la traduction française CONCRÈTE du MOT dans le sens qu'il a DANS CE VERSET précis (le sens peut varier d'un verset à l'autre), courte (1 à 6 mots), registre usuel (style Abdel-Nour). RÈGLES : (1) NE JAMAIS inclure une NÉGATION (« ne… pas », « sans ») si elle vient d'un mot SÉPARÉ du verset (ألا, لا, لم, ما, لن, غير…) — traduis le mot en forme AFFIRMATIVE ; (2) n'inclure que ce qui est réellement dans le mot (un pronom/particule COLLÉ peut être rendu, ex. رزقناهم = « Nous les avons pourvus »).
+- note : UNE phrase courte sur ce que la forme/le wazn apporte au sens (ex. « forme X : demander l'action → demander pardon » ; passif, participe…). Concret.
 Réponds uniquement via le format structuré.`;
 
 const SCHEMA = {

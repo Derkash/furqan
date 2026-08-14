@@ -32,9 +32,10 @@ interface Props {
   embedded?: boolean;
 }
 
-/** Clé d'info par forme/wazn : le lemme (chaque dérivation = un sens). */
+/** Clé d'info PAR OCCURRENCE (verset:mot) : le sens d'un mot varie d'un verset
+ *  à l'autre, donc chaque occurrence reçoit sa propre traduction contextuelle. */
 function infoKey(o: RootOccurrence): string {
-  return o.morph?.lemma || o.morph?.form || `${o.verseKey}:${o.word}`;
+  return `${o.verseKey}:${o.word}`;
 }
 
 /** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
