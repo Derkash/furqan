@@ -113,9 +113,11 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         if (synth.has(ik)) continue;
         synth.set(ik, `k${synth.size}`);
         const hit = getCachedOccInfo(ik);
-        if (hit) {
+        // On ne réutilise le cache que s'il porte déjà un frSpan (chaîne) : les
+        // vieilles entrées cachées avant l'ajout de frSpan sont re-demandées.
+        if (hit && typeof hit.frSpan === 'string') {
           cached[ik] = hit;
-          continue; // déjà connu → pas de requête
+          continue;
         }
         items.push({
           key: synth.get(ik)!,
@@ -142,7 +144,13 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
           const remapped: Record<string, { gloss: string; frSpan: string; note: string }> = {};
           for (const [ik, sk] of synth) if (data.info[sk]) remapped[ik] = data.info[sk];
           setInfo((prev) => ({ ...prev, ...remapped }));
-          setCachedOccInfoBulk(remapped); // persiste pour l'hors-ligne
+          // On ne persiste que les réponses portant un frSpan (chaîne), pour ne
+          // pas empoisonner le cache avec des entrées d'une ancienne API.
+          const toCache: Record<string, { gloss: string; frSpan: string; note: string }> = {};
+          for (const [ik, v] of Object.entries(remapped)) {
+            if (typeof v.frSpan === 'string') toCache[ik] = v;
+          }
+          setCachedOccInfoBulk(toCache);
         }
       } catch {
         /* réseau — on garde le sens de base (et le cache déjà chargé) */
