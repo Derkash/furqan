@@ -40,7 +40,7 @@ function writeMap<T>(key: string, map: Record<string, Timed<T>>, cap: number): v
 }
 
 const ANALYZE_KEY = 'almuraja3a:cache:wordanalyze:v1';
-const OCC_KEY = 'almuraja3a:cache:occinfo:v4'; // v4 : frSpan quasi toujours rempli
+const OCC_KEY = 'almuraja3a:cache:occinfo:v5'; // v5 : lots découpés (plus de troncature)
 const CAP = 4000;
 
 // ---- Analyse d'un mot (WordCard hors lexique) ----

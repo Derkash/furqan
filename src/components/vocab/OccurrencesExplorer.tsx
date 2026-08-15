@@ -113,9 +113,10 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
         if (synth.has(ik)) continue;
         synth.set(ik, `k${synth.size}`);
         const hit = getCachedOccInfo(ik);
-        // On ne réutilise le cache que s'il porte déjà un frSpan (chaîne) : les
-        // vieilles entrées cachées avant l'ajout de frSpan sont re-demandées.
-        if (hit && typeof hit.frSpan === 'string') {
+        // On ne réutilise le cache que s'il porte une info EXPLOITABLE (frSpan ou
+        // gloss). Les entrées vides (mises en cache lors d'une réponse tronquée)
+        // sont re-demandées.
+        if (hit && (hit.frSpan || hit.gloss)) {
           cached[ik] = hit;
           continue;
         }

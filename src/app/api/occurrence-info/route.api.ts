@@ -81,26 +81,26 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
-async function claudeBatch(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function claudeChunk(
+  client: any,
+  trans: Record<string, string>,
   items: Item[]
 ): Promise<Record<string, { gloss: string; frSpan: string; note: string }>> {
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const trans = await getHamidullah();
   const lines = items.map((it) => {
     const t = it.verseKey ? trans[it.verseKey] : undefined;
     return `- key=${it.key} | forme=${it.form ?? ''} | racine=${it.root ?? ''} | wazn=${it.verbForm ?? ''} | nature=${it.pos ?? ''}${
       t ? ` | verset: ${t}` : ''
     }`;
   });
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const msg = await client.messages.create({
     model: 'claude-haiku-4-5',
-    max_tokens: 3500,
+    max_tokens: 2000,
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: lines.join('\n') }],
   });
-  const block = msg.content.find((b) => b.type === 'text');
+  const block = msg.content.find((b: { type: string }) => b.type === 'text');
   const out: Record<string, { gloss: string; frSpan: string; note: string }> = {};
   if (block && block.type === 'text') {
     const parsed = JSON.parse(block.text);
@@ -108,6 +108,26 @@ async function claudeBatch(
       if (r.key) out[r.key] = { gloss: r.gloss ?? '', frSpan: r.frSpan ?? '', note: r.note ?? '' };
     }
   }
+  return out;
+}
+
+// Découpe en PETITS lots : une racine fréquente (ex. عرض, ~79 occurrences) en un
+// seul appel dépasse max_tokens → JSON tronqué → occurrences sans traduction.
+// Des lots de 15 tiennent largement dans la réponse et partent en parallèle.
+async function claudeBatch(
+  items: Item[]
+): Promise<Record<string, { gloss: string; frSpan: string; note: string }>> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const trans = await getHamidullah();
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const CHUNK = 15;
+  const chunks: Item[][] = [];
+  for (let i = 0; i < items.length; i += CHUNK) chunks.push(items.slice(i, i + CHUNK));
+  const parts = await Promise.all(
+    chunks.map((c) => claudeChunk(client, trans, c).catch(() => ({})))
+  );
+  const out: Record<string, { gloss: string; frSpan: string; note: string }> = {};
+  for (const p of parts) Object.assign(out, p);
   return out;
 }
 
