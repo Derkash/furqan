@@ -94,6 +94,15 @@ html.capacitor .app-topbar-safe {
 html.capacitor .ds-page {
   padding-top: env(safe-area-inset-top);
 }
+/* Dans une coque .ds-page (déjà décalée de la zone sûre), les barres ne
+   rajoutent PAS l'inset une seconde fois — sinon double décalage, très
+   visible en portrait (Adkar iPhone : barre verte géante). */
+html.capacitor .ds-page .app-topbar {
+  padding-top: 0.5rem;
+}
+html.capacitor .ds-page .app-topbar-safe {
+  padding-top: 0.375rem;
+}
 
 /* Écran FIXE : jamais de rebond/défilement du document lui-même (sensation
    d'app, pas de page web). Les conteneurs internes gèrent leur propre scroll. */

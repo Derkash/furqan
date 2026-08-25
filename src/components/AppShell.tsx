@@ -141,7 +141,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="hidden md:flex flex-none w-[96px] flex-col items-center border-r border-[var(--ds-divider)] bg-white py-5 h-dvh overflow-y-auto z-40"
+      className="hidden md:flex flex-none w-[96px] flex-col items-center border-r border-[var(--ds-divider)] bg-white py-5 h-full overflow-y-auto z-40"
       style={{ fontFamily: 'var(--ds-font)' }}
     >
       <Link href="/exercises" className="flex flex-col items-center gap-0.5 mb-5">
@@ -262,7 +262,10 @@ export function PracticeShell({ children }: { children: React.ReactNode }) {
           <Sidebar />
         </div>
       )}
-      <div className="flex-1 min-w-0 h-dvh relative overflow-hidden">
+      {/* h-full (PAS h-dvh) : la coque .ds-page a un padding-top de zone sûre
+          en Capacitor — un enfant en h-dvh déborderait d'autant et le BAS de
+          l'écran serait coupé (boutons invisibles en portrait, ex. Adkar). */}
+      <div className="flex-1 min-w-0 h-full relative overflow-hidden">
         <RailToggle hidden={hidden} onToggle={toggle} className="absolute left-0 top-1/2 -translate-y-1/2 hidden md:flex" />
         {children}
       </div>

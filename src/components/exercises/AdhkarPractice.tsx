@@ -262,8 +262,8 @@ export default function AdhkarPractice() {
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex-none px-4 py-3 border-t border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] flex items-center gap-2">
+          {/* Actions — pb : reste au-dessus de la barre home en portrait */}
+          <div className="flex-none px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] flex items-center gap-2">
             <button
               onClick={() => go(-1)}
               disabled={index === 0}
