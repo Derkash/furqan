@@ -4,22 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import LoginCard from '@/components/exercises/LoginCard';
 import AppShell from '@/components/AppShell';
 import {
-  aggregateMistakesByWord,
+  aggregateWordDifficulties,
+  DIFFICULTY_LEVEL_META,
   deleteAccount,
   getCurrentUser,
   loadStats,
   logout,
-  type MistakeType,
   type UserStats,
 } from '@/utils/exercises/userStats';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-
-const TYPE_LABELS: Record<MistakeType, string> = {
-  oubli: 'Oubli',
-  inversion: 'Inversion',
-  harakat: 'Harakat',
-  mot: 'Mot erroné',
-};
 
 // ---------- Rendu du mot fautif avec la vraie police QCF de sa page ----------
 
@@ -195,15 +188,16 @@ export default function DashboardPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const aggregated = useMemo(
-    () => (user && stats ? aggregateMistakesByWord(user) : []),
+    () => (user && stats ? aggregateWordDifficulties(user) : []),
     [user, stats]
   );
 
-  const byType = useMemo(() => {
-    const counts: Record<MistakeType, number> = { oubli: 0, inversion: 0, harakat: 0, mot: 0 };
-    for (const m of stats?.wordMistakes ?? []) counts[m.type]++;
+  // Répartition des mots en difficulté par niveau (1 légère … 4 récurrente).
+  const byLevel = useMemo(() => {
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (const d of aggregated) if (d.level > 0) counts[d.level]++;
     return counts;
-  }, [stats]);
+  }, [aggregated]);
 
   // Séries journalières sur 14 jours : fautes déclarées + taux de réussite.
   const daily = useMemo(() => {
@@ -216,6 +210,7 @@ export default function DashboardPage() {
     }
     const mistakes = new Map<string, number>();
     for (const m of stats?.wordMistakes ?? []) {
+      if (m.type === 'ok') continue; // récitations correctes : pas des fautes
       const k = m.at.slice(0, 10);
       mistakes.set(k, (mistakes.get(k) ?? 0) + 1);
     }
@@ -272,11 +267,11 @@ export default function DashboardPage() {
     );
   }
 
-  const totalMistakes = stats?.wordMistakes.length ?? 0;
+  const totalMistakes = stats?.wordMistakes.filter((m) => m.type !== 'ok').length ?? 0;
   const totalAnswers = stats?.verseResults.length ?? 0;
   const totalFound = stats?.verseResults.filter((r) => r.found).length ?? 0;
   const successRate = totalAnswers > 0 ? Math.round((totalFound / totalAnswers) * 100) : null;
-  const maxType = Math.max(1, ...Object.values(byType));
+  const maxLevelCount = Math.max(1, ...Object.values(byLevel));
 
   return (
     <AppShell>
@@ -371,66 +366,74 @@ export default function DashboardPage() {
             <BarChart data={daily.success} color="#4a7c23" unit="%" fixedMax={100} />
           </SectionCard>
 
-          {/* Répartition par type de faute */}
-          <SectionCard title="Répartition par type de faute">
-            {totalMistakes === 0 ? (
-              <p className="text-sm text-gray-400">Aucune faute déclarée pour l&apos;instant.</p>
+          {/* Répartition des mots en difficulté par niveau */}
+          <SectionCard title="Mots en difficulté par niveau">
+            {aggregated.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucun mot en difficulté pour l&apos;instant.</p>
             ) : (
               <div className="space-y-2">
-                {(Object.keys(TYPE_LABELS) as MistakeType[]).map((t) => (
-                  <div key={t} className="flex items-center gap-2">
-                    <span className="w-24 text-xs font-semibold text-[#1a1a1a]">{TYPE_LABELS[t]}</span>
+                {DIFFICULTY_LEVEL_META.map((t) => (
+                  <div key={t.level} className="flex items-center gap-2">
+                    <span className="w-24 text-xs font-semibold text-[#1a1a1a]">{t.label}</span>
                     <div className="flex-1 h-4 bg-[#fdfaf3] rounded-full overflow-hidden border border-[#c9a959]/20">
                       <div
                         className="h-full rounded-full"
                         style={{
-                          width: `${Math.round((byType[t] / maxType) * 100)}%`,
-                          backgroundColor: '#b45309',
-                          minWidth: byType[t] > 0 ? 8 : 0,
+                          width: `${Math.round((byLevel[t.level] / maxLevelCount) * 100)}%`,
+                          backgroundColor: t.color,
+                          minWidth: byLevel[t.level] > 0 ? 8 : 0,
                         }}
                       />
                     </div>
                     <span className="w-8 text-right text-xs font-bold text-[#2d5016]">
-                      {toArabicNumbers(byType[t])}
+                      {toArabicNumbers(byLevel[t.level])}
                     </span>
                   </div>
                 ))}
+                <p className="text-[10px] text-gray-400 pt-1">
+                  Le niveau monte à chaque faute et redescend à chaque récitation correcte du mot :
+                  il reflète les difficultés RÉCENTES, pas le cumul historique.
+                </p>
               </div>
             )}
           </SectionCard>
 
           {/* Mots à retravailler */}
-          <SectionCard title="Mots à retravailler (les plus fréquents)">
+          <SectionCard title="Mots à retravailler (difficultés les plus fortes)">
             {aggregated.length === 0 ? (
               <p className="text-sm text-gray-400">
-                Déclarez vos fautes dans l&apos;exercice Récitation pour les retrouver ici.
+                Déclarez vos fautes dans les exercices Hifz, Lecture ou Récitation pour les retrouver ici.
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {aggregated.slice(0, 18).map((m) => (
-                  <div
-                    key={`${m.verseKey}#${m.position}`}
-                    className="bg-[#fdfaf3] border border-[#c9a959]/25 rounded-xl px-3 py-2 flex flex-col items-center text-center"
-                  >
-                    <MistakeWordGlyph verseKey={m.verseKey} position={m.position} page={m.page} />
-                    <div className="text-[10px] text-gray-500 mt-1" dir="ltr">
-                      {m.verseKey} • p.{m.page}
-                    </div>
-                    <div className="flex flex-wrap gap-1 justify-center mt-1">
-                      <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5">
-                        ×{toArabicNumbers(m.count)}
-                      </span>
-                      {(Object.keys(m.types) as MistakeType[]).map((t) => (
-                        <span
-                          key={t}
-                          className="text-[10px] text-[#7a5d2c] bg-[#c9a959]/15 border border-[#c9a959]/30 rounded-full px-1.5"
-                        >
-                          {TYPE_LABELS[t]}
+                {aggregated.slice(0, 18).map((m) => {
+                  const levelMeta = DIFFICULTY_LEVEL_META.find((t) => t.level === m.level);
+                  return (
+                    <div
+                      key={`${m.verseKey}#${m.position}`}
+                      className="bg-[#fdfaf3] border border-[#c9a959]/25 rounded-xl px-3 py-2 flex flex-col items-center text-center"
+                      style={{ borderColor: levelMeta ? `${levelMeta.color}55` : undefined }}
+                    >
+                      <MistakeWordGlyph verseKey={m.verseKey} position={m.position} page={m.page} />
+                      <div className="text-[10px] text-gray-500 mt-1" dir="ltr">
+                        {m.verseKey} • p.{m.page}
+                      </div>
+                      <div className="flex flex-wrap gap-1 justify-center mt-1">
+                        {levelMeta && (
+                          <span
+                            className="text-[10px] font-bold rounded-full px-1.5 text-white"
+                            style={{ backgroundColor: levelMeta.color }}
+                          >
+                            {levelMeta.label}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5">
+                          ×{toArabicNumbers(m.faults)}
                         </span>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </SectionCard>

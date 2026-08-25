@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair, VersePosition } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
+import { useOrientation } from '@/hooks/useOrientation';
 import { getAudioUrl, fromGlobalAyahNumber, SURAH_START_AYAH, TOTAL_AYAHS } from '@/utils/ayahMapping';
 import { getVerseRoots, getVersePageMap } from '@/utils/vocab/morphology';
 import { lexiconMatchSets, matchesLexicon, type LexiconMatch } from '@/utils/vocab/vocabStore';
@@ -28,10 +29,9 @@ import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { useTafsirGroups } from '@/hooks/exercises/useTafsirGroups';
 import {
   getCurrentUser,
-  getMistakeWordMarks,
+  creditRecitedVerses,
+  getWordDifficultyMarks,
   recordWordMistakes,
-  MISTAKE_TYPE_META,
-  type MistakeType,
 } from '@/utils/exercises/userStats';
 import { playBeep } from '@/utils/beep';
 import MushafDoublePage from '@/components/MushafDoublePage';
@@ -170,7 +170,7 @@ export default function LecturePractice() {
   // Saisie des fautes (comme en Hifz) : mode marquage + sélection + fautes persistées.
   const [markingMode, setMarkingMode] = useState(false);
   const [selWords, setSelWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
-  const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
+  const [mistakeWords, setMistakeWords] = useState<Map<string, string>>(new Map());
   const [showMistakes, setShowMistakes] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showMistakes ?? true);
   const [selected, setSelected] = useState<{ verseKey: string; position: number; side: 'left' | 'right'; page: number } | null>(null);
   const [showTrans, setShowTrans] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.showTrans ?? false);
@@ -262,12 +262,35 @@ export default function LecturePractice() {
   const canPrev = pair.rightPage > 1;
   const canNext = pair.rightPage < 603;
 
+  // ---- Crédit de lecture : quitter une double page vers l'AVANT après un
+  // temps de lecture minimal = « versets récités ». Les mots en difficulté de
+  // ces versets, sans nouvelle faute cette session, reçoivent un 'ok' (score −1).
+  const MIN_READ_MS = 8000; // filtre les feuilletages rapides (navigation)
+  const pairShownAt = useRef(Date.now());
+  const creditedVerses = useRef<Set<string>>(new Set()); // 1 crédit max / verset / session
+  const sessionFaultKeys = useRef<Set<string>>(new Set()); // fautes déclarées cette session
+  useEffect(() => {
+    pairShownAt.current = Date.now();
+  }, [pair.rightPage]);
+  const creditCurrentPair = () => {
+    if (Date.now() - pairShownAt.current < MIN_READ_MS) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    const keys = [...(right?.verses ?? []), ...(left?.verses ?? [])]
+      .map((v) => v.verseKey)
+      .filter((k) => !creditedVerses.current.has(k));
+    if (keys.length === 0) return;
+    const credited = creditRecitedVerses(user, keys, sessionFaultKeys.current);
+    for (const k of keys) creditedVerses.current.add(k);
+    if (credited > 0) setMistakeWords(getWordDifficultyMarks(user));
+  };
+
   /* eslint-disable react-hooks/set-state-in-effect */
   // Racines du lexique (rechargeable après ajout d'un mot).
   useEffect(() => {
     setLexicon(lexiconMatchSets());
     setLpConfig(loadLongPressConfig());
-    setMistakeWords(getMistakeWordMarks(getCurrentUser()));
+    setMistakeWords(getWordDifficultyMarks(getCurrentUser()));
   }, []);
 
   // Persiste les réglages d'appui long.
@@ -919,6 +942,7 @@ export default function LecturePractice() {
 
   function flip(dir: 'prev' | 'next') {
     hapticLight();
+    if (dir === 'next') creditCurrentPair();
     stop();
     setSelected(null);
     setVerseMenu(null);
@@ -1175,7 +1199,9 @@ export default function LecturePractice() {
     setLexicon(lexiconMatchSets()); // le nouveau mot se surligne aussitôt
   }, []);
 
-  const orientation: Orientation = 'landscape';
+  // Orientation réelle de l'écran : en paysage 2 pages côte à côte, en
+  // portrait (web smartphone) 2 pages empilées — plus de paysage imposé.
+  const orientation: Orientation = useOrientation();
   const visibleVerses = useMemo(
     () => new Set([...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey)),
     [right, left]
@@ -1191,15 +1217,16 @@ export default function LecturePractice() {
     return m;
   }, [showLexicon, showThemes, marks, showMistakes, mistakeWords, selWords]);
 
-  // Déclare les mots sélectionnés avec un type de faute (mémorisé).
-  const declareMistakes = (type: MistakeType) => {
+  // Déclare les mots sélectionnés comme fautes (déclaration unique, mémorisée).
+  const declareMistakes = () => {
     const user = getCurrentUser();
     const at = new Date().toISOString();
     recordWordMistakes(
       user,
-      Array.from(selWords.values()).map((w) => ({ ...w, type, at }))
+      Array.from(selWords.values()).map((w) => ({ ...w, type: 'faute', at }))
     );
-    setMistakeWords(getMistakeWordMarks(user));
+    for (const k of selWords.keys()) sessionFaultKeys.current.add(k);
+    setMistakeWords(getWordDifficultyMarks(user));
     setSelWords(new Map());
   };
 
@@ -1696,30 +1723,24 @@ export default function LecturePractice() {
           />
         )}
 
-        {/* Marquage : choisir le type de faute pour les mots sélectionnés */}
+        {/* Marquage : un seul bouton « Faute » pour les mots sélectionnés */}
         {markingMode && selWords.size > 0 && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,420px)]" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
-                  {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} — type de faute ?
-                </span>
-                <button onClick={() => setSelWords(new Map())} className="text-[11px] text-gray-400 hover:text-gray-600 underline">
-                  Annuler
-                </button>
-              </div>
               {getCurrentUser() ? (
-                <div className="flex gap-1.5 flex-wrap">
-                  {MISTAKE_TYPE_META.map((t) => (
-                    <button
-                      key={t.value}
-                      onClick={() => declareMistakes(t.value)}
-                      className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95"
-                      style={{ borderColor: t.color, color: t.color }}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-[11px] font-bold uppercase tracking-widest text-red-600">
+                    {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} sélectionné{selWords.size > 1 ? 's' : ''}
+                  </span>
+                  <button onClick={() => setSelWords(new Map())} className="text-[11px] text-gray-400 hover:text-gray-600 underline">
+                    Annuler
+                  </button>
+                  <button
+                    onClick={declareMistakes}
+                    className="py-1.5 px-4 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:scale-95"
+                  >
+                    Faute
+                  </button>
                 </div>
               ) : (
                 <p className="text-xs text-gray-500">Connecte-toi (exercice Récitation ou tableau de bord) pour mémoriser tes fautes.</p>

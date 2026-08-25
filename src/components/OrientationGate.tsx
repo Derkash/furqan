@@ -1,18 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { isNativeApp } from '@/utils/audioStore';
 
 /**
- * Garde-fou paysage. L'app est conçue en paysage uniquement, mais iPadOS 26 a
- * une RÉGRESSION : quand le verrou de rotation de l'appareil est désactivé, il
- * laisse afficher le portrait malgré la déclaration « landscape only ». Ce
- * voile bloque alors l'usage et invite à tourner l'appareil — garanti quel que
- * soit le comportement d'iOS.
+ * Garde-fou paysage — APP NATIVE UNIQUEMENT. L'app native est conçue en
+ * paysage, mais iPadOS 26 a une RÉGRESSION : quand le verrou de rotation de
+ * l'appareil est désactivé, il laisse afficher le portrait malgré le verrou
+ * d'orientation. Ce voile bloque alors l'usage et invite à tourner l'appareil.
+ *
+ * Exceptions :
+ * - le WEB n'impose plus jamais le paysage (interface responsive) ;
+ * - le module ADKAR s'utilise en portrait, sur toutes les plateformes.
  */
 export default function OrientationGate() {
   const [portrait, setPortrait] = useState(false);
+  const [native, setNative] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
+    setNative(isNativeApp());
     const check = () => setPortrait(window.innerHeight > window.innerWidth);
     check();
     window.addEventListener('resize', check);
@@ -23,7 +31,7 @@ export default function OrientationGate() {
     };
   }, []);
 
-  if (!portrait) return null;
+  if (!native || !portrait || pathname?.startsWith('/adhkar')) return null;
 
   return (
     <div

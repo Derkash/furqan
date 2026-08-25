@@ -59,15 +59,19 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Le micro sert à enregistrer ta récitation pour la réécouter et repérer tes erreurs (exercice Récitation).</string>
+	<!-- Portrait déclaré pour le module Adkar ; à l'exécution, l'AppDelegate
+	     (supportedInterfaceOrientationsFor) impose le paysage partout ailleurs. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>

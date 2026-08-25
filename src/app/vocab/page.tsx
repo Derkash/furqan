@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Orientation, PageVerses, PagePair } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
+import { useOrientation } from '@/hooks/useOrientation';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
@@ -274,7 +275,8 @@ function ReadMode() {
     );
   }
 
-  const orientation: Orientation = 'landscape';
+  // Orientation réelle de l'écran (portrait = pages empilées, responsive web).
+  const orientation: Orientation = useOrientation();
   return (
     <div className="flex-1 min-h-0 relative" onClick={onMushafClick}>
       <MushafDoublePage

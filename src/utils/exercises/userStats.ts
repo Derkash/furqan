@@ -15,23 +15,28 @@ import {
 import { hydrateSetupsLocal } from './exerciseMemory';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
 
-export type MistakeType = 'oubli' | 'inversion' | 'harakat' | 'mot';
-
-/** Types de faute avec libellé et couleur (mêmes teintes que les marques sur la page). */
-export const MISTAKE_TYPE_META: { value: MistakeType; label: string; color: string }[] = [
-  { value: 'oubli', label: 'Oubli', color: '#d97706' },
-  { value: 'inversion', label: 'Inversion', color: '#7c3aed' },
-  { value: 'harakat', label: 'Harakat', color: '#2563eb' },
-  { value: 'mot', label: 'Mot erroné', color: '#dc2626' },
-];
+/**
+ * Événement par mot : 'faute' (difficulté déclarée) ou 'ok' (mot récité sans
+ * faute → la difficulté diminue). Les anciens types historisés
+ * ('oubli' | 'inversion' | 'harakat' | 'mot') sont relus comme 'faute'.
+ */
+export type WordEventType = 'faute' | 'ok';
 
 export interface WordMistake {
   verseKey: string; // "4:124"
   position: number; // index du mot dans le verset (données QCF)
   page: number;
-  type: MistakeType;
+  type: string; // WordEventType (ou ancien type de faute, relu comme 'faute')
   at: string; // ISO date
 }
+
+/** Niveaux visuels de difficulté (1 → 4), du plus léger au plus alarmant. */
+export const DIFFICULTY_LEVEL_META: { level: 1 | 2 | 3 | 4; label: string; color: string }[] = [
+  { level: 1, label: 'Légère', color: '#d9b64e' },
+  { level: 2, label: 'Répétée', color: '#d97706' },
+  { level: 3, label: 'Fréquente', color: '#ea580c' },
+  { level: 4, label: 'Récurrente', color: '#dc2626' },
+];
 
 export interface VerseResult {
   verseKey: string;
@@ -318,7 +323,7 @@ export function getPriorityVerses(
     result.set(verseKey, cur);
   };
 
-  for (const m of stats.wordMistakes) bump(m.verseKey, m.page, 2);
+  for (const m of stats.wordMistakes) bump(m.verseKey, m.page, m.type === 'ok' ? -1 : 2);
   for (const r of stats.verseResults) bump(r.verseKey, r.page, r.found ? -1 : 2);
 
   for (const [key, value] of result) {
@@ -340,49 +345,114 @@ export function getPriorityPages(
   return pages;
 }
 
-/**
- * Marques "verseKey#position" → type de faute, pour l'affichage coloré
- * (Récitation et Hifz). En cas de types multiples : le plus récent gagne.
- */
-export function getMistakeWordMarks(username: string | null): Map<string, MistakeType> {
-  const marks = new Map<string, MistakeType>();
-  if (!username) return marks;
-  // wordMistakes est chronologique : la dernière écriture l'emporte.
-  for (const m of loadStats(username).wordMistakes) {
-    marks.set(`${m.verseKey}#${m.position}`, m.type);
-  }
-  return marks;
-}
+// ---------- Score de difficulté par mot (glissant, borné) ----------
+//
+// Chaque mot a un score évolutif rejoué depuis son historique chronologique :
+// faute → +1, récitation correcte ('ok') → −1, borné à [0, DIFFICULTY_MAX].
+// Le score est donc « glissant » : les récitations récentes l'emportent sur
+// l'accumulation ancienne (5 fautes → rouge, puis 5 récitations correctes →
+// retour au normal, en repassant par orange et teinte légère).
 
-export interface AggregatedMistake {
+export const DIFFICULTY_MAX = 5;
+
+export interface WordDifficulty {
   verseKey: string;
   position: number;
   page: number;
-  count: number;
-  types: Partial<Record<MistakeType, number>>;
+  /** Score glissant borné [0, DIFFICULTY_MAX]. */
+  score: number;
+  /** Niveau visuel : 0 normal, 1 légère, 2 répétée, 3 fréquente, 4 récurrente. */
+  level: 0 | 1 | 2 | 3 | 4;
+  /** Nombre total de fautes historisées (info tableau de bord). */
+  faults: number;
   lastAt: string;
 }
 
-/** Fautes agrégées par mot (pour le tableau de bord), triées par fréquence. */
-export function aggregateMistakesByWord(username: string | null): AggregatedMistake[] {
-  const map = new Map<string, AggregatedMistake>();
-  if (!username) return [];
-  for (const m of loadStats(username).wordMistakes) {
+/** Niveau visuel à partir du score glissant. */
+export function difficultyLevel(score: number): 0 | 1 | 2 | 3 | 4 {
+  if (score <= 0) return 0;
+  if (score >= 4) return 4;
+  return Math.ceil(score) as 1 | 2 | 3;
+}
+
+/**
+ * Difficulté courante de chaque mot ("verseKey#position") : historique rejoué
+ * dans l'ordre chronologique. Les mots revenus à 0 sans faute historisée
+ * n'apparaissent pas.
+ */
+export function getWordDifficulties(username: string | null): Map<string, WordDifficulty> {
+  const map = new Map<string, WordDifficulty>();
+  if (!username) return map;
+  const events = [...loadStats(username).wordMistakes].sort((a, b) =>
+    a.at < b.at ? -1 : a.at > b.at ? 1 : 0
+  );
+  for (const m of events) {
     const key = `${m.verseKey}#${m.position}`;
     const entry = map.get(key) ?? {
       verseKey: m.verseKey,
       position: m.position,
       page: m.page,
-      count: 0,
-      types: {},
+      score: 0,
+      level: 0 as const,
+      faults: 0,
       lastAt: m.at,
     };
-    entry.count++;
-    entry.types[m.type] = (entry.types[m.type] ?? 0) + 1;
+    if (m.type === 'ok') {
+      entry.score = Math.max(0, entry.score - 1);
+    } else {
+      entry.score = Math.min(DIFFICULTY_MAX, entry.score + 1);
+      entry.faults++;
+    }
+    entry.level = difficultyLevel(entry.score);
     if (m.at > entry.lastAt) entry.lastAt = m.at;
     map.set(key, entry);
   }
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  return map;
+}
+
+/**
+ * Marques "verseKey#position" → 'diff-1' … 'diff-4' pour l'affichage sur la
+ * page (Hifz, Lecture, Récitation) : l'intensité suit le niveau de difficulté.
+ */
+export function getWordDifficultyMarks(username: string | null): Map<string, string> {
+  const marks = new Map<string, string>();
+  for (const [key, d] of getWordDifficulties(username)) {
+    if (d.level > 0) marks.set(key, `diff-${d.level}`);
+  }
+  return marks;
+}
+
+/**
+ * Crédite une récitation correcte : pour chaque mot EN DIFFICULTÉ (score > 0)
+ * appartenant à un verset réellement récité, enregistre un événement 'ok'
+ * (score −1). Les mots sans difficulté connue ne génèrent aucun événement
+ * (rien à diminuer), et `excludeKeys` protège les mots dont la faute vient
+ * d'être déclarée dans la même passe. Retourne le nombre de mots crédités.
+ */
+export function creditRecitedVerses(
+  username: string | null,
+  verseKeys: Iterable<string>,
+  excludeKeys?: Set<string>
+): number {
+  if (!username) return 0;
+  const recited = new Set(verseKeys);
+  if (recited.size === 0) return 0;
+  const at = new Date().toISOString();
+  const events: WordMistake[] = [];
+  for (const [key, d] of getWordDifficulties(username)) {
+    if (d.score <= 0 || !recited.has(d.verseKey)) continue;
+    if (excludeKeys?.has(key)) continue;
+    events.push({ verseKey: d.verseKey, position: d.position, page: d.page, type: 'ok', at });
+  }
+  recordWordMistakes(username, events);
+  return events.length;
+}
+
+/** Mots en difficulté (score > 0) pour le tableau de bord, triés par score. */
+export function aggregateWordDifficulties(username: string | null): WordDifficulty[] {
+  return Array.from(getWordDifficulties(username).values())
+    .filter((d) => d.score > 0)
+    .sort((a, b) => b.score - a.score || b.faults - a.faults);
 }
 
 /** Tire un verset prioritaire au hasard, pondéré par le poids. */

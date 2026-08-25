@@ -6,20 +6,21 @@ import Link from 'next/link';
 import MushafDoublePage from '@/components/MushafDoublePage';
 import LoginCard from '@/components/exercises/LoginCard';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
+import { useOrientation } from '@/hooks/useOrientation';
 import { useAudio } from '@/hooks/useAudio';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
+  creditRecitedVerses,
   getCurrentUser,
-  getMistakeWordMarks,
-  MISTAKE_TYPE_META,
+  getWordDifficultyMarks,
+  DIFFICULTY_LEVEL_META,
   getPriorityVerses,
   loadStats,
   logout,
   pickPriorityVerse,
   recordVerseResult,
   recordWordMistakes,
-  type MistakeType,
   type WordMistake,
 } from '@/utils/exercises/userStats';
 import { getSelfAssess } from '@/utils/exercises/prefs';
@@ -44,8 +45,10 @@ function getPagePair(page: number): PagePair {
  *    mémorisées) ; 9 s de son début sont jouées, double page floutée.
  * 2. Gros bouton rouge → enregistrement du micro, pages toujours floutées.
  * 3. Stop → double page révélée, verset surligné. Vous pouvez : réécouter votre
- *    récitation, sélectionner les mots ratés (oubli / inversion / harakat / mot),
- *    feuilleter ±5 pages, puis répondre Trouvé / Raté (mémorisé pour les quiz).
+ *    récitation, marquer d'un tap les mots en faute (déclaration unique, sans
+ *    type), feuilleter ±5 pages, puis répondre Trouvé / Raté (mémorisé).
+ *    En fin de tour, les mots en difficulté du verset récité SANS nouvelle
+ *    faute sont crédités ('ok') : leur niveau redescend progressivement.
  * Nécessite une connexion (mémoire des fautes).
  */
 export default function RecitationPractice() {
@@ -84,14 +87,18 @@ export default function RecitationPractice() {
 
   // Phase résultat : double page affichée (feuilletable sur tout le Mushaf)
   const [resultPair, setResultPair] = useState<PagePair | null>(null);
-  // Sélection de mots en faute : "verseKey#position" → en attente de type
+  // Sélection de mots en faute : "verseKey#position" → en attente de validation
   const [selectedWords, setSelectedWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
-  // Toutes les fautes déjà déclarées (persistées) : affichées à CHAQUE résultat,
-  // colorées par type, même sans nouvelle faute.
-  const [storedMarks, setStoredMarks] = useState<Map<string, MistakeType>>(new Map());
+  // Difficultés persistées ("verseKey#position" → 'diff-1'…'diff-4') : affichées
+  // à CHAQUE résultat, l'intensité suivant le niveau de difficulté du mot.
+  const [storedMarks, setStoredMarks] = useState<Map<string, string>>(new Map());
+  // Fautes déclarées PENDANT le tour courant : exclues du crédit 'ok' de fin de tour.
+  const roundFaultKeys = useRef<Set<string>>(new Set());
 
   const audio = useAudio();
   const recorder = useAudioRecorder();
+  // Orientation réelle de l'écran (portrait web = pages empilées, responsive).
+  const orientation = useOrientation();
 
   // Vitesse de réécoute de l'enregistrement (×2 par défaut).
   const [playbackRate, setPlaybackRate] = useState(2);
@@ -220,8 +227,9 @@ export default function RecitationPractice() {
       setLeftPageVerses(left);
       setRightPageVerses(right);
       setSelectedWords(new Map());
-      // Recharge les fautes persistées : toujours visibles au prochain résultat.
-      setStoredMarks(getMistakeWordMarks(getCurrentUser()));
+      roundFaultKeys.current = new Set();
+      // Recharge les difficultés persistées : toujours visibles au prochain résultat.
+      setStoredMarks(getWordDifficultyMarks(getCurrentUser()));
       setRound((r) => r + 1);
       setPhase('listening');
     } catch {
@@ -284,6 +292,11 @@ export default function RecitationPractice() {
   const advanceRound = () => {
     audio.stop();
     recorder.clear();
+    // Verset récité sans nouvelle faute → les mots en difficulté de ce verset
+    // sont crédités ('ok') et leur niveau redescend d'un cran.
+    if (target && phase === 'result') {
+      creditRecitedVerses(user, [target.verseKey], roundFaultKeys.current);
+    }
     if (round >= maxRounds) setCompleted(true);
     else newRound();
   };
@@ -341,19 +354,20 @@ export default function RecitationPractice() {
     });
   };
 
-  /** Enregistre les mots sélectionnés avec le type de faute choisi. */
-  const declareMistakes = (type: MistakeType) => {
+  /** Enregistre les mots sélectionnés comme fautes (déclaration unique). */
+  const declareMistakes = () => {
     const at = new Date().toISOString();
     const mistakes: WordMistake[] = Array.from(selectedWords.values()).map((w) => ({
       verseKey: w.verseKey,
       position: w.position,
       page: w.page,
-      type,
+      type: 'faute',
       at,
     }));
+    for (const key of selectedWords.keys()) roundFaultKeys.current.add(key);
     recordWordMistakes(user, mistakes);
-    // Recharge depuis le stockage : les nouveaux mots prennent leur couleur de type.
-    setStoredMarks(getMistakeWordMarks(user));
+    // Recharge depuis le stockage : les mots prennent la teinte de leur niveau.
+    setStoredMarks(getWordDifficultyMarks(user));
     setSelectedWords(new Map());
   };
 
@@ -378,23 +392,22 @@ export default function RecitationPractice() {
       page: number;
       words: number;
       notFound: number;
-      types: Record<MistakeType, number>;
       lastAt: string;
     };
     const map = new Map<string, Row>();
     const get = (verseKey: string, page: number, at: string): Row => {
       let e = map.get(verseKey);
       if (!e) {
-        e = { verseKey, page, words: 0, notFound: 0, types: { oubli: 0, inversion: 0, harakat: 0, mot: 0 }, lastAt: at };
+        e = { verseKey, page, words: 0, notFound: 0, lastAt: at };
         map.set(verseKey, e);
       }
       if (at > e.lastAt) e.lastAt = at;
       return e;
     };
     for (const m of stats.wordMistakes) {
+      if (m.type === 'ok') continue; // récitations correctes : pas des fautes
       const e = get(m.verseKey, m.page, m.at);
       e.words++;
-      e.types[m.type]++;
     }
     for (const r of stats.verseResults) {
       if (!r.found) get(r.verseKey, r.page, r.at).notFound++;
@@ -477,17 +490,15 @@ export default function RecitationPractice() {
                       <span className="text-[10px] text-gray-500">p.{toArabicNumbers(v.page)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {MISTAKE_TYPE_META.filter((t) => v.types[t.value] > 0).map((t) => (
+                      {v.words > 0 && (
                         <span
-                          key={t.value}
-                          className="flex items-center gap-0.5 text-[10px] font-bold"
-                          style={{ color: t.color }}
-                          title={t.label}
+                          className="flex items-center gap-0.5 text-[10px] font-bold text-[#b45309]"
+                          title="Fautes déclarées"
                         >
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
-                          {toArabicNumbers(v.types[t.value])}
+                          <span className="w-2 h-2 rounded-full bg-[#b45309]" />
+                          {toArabicNumbers(v.words)}
                         </span>
-                      ))}
+                      )}
                       {v.notFound > 0 && (
                         <span className="text-[10px] font-bold text-red-600" title="Non trouvé">
                           ✗{toArabicNumbers(v.notFound)}
@@ -610,8 +621,9 @@ export default function RecitationPractice() {
               Touchez les mots ratés • feuilletez tout le Mushaf
             </span>
             <span className="hidden sm:flex items-center gap-2 ml-2">
-              {MISTAKE_TYPE_META.map((t) => (
-                <span key={t.value} className="flex items-center gap-1 text-[10px] text-white/80">
+              <span className="text-[10px] text-white/60">Difficulté :</span>
+              {DIFFICULTY_LEVEL_META.map((t) => (
+                <span key={t.level} className="flex items-center gap-1 text-[10px] text-white/80">
                   <span
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: t.color }}
@@ -646,7 +658,7 @@ export default function RecitationPractice() {
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
           pagePair={displayedPair}
-          orientation="landscape"
+          orientation={orientation}
           revealedVerses={new Set([target.verseKey])}
           visibleVerses={new Set([target.verseKey])}
           highlightedVerseKey={phase === 'result' ? target.verseKey : undefined}
@@ -751,46 +763,30 @@ export default function RecitationPractice() {
           </>
         )}
 
-        {/* Barre de déclaration de fautes : type à choisir pour la sélection */}
+        {/* Barre de déclaration : un seul bouton « Faute » (déclaration rapide) */}
         {phase === 'result' && selectedWords.size > 0 && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,480px)]">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(94vw,420px)]">
             <div
-              className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
+              className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2 flex items-center gap-2"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
-                  {toArabicNumbers(selectedWords.size)} mot{selectedWords.size > 1 ? 's' : ''} — type de faute ?
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedWords(new Map())}
-                  className="text-[11px] text-gray-400 hover:text-gray-600 underline"
-                >
-                  Annuler
-                </button>
-              </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {MISTAKE_TYPE_META.map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => declareMistakes(t.value)}
-                    className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95 transition-all hover:text-white"
-                    style={{ borderColor: t.color, color: t.color }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = t.color;
-                      e.currentTarget.style.color = '#fff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                      e.currentTarget.style.color = t.color;
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <span className="flex-1 text-[11px] font-bold uppercase tracking-widest text-red-600">
+                {toArabicNumbers(selectedWords.size)} mot{selectedWords.size > 1 ? 's' : ''} sélectionné{selectedWords.size > 1 ? 's' : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedWords(new Map())}
+                className="text-[11px] text-gray-400 hover:text-gray-600 underline"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={declareMistakes}
+                className="py-1.5 px-4 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:scale-95 transition-all"
+              >
+                Faute
+              </button>
             </div>
           </div>
         )}

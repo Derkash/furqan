@@ -92,7 +92,8 @@ interface MushafPageProps {
   loading?: boolean;
   /**
    * Marques par mot, clés "verseKey#position" → 'selected' (sélection en cours)
-   * ou type de faute ('oubli' | 'inversion' | 'harakat' | 'mot'), chacun sa couleur.
+   * ou niveau de difficulté ('diff-1' … 'diff-4') : l'intensité de la teinte
+   * suit la fréquence/récence des fautes (léger → rouge).
    */
   wordMarks?: Map<string, string>;
   /**
@@ -506,31 +507,32 @@ export default function MushafPage({
           background-color: rgba(228, 195, 100, 0.36);
         }
 
-        /* Marques de fautes — même technique box-shadow (pas de padding),
-           une couleur par type. */
+        /* Marques de difficulté — même technique box-shadow (pas de padding).
+           L'intensité monte avec le niveau : teinte légère → ambre → orange →
+           rouge (faute très récurrente). */
         .verse-word.mark-selected {
           background-color: rgba(100, 116, 139, 0.22);
           box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.35);
           border-radius: 6px;
         }
-        .verse-word.mark-oubli {
-          background-color: rgba(217, 119, 6, 0.22);
-          box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.32);
+        .verse-word.mark-diff-1 {
+          background-color: rgba(217, 182, 78, 0.20);
+          box-shadow: 0 0 0 2px rgba(217, 182, 78, 0.30);
           border-radius: 6px;
         }
-        .verse-word.mark-inversion {
-          background-color: rgba(124, 58, 237, 0.20);
-          box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.30);
+        .verse-word.mark-diff-2 {
+          background-color: rgba(217, 119, 6, 0.24);
+          box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.34);
           border-radius: 6px;
         }
-        .verse-word.mark-harakat {
-          background-color: rgba(37, 99, 235, 0.18);
-          box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.30);
+        .verse-word.mark-diff-3 {
+          background-color: rgba(234, 88, 12, 0.30);
+          box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.42);
           border-radius: 6px;
         }
-        .verse-word.mark-mot {
-          background-color: rgba(220, 38, 38, 0.22);
-          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.30);
+        .verse-word.mark-diff-4 {
+          background-color: rgba(220, 38, 38, 0.36);
+          box-shadow: 0 0 0 2.5px rgba(220, 38, 38, 0.55);
           border-radius: 6px;
         }
         /* Mots du lexique personnel (mode Lecture) — vert olive. */

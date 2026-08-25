@@ -11,10 +11,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    // Paysage uniquement : requis en plus de l'Info.plist car iPadOS 26
-    // ignore UIRequiresFullScreen (déprécié) selon le mode multitâche.
+    // Paysage OBLIGATOIRE par défaut (les deux directions), avec UNE exception :
+    // le module Adkar pose un verrou portrait via @capacitor/screen-orientation
+    // (ScreenOrientation.lock({orientation:'portrait'}) → le bridge ne supporte
+    // plus que le portrait). En sortant d'Adkar, unlock() rétablit les valeurs
+    // de l'Info.plist et ce délégué ré-impose le paysage. Requis en plus de
+    // l'Info.plist car iPadOS 26 ignore UIRequiresFullScreen (déprécié) selon
+    // le mode multitâche.
     func application(_ application: UIApplication,
                      supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        if let vc = window?.rootViewController as? CAPBridgeViewController,
+           vc.supportedInterfaceOrientations == .portrait {
+            return .portrait // verrou Adkar actif
+        }
         return .landscape
     }
 

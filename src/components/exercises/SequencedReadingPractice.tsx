@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Orientation, PagePair, PageVerses } from '@/types';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
+import { useOrientation } from '@/hooks/useOrientation';
 import { getAudioUrl } from '@/utils/ayahMapping';
 import { getMiddleVerse } from '@/utils/exercises/getMiddleVerse';
 import { useVerseMap } from '@/hooks/useVerseMap';
@@ -418,7 +419,9 @@ export default function SequencedReadingPractice() {
     setTimeout(() => runAction(0), 50);
   }
 
-  const orientation: Orientation = 'landscape';
+  // Orientation réelle de l'écran : en paysage 2 pages côte à côte, en
+  // portrait (web smartphone) 2 pages empilées — plus de paysage imposé.
+  const orientation: Orientation = useOrientation();
 
   // ---- Écran de configuration ----
   if (phase === 'config') {

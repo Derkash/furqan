@@ -5,6 +5,7 @@ import { PracticeShell } from '@/components/AppShell';
 import { hapticLight } from '@/utils/haptics';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
+import { useOrientation } from '@/hooks/useOrientation';
 import { useAudio } from '@/hooks/useAudio';
 import { useTranslation } from '@/hooks/exercises/useTranslation';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
@@ -17,12 +18,11 @@ import WordCard from '@/components/vocab/WordCard';
 import type { ExerciseId, VersePositionType } from '@/types/exercises';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
+  creditRecitedVerses,
   getCurrentUser,
-  getMistakeWordMarks,
-  MISTAKE_TYPE_META,
+  getWordDifficultyMarks,
   recordVerseResult,
   recordWordMistakes,
-  type MistakeType,
 } from '@/utils/exercises/userStats';
 import { useAudioRecorder } from '@/hooks/exercises/useAudioRecorder';
 import { useTafsir } from '@/hooks/exercises/useTafsir';
@@ -261,8 +261,9 @@ function MushafPractice() {
     reset,
   } = useExercise();
 
-  // Double page côte à côte forcée pour tous les exercices (Hifz utilise singlePage et ignore l'orientation)
-  const orientation: Orientation = 'landscape';
+  // Orientation réelle de l'écran : paysage = 2 pages côte à côte, portrait
+  // (web smartphone) = pages empilées. L'app native reste verrouillée paysage.
+  const orientation: Orientation = useOrientation();
   const audio = useAudio();
   const [initialized, setInitialized] = useState(false);
   // Dernier verset joué à l'audio dans le tour courant : permet de le faire
@@ -297,12 +298,13 @@ function MushafPractice() {
     return s;
   }, [exerciseId, visibleVerses, seqRevealed]);
 
-  // Hifz : fautes déclarées en Récitation, transférées ici (une couleur par type).
+  // Hifz : difficultés par mot (historique commun Hifz/Lecture/Récitation),
+  // teinte d'intensité croissante selon le niveau ('diff-1' … 'diff-4').
   const [showMistakes, setShowMistakes] = useState(true);
-  const [mistakeWords, setMistakeWords] = useState<Map<string, MistakeType>>(new Map());
+  const [mistakeWords, setMistakeWords] = useState<Map<string, string>>(new Map());
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (isHifz) setMistakeWords(getMistakeWordMarks(getCurrentUser()));
+    if (isHifz) setMistakeWords(getWordDifficultyMarks(getCurrentUser()));
   }, [isHifz]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -347,15 +349,39 @@ function MushafPractice() {
     Map<string, { verseKey: string; position: number; page: number }>
   >(new Map());
 
-  const declareHifzMistakes = (type: MistakeType) => {
+  const declareHifzMistakes = () => {
     const user = getCurrentUser();
     const at = new Date().toISOString();
     recordWordMistakes(
       user,
-      Array.from(selWords.values()).map((w) => ({ ...w, type, at }))
+      Array.from(selWords.values()).map((w) => ({ ...w, type: 'faute', at }))
     );
-    setMistakeWords(getMistakeWordMarks(user));
+    for (const k of selWords.keys()) hifzFaultKeys.current.add(k);
+    setMistakeWords(getWordDifficultyMarks(user));
     setSelWords(new Map());
+  };
+
+  // ---- Crédit de récitation (Hifz) : avancer vers la page suivante après un
+  // temps de lecture minimal = double page récitée. Les mots en difficulté de
+  // ces versets, sans nouvelle faute cette session, reçoivent un 'ok' (score −1).
+  const HIFZ_MIN_READ_MS = 8000;
+  const hifzPairShownAt = useRef(Date.now());
+  const hifzCreditedVerses = useRef<Set<string>>(new Set());
+  const hifzFaultKeys = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    hifzPairShownAt.current = Date.now();
+  }, [pagePair?.rightPage]);
+  const creditHifzPair = () => {
+    if (!isHifz || Date.now() - hifzPairShownAt.current < HIFZ_MIN_READ_MS) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    const keys = [...(rightPageVerses?.verses ?? []), ...(leftPageVerses?.verses ?? [])]
+      .map((v) => v.verseKey)
+      .filter((k) => !hifzCreditedVerses.current.has(k));
+    if (keys.length === 0) return;
+    const credited = creditRecitedVerses(user, keys, hifzFaultKeys.current);
+    for (const k of keys) hifzCreditedVerses.current.add(k);
+    if (credited > 0) setMistakeWords(getWordDifficultyMarks(user));
   };
 
   // Marques affichées en Hifz : fautes persistées (si visibles) + sélection en cours.
@@ -1176,39 +1202,25 @@ function MushafPractice() {
               className="bg-[var(--ds-bg)]/95 backdrop-blur border-2 border-red-300 rounded-2xl shadow-lg px-3 py-2"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-red-600">
-                  {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} — type de faute ?
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelWords(new Map())}
-                  className="text-[11px] text-gray-400 hover:text-gray-600 underline"
-                >
-                  Annuler
-                </button>
-              </div>
               {getCurrentUser() ? (
-                <div className="flex gap-1.5 flex-wrap">
-                  {MISTAKE_TYPE_META.map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => declareHifzMistakes(t.value)}
-                      className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold bg-white border-2 active:scale-95 transition-all"
-                      style={{ borderColor: t.color, color: t.color }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = t.color;
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fff';
-                        e.currentTarget.style.color = t.color;
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-[11px] font-bold uppercase tracking-widest text-red-600">
+                    {toArabicNumbers(selWords.size)} mot{selWords.size > 1 ? 's' : ''} sélectionné{selWords.size > 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelWords(new Map())}
+                    className="text-[11px] text-gray-400 hover:text-gray-600 underline"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={declareHifzMistakes}
+                    className="py-1.5 px-4 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:scale-95 transition-all"
+                  >
+                    Faute
+                  </button>
                 </div>
               ) : (
                 <p className="text-xs text-gray-500">
@@ -1337,6 +1349,7 @@ function MushafPractice() {
                 e.stopPropagation();
                 setPopover(null);
                 hapticLight();
+                creditHifzPair();
                 flipPair('next');
               }}
               className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
