@@ -10,13 +10,24 @@ import {
   type VocabEntry,
 } from '@/utils/vocab/vocabStore';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { useScopedVocab } from '@/hooks/useScopedVocab';
 
 type Dir = 'ar2fr' | 'fr2ar';
 
-/** Révision façon flashcards (Leitner) du vocabulaire personnel. */
-export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
+/** Révision façon flashcards (Leitner) du vocabulaire personnel, restreinte
+ *  aux mots PRÉSENTS dans la plage de lecture quand une plage est définie. */
+export default function ReviewSession({
+  onEmpty,
+  startPage,
+  endPage,
+}: {
+  onEmpty?: () => void;
+  startPage: number | null;
+  endPage: number | null;
+}) {
   const [ready, setReady] = useState(false);
   const [total, setTotal] = useState(0);
+  const [all, setAll] = useState<VocabEntry[]>([]);
   const [dueOnly, setDueOnly] = useState(true);
   const [dir, setDir] = useState<Dir>('ar2fr');
   const [queue, setQueue] = useState<VocabEntry[]>([]);
@@ -29,14 +40,25 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     seedVocabIfNeeded().then(() => {
-      setTotal(getVocab().length);
+      const v = getVocab();
+      setAll(v);
+      setTotal(v.length);
       setReady(true);
     });
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const buildQueue = (all: boolean) => {
-    const list = all ? shuffle(getVocab()) : dueVocab();
+  // Mots du lexique réellement présents dans la plage (null = pas de plage).
+  const { scoped, loading: scopeLoading } = useScopedVocab(all, startPage, endPage);
+  const scopeIds = useMemo(
+    () => (scoped ? new Set(scoped.map((s) => s.entry.id)) : null),
+    [scoped]
+  );
+  const inScope = (list: VocabEntry[]) =>
+    scopeIds ? list.filter((e) => scopeIds.has(e.id)) : list;
+
+  const buildQueue = (everything: boolean) => {
+    const list = inScope(everything ? shuffle(getVocab()) : dueVocab());
     setQueue(list.slice(0, 30));
     setIdx(0);
     setRevealed(false);
@@ -96,13 +118,15 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
 
   // Écran d'accueil de la session
   if (queue.length === 0 && !done) {
-    const dueCount = dueVocab().length;
+    const dueCount = inScope(dueVocab()).length;
+    const poolCount = scopeIds ? scopeIds.size : total;
     return (
       <Centered>
         <p className="text-[var(--ds-green)] text-lg font-bold mb-1">Prêt à réviser ?</p>
         <p className="text-sm text-gray-500 mb-4">
-          {toArabicNumbers(dueCount)} mot{dueCount > 1 ? 's' : ''} à revoir aujourd&apos;hui ·{' '}
-          {toArabicNumbers(total)} au total
+          {scopeLoading
+            ? 'Recherche des mots de ta plage…'
+            : `${toArabicNumbers(dueCount)} mot${dueCount > 1 ? 's' : ''} à revoir aujourd'hui · ${toArabicNumbers(poolCount)} ${scopeIds ? 'dans ta plage' : 'au total'}`}
         </p>
 
         <DirToggle dir={dir} setDir={setDir} />
@@ -119,9 +143,14 @@ export default function ReviewSession({ onEmpty }: { onEmpty?: () => void }) {
             onClick={() => start(true)}
             className="px-5 py-2.5 border-2 border-[var(--ds-gold)]/40 text-[var(--ds-sage)] rounded-xl text-sm font-bold hover:border-[var(--ds-gold)]"
           >
-            Tout mélanger
+            {scopeIds ? 'Mélanger ma plage' : 'Tout mélanger'}
           </button>
         </div>
+        {scopeIds && poolCount === 0 && !scopeLoading && (
+          <p className="text-xs text-gray-400 mt-3">
+            Aucun mot de ton lexique n&apos;apparaît dans cette plage.
+          </p>
+        )}
         {dueCount === 0 && (
           <p className="text-xs text-gray-400 mt-3">Rien d&apos;urgent — « Tout mélanger » pour réviser librement.</p>
         )}

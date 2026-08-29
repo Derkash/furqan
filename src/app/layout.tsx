@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import AppInit from "@/components/AppInit";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import OrientationGate from "@/components/OrientationGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,7 +37,6 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body className="antialiased">
         <AppInit />
-        <OrientationGate />
         <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>

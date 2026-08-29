@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { computeHomeStats } from '@/utils/homeStats';
+import OrientationControl from '@/components/OrientationControl';
 
 /**
  * Coque de l'app (design Application2).
@@ -159,6 +160,8 @@ export function Sidebar() {
           <NavItem key={item.href} item={item} active={item.match(pathname)} />
         ))}
       </nav>
+      {/* Orientation (app native) : Auto / Portrait / Paysage — rien n'est imposé. */}
+      <OrientationControl variant="rail" className="mt-2" />
       {streak > 0 && (
         <div className="ds-card flex flex-col items-center px-3 py-2 mt-4">
           <span className="text-[var(--ds-gold)] text-base leading-none">🔥</span>

@@ -379,3 +379,43 @@ function romanForm(vf: string): string {
   const n = Number(vf);
   return Number.isFinite(n) && ROMAN[n] ? ROMAN[n] : vf;
 }
+
+/**
+ * Parcourt TOUS les mots du Mushaf situés dans une plage de pages.
+ * Sert à savoir ce qui est réellement PRÉSENT dans la plage (lemmes, formes,
+ * racines) — indépendamment de l'endroit où un mot a été ajouté au lexique.
+ */
+export async function forEachWordInPages(
+  startPage: number,
+  endPage: number,
+  cb: (m: WordMorphology, verseKey: string, page: number, word: number) => void
+): Promise<void> {
+  const vp = await loadVersePage();
+  const lo = Math.min(startPage, endPage);
+  const hi = Math.max(startPage, endPage);
+
+  // Versets de la plage, groupés par sourate : verset → page.
+  const bySurah = new Map<number, Map<number, number>>();
+  for (const [verseKey, page] of Object.entries(vp)) {
+    if (page < lo || page > hi) continue;
+    const [s, v] = verseKey.split(':').map(Number);
+    let m = bySurah.get(s);
+    if (!m) {
+      m = new Map();
+      bySurah.set(s, m);
+    }
+    m.set(v, page);
+  }
+
+  await Promise.all(Array.from(bySurah.keys()).map((s) => loadSurah(s)));
+
+  for (const [s, verses] of bySurah) {
+    const words = surahCache.get(s) ?? {};
+    for (const [key, morph] of Object.entries(words)) {
+      const [v, w] = key.split(':').map(Number);
+      const page = verses.get(v);
+      if (page == null) continue;
+      cb(morph, `${s}:${v}`, page, w);
+    }
+  }
+}

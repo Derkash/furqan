@@ -38,6 +38,7 @@ import MushafDoublePage from '@/components/MushafDoublePage';
 import WordCard from '@/components/vocab/WordCard';
 import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
 import { RailToggle, railHiddenInitial, persistRailHidden } from '@/components/AppShell';
+import OrientationControl from '@/components/OrientationControl';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 function pairOf(page: number): PagePair {
@@ -1410,6 +1411,7 @@ export default function LecturePractice() {
                     </button>
                   ))}
                 </div>
+                <OrientationControl className="mt-4" />
               </div>
             )}
 

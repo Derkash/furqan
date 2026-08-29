@@ -1,33 +1,57 @@
-// Verrouillage d'orientation — APP NATIVE (Capacitor) UNIQUEMENT.
+// Orientation de l'écran — PRÉFÉRENCE UTILISATEUR.
 //
-// L'app native vit en PAYSAGE (imposé par l'AppDelegate, les deux directions).
-// Le module Adkar est l'exception : il pose un verrou PORTRAIT à l'entrée
-// (le seul cas où l'AppDelegate laisse passer le portrait) et le retire en
-// sortant — le paysage standard se rétablit alors de lui-même.
-// Sur le web ces fonctions sont des no-op : aucune orientation n'y est imposée
-// (l'interface s'adapte à l'espace disponible).
+// Plus aucune orientation n'est imposée : ni paysage, ni portrait, nulle part.
+// - WEB : rien n'est verrouillé, l'affichage suit la rotation de l'appareil
+//   (l'interface est responsive, portrait comme paysage).
+// - APP NATIVE (Capacitor) : l'utilisateur choisit dans le menu Réglages
+//   « Orientation » → Auto (suit l'appareil) / Portrait / Paysage. Le choix est
+//   mémorisé et réappliqué au démarrage.
 
 import { Capacitor } from '@capacitor/core';
 
-/** Verrouille le portrait (module Adkar). */
-export async function lockPortrait(): Promise<void> {
+export type OrientationPref = 'auto' | 'portrait' | 'landscape';
+
+const KEY = 'almuraja3a:orientation';
+
+export const ORIENTATION_LABELS: Record<OrientationPref, string> = {
+  auto: 'Auto',
+  portrait: 'Portrait',
+  landscape: 'Paysage',
+};
+
+/** Préférence enregistrée (par défaut : Auto — l'appareil décide). */
+export function loadOrientationPref(): OrientationPref {
+  if (typeof window === 'undefined') return 'auto';
+  try {
+    const v = window.localStorage.getItem(KEY);
+    if (v === 'portrait' || v === 'landscape' || v === 'auto') return v;
+  } catch {
+    // stockage indisponible
+  }
+  return 'auto';
+}
+
+/** Applique la préférence (no-op sur le web : rien n'y est verrouillé). */
+export async function applyOrientationPref(
+  pref: OrientationPref = loadOrientationPref()
+): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const { ScreenOrientation } = await import('@capacitor/screen-orientation');
-    await ScreenOrientation.lock({ orientation: 'portrait' });
+    if (pref === 'auto') await ScreenOrientation.unlock();
+    else await ScreenOrientation.lock({ orientation: pref });
   } catch {
-    // Plugin absent ou verrou refusé (ex. iPad multitâche) : sans conséquence,
-    // l'OrientationGate reste le filet de sécurité côté UI.
+    // Plugin absent ou verrou refusé (iPad multitâche) : sans conséquence,
+    // l'app reste utilisable dans les deux sens.
   }
 }
 
-/** Retire le verrou portrait : l'AppDelegate ré-impose le paysage standard. */
-export async function restoreLandscape(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+/** Enregistre ET applique le choix de l'utilisateur. */
+export async function setOrientationPref(pref: OrientationPref): Promise<void> {
   try {
-    const { ScreenOrientation } = await import('@capacitor/screen-orientation');
-    await ScreenOrientation.unlock();
+    window.localStorage.setItem(KEY, pref);
   } catch {
-    // idem : sans conséquence
+    // stockage indisponible : le choix ne sera pas mémorisé
   }
+  await applyOrientationPref(pref);
 }

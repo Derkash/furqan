@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { initAudioStore, isNativeApp } from '@/utils/audioStore';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
+import { applyOrientationPref } from '@/utils/orientation';
 
 /**
  * Initialisations côté client au démarrage. Dans l'app iPad (Capacitor) :
@@ -14,6 +15,9 @@ export default function AppInit() {
   useEffect(() => {
     if (isNativeApp()) {
       document.documentElement.classList.add('capacitor');
+      // Orientation choisie par l'utilisateur (Auto par défaut) : rien n'est
+      // imposé, on se contente de rétablir son réglage.
+      applyOrientationPref();
     }
     // Nettoyage : le lexique s'était importé sans compte (« guest ») avant que
     // le vocabulaire ne soit réservé aux comptes connectés. On purge cette

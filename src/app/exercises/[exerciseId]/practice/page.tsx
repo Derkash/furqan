@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { PracticeShell } from '@/components/AppShell';
+import OrientationControl from '@/components/OrientationControl';
 import { hapticLight } from '@/utils/haptics';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useExercise } from '@/hooks/exercises/useExercise';
@@ -944,6 +945,7 @@ function MushafPractice() {
                   ))}
                 </div>
                 <p className="text-[11px] text-[var(--ds-n600)] mt-2">0 = tout visible · 8 = quasi tout masqué</p>
+                <OrientationControl className="mt-4" />
               </div>
             )}
             {hifzLayer === 'affichage' && (

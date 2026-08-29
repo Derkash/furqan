@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getVocab,
   recordReview,
@@ -8,12 +8,8 @@ import {
   importSeed,
   type VocabEntry,
 } from '@/utils/vocab/vocabStore';
-import { getRootLocations } from '@/utils/vocab/morphology';
+import { scopeVocabToPages } from '@/utils/vocab/rangeScope';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
-import { unitToPageRange } from '@/utils/exercises/rangeToPages';
-import { loadSharedRange } from '@/utils/exercises/sharedRange';
-import { type RangePickerValue } from '@/components/exercises/RangePicker';
 
 const THRESHOLD = 110;
 
@@ -26,13 +22,20 @@ interface QItem {
 /**
  * Révision « à la Tinder », SCOPÉE À UNE PLAGE (« où j'en suis »). Le mot et son
  * sens sont affichés directement ; on glisse à droite (acquis) / gauche (à revoir).
- * Seuls les mots dont la racine apparaît dans la plage choisie sont proposés.
+ * Seuls les mots du lexique PRÉSENTS dans la plage choisie sont proposés
+ * (identité par lemme, comme le surlignage du Mushaf — jamais par racine seule).
  */
-export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
-  const { data: units } = useQuranUnits();
+export default function SwipeReview({
+  onEmpty,
+  startPage,
+  endPage,
+}: {
+  onEmpty?: () => void;
+  startPage: number | null;
+  endPage: number | null;
+}) {
   const [ready, setReady] = useState(false);
   const [total, setTotal] = useState(0);
-  const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
   const [building, setBuilding] = useState(false);
   const [queue, setQueue] = useState<QItem[]>([]);
   const [started, setStarted] = useState(false);
@@ -47,39 +50,28 @@ export default function SwipeReview({ onEmpty }: { onEmpty?: () => void }) {
   const startX = useRef(0);
   const committing = useRef(false);
 
-  const { startPage, endPage } = useMemo(
-    () => unitToPageRange(range.mode, range.start, range.end, units),
-    [range, units]
-  );
-
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     seedVocabIfNeeded().then(() => {
       setTotal(getVocab().length);
-      // Plage GLOBALE partagée (même « où j'en suis » que les exercices).
-      const shared = loadSharedRange();
-      if (shared) setRange({ mode: shared.mode, start: shared.start, end: shared.end });
       setReady(true);
     });
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Construit la file scopée à la plage : mots dont la racine apparaît dedans,
+  // Construit la file scopée à la plage : mots du lexique qui y apparaissent,
   // triés par 1re apparition (ordre de progression).
   const beginRange = async () => {
     if (startPage == null || endPage == null) return;
-    const lo = Math.min(startPage, endPage);
-    const hi = Math.max(startPage, endPage);
     setBuilding(true);
-    const items: QItem[] = [];
-    for (const entry of getVocab()) {
-      if (!entry.root) continue; // sans racine → non localisable
-      const locs = await getRootLocations(entry.root, lo, hi);
-      if (locs.length === 0) continue;
-      items.push({ entry, ref: { verseKey: locs[0].verseKey, page: locs[0].page }, count: locs.length });
-    }
-    items.sort((a, b) => (a.ref?.page ?? 0) - (b.ref?.page ?? 0));
-    launch(items);
+    const scoped = await scopeVocabToPages(getVocab(), startPage, endPage);
+    launch(
+      scoped.map(({ entry, hit }) => ({
+        entry,
+        ref: { verseKey: hit.verseKey, page: hit.firstPage },
+        count: hit.count,
+      }))
+    );
     setBuilding(false);
   };
 

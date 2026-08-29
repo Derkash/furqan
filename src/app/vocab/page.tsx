@@ -14,6 +14,7 @@ import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import ReviewTab from '@/components/vocab/ReviewTab';
 import MatchGame from '@/components/vocab/MatchGame';
 import { getRootFirstPage } from '@/utils/vocab/morphology';
+import { useScopedVocab } from '@/hooks/useScopedVocab';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
 import { MODE_LABELS } from '@/utils/exercises/rangeToPages';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
@@ -159,14 +160,16 @@ function VocabPageInner() {
 
       {/* Contenu — se recale quand la plage change */}
       <div key={rangeKey} className="flex-1 min-h-0 flex flex-col">
-        {mode === 'review' && <ReviewTab onEmpty={() => setMode('capture')} />}
+        {mode === 'review' && (
+          <ReviewTab onEmpty={() => setMode('capture')} startPage={startPage} endPage={endPage} />
+        )}
         {mode === 'match' && (
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
-            <MatchGame />
+            <MatchGame startPage={startPage} endPage={endPage} />
           </div>
         )}
         {mode === 'capture' && <ReadMode />}
-        {mode === 'list' && <ListMode />}
+        {mode === 'list' && <ListMode startPage={startPage} endPage={endPage} />}
       </div>
     </div>
   );
@@ -348,8 +351,11 @@ function ReadMode() {
 // MON LEXIQUE
 // ============================================================
 
-function ListMode() {
+function ListMode({ startPage, endPage }: { startPage: number | null; endPage: number | null }) {
   const [items, setItems] = useState<VocabEntry[]>([]);
+  // Quand une plage est définie, on N'AFFICHE QUE les mots du lexique qui
+  // apparaissent dans ces pages. Le bouton « tout le lexique » lève le filtre.
+  const [scopeToRange, setScopeToRange] = useState(true);
   const [query, setQuery] = useState('');
   const [explore, setExplore] = useState<{ root: string; gloss?: string; lemma?: string } | null>(null);
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
@@ -383,25 +389,42 @@ function ListMode() {
   }, [items]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  const hasRange = startPage != null && endPage != null;
+  const scoping = hasRange && scopeToRange;
+  const { scoped, loading: scopeLoading } = useScopedVocab(
+    items,
+    scoping ? startPage : null,
+    scoping ? endPage : null
+  );
+  // Mots de la plage + leurs occurrences (page de 1re apparition DANS la plage).
+  const inRange = useMemo(
+    () => (scoped ? new Map(scoped.map((s) => [s.entry.id, s.hit])) : null),
+    [scoped]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     // Recherche arabe INDÉPENDANTE des voyelles (harakat) : on compare les
     // formes « nues » → taper un mot sans harakat le retrouve quand même.
     const qBare = bareForm(query.trim());
+    // Tant que le scope se calcule, on n'affiche pas le lexique entier (évite
+    // un flash des mots hors plage).
+    const base = inRange ? scoped!.map((s) => s.entry) : scoping ? [] : items;
     const list = q
-      ? items.filter(
+      ? base.filter(
           (e) =>
             e.gloss.toLowerCase().includes(q) ||
             (qBare && bareForm(e.arabic).includes(qBare)) ||
             (qBare && e.lemma && bareForm(e.lemma).includes(qBare)) ||
             (qBare && e.root && bareForm(e.root).includes(qBare))
         )
-      : items;
-    // Tri par ORDRE D'APPARITION dans le Mushaf (depuis le début de Baqara),
-    // quel que soit l'endroit où le mot a été ajouté.
-    const rank = (e: VocabEntry) => firstPage[e.id] ?? Number.POSITIVE_INFINITY;
+      : base;
+    // Tri par ORDRE D'APPARITION : dans la plage quand elle est active, sinon
+    // dans le Mushaf entier (depuis le début de Baqara).
+    const rank = (e: VocabEntry) =>
+      inRange ? (inRange.get(e.id)?.firstPage ?? Number.POSITIVE_INFINITY) : (firstPage[e.id] ?? Number.POSITIVE_INFINITY);
     return [...list].sort((a, b) => rank(a) - rank(b));
-  }, [items, query, firstPage]);
+  }, [items, scoped, inRange, scoping, query, firstPage]);
 
   const doImport = async () => {
     const n = await importSeed();
@@ -488,13 +511,41 @@ function ListMode() {
         </div>
         {seedMsg && <p className="text-xs text-[var(--ds-sage)] mb-2">{seedMsg}</p>}
 
+        {/* Portée de la liste : plage définie ⇒ uniquement les mots qui y sont. */}
+        {hasRange && (
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setScopeToRange(true)}
+              className={`text-[11px] font-bold rounded-full px-2.5 py-1 transition-colors ${
+                scopeToRange ? 'bg-[var(--ds-green)] text-white' : 'text-[var(--ds-sage)] border border-[var(--ds-gold)]/40'
+              }`}
+            >
+              Mots de ma plage
+            </button>
+            <button
+              onClick={() => setScopeToRange(false)}
+              className={`text-[11px] font-bold rounded-full px-2.5 py-1 transition-colors ${
+                !scopeToRange ? 'bg-[var(--ds-green)] text-white' : 'text-[var(--ds-sage)] border border-[var(--ds-gold)]/40'
+              }`}
+            >
+              Tout le lexique
+            </button>
+          </div>
+        )}
+
         <p className="text-xs text-gray-400 mb-2">
-          {toArabicNumbers(items.length)} mot{items.length > 1 ? 's' : ''} — {toArabicNumbers(items.filter((e) => e.root).length)} avec racine
+          {scoping && scopeLoading
+            ? 'Recherche des mots présents dans la plage…'
+            : scoping
+              ? `${toArabicNumbers(scoped?.length ?? 0)} mot${(scoped?.length ?? 0) > 1 ? 's' : ''} du lexique dans les pages ${Math.min(startPage!, endPage!)}–${Math.max(startPage!, endPage!)} (sur ${toArabicNumbers(items.length)})`
+              : `${toArabicNumbers(items.length)} mot${items.length > 1 ? 's' : ''} — ${toArabicNumbers(items.filter((e) => e.root).length)} avec racine`}
         </p>
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !(scoping && scopeLoading) && (
           <p className="text-center text-gray-500 py-10 text-sm">
-            Aucun mot. Va dans « Lire &amp; capturer » pour en ajouter.
+            {scoping
+              ? 'Aucun mot de ton lexique n’apparaît dans cette plage.'
+              : 'Aucun mot. Va dans « Lire & capturer » pour en ajouter.'}
           </p>
         )}
 
@@ -520,6 +571,11 @@ function ListMode() {
                       <span key={b} className={`w-1.5 h-1.5 rounded-full ${b < e.box ? 'bg-[var(--ds-sage)]' : 'bg-[var(--ds-sage)]/15'}`} />
                     ))}
                   </span>
+                  {inRange?.get(e.id) && (
+                    <span className="text-[10px] text-[var(--ds-sage)] bg-[var(--ds-sage)]/10 rounded-full px-2 py-0.5">
+                      p. {inRange.get(e.id)!.firstPage} · {toArabicNumbers(inRange.get(e.id)!.count)}×
+                    </span>
+                  )}
                   {e.source === 'seed' && <span className="text-[10px] text-gray-400">lexique</span>}
                 </div>
               </div>

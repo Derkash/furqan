@@ -8,7 +8,15 @@ type Sub = 'swipe' | 'guess';
 
 /** Onglet Révision : « Parcourir » (swipe, sens visible) par défaut, et
  *  « Deviner » (flashcards) gardé à côté. */
-export default function ReviewTab({ onEmpty }: { onEmpty?: () => void }) {
+export default function ReviewTab({
+  onEmpty,
+  startPage,
+  endPage,
+}: {
+  onEmpty?: () => void;
+  startPage: number | null;
+  endPage: number | null;
+}) {
   const [sub, setSub] = useState<Sub>('swipe');
 
   return (
@@ -29,7 +37,11 @@ export default function ReviewTab({ onEmpty }: { onEmpty?: () => void }) {
           </button>
         ))}
       </div>
-      {sub === 'swipe' ? <SwipeReview onEmpty={onEmpty} /> : <ReviewSession onEmpty={onEmpty} />}
+      {sub === 'swipe' ? (
+        <SwipeReview onEmpty={onEmpty} startPage={startPage} endPage={endPage} />
+      ) : (
+        <ReviewSession onEmpty={onEmpty} startPage={startPage} endPage={endPage} />
+      )}
     </div>
   );
 }

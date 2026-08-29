@@ -2,7 +2,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { lockPortrait, restoreLandscape } from '@/utils/orientation';
 
 interface SurahItem {
   name: string;
@@ -93,16 +92,9 @@ export default function AdhkarPractice() {
   const [surahCounts, setSurahCounts] = useState<number[]>([]); // compteurs de la carte « sourates »
   const [showTrans, setShowTrans] = useState(false);
 
-  // Exception d'orientation : les Adkar s'utilisent en PORTRAIT (consultation
-  // rapide, téléphone tenu verticalement). Sur l'app native on verrouille le
-  // portrait à l'entrée et on rétablit le paysage standard en sortant ;
-  // sur le web c'est un no-op (interface responsive, rien d'imposé).
-  useEffect(() => {
-    lockPortrait();
-    return () => {
-      restoreLandscape();
-    };
-  }, []);
+  // Aucune orientation imposée : les Adkar se lisent aussi bien en portrait
+  // qu'en paysage. Le sens d'affichage suit l'appareil (web) ou le réglage
+  // « Orientation » du menu Réglages (app native).
 
   useEffect(() => {
     fetch('/adhkar.json')

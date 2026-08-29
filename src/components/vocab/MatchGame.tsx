@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getVocab, recordReview, type VocabEntry } from '@/utils/vocab/vocabStore';
+import { useScopedVocab } from '@/hooks/useScopedVocab';
 
 /**
  * Jeu d'association du vocabulaire (maquette AlMuraja3a — Exercice Vocabulaire).
@@ -9,6 +10,9 @@ import { getVocab, recordReview, type VocabEntry } from '@/utils/vocab/vocabStor
  * carte arabe puis sa traduction française ; à chaque bonne association, le mot
  * quitte le plateau et un nouveau mot du vocabulaire vient prendre la place
  * libérée (arabe ET français). On enchaîne jusqu'à épuisement du lexique.
+ *
+ * Quand une plage de lecture est définie, SEULS les mots du lexique présents
+ * dans cette plage sont jouables.
  */
 
 const ARABIC_SLOTS = 4;
@@ -29,9 +33,21 @@ function shuffle<T>(a: T[]): T[] {
   return r;
 }
 
-export default function MatchGame() {
-  const all = useMemo(() => getVocab().filter((e) => e.arabic && e.gloss), []);
+export default function MatchGame({
+  startPage = null,
+  endPage = null,
+}: {
+  startPage?: number | null;
+  endPage?: number | null;
+}) {
+  const vocab = useMemo(() => getVocab().filter((e) => e.arabic && e.gloss), []);
+  const { scoped, loading: scopeLoading } = useScopedVocab(vocab, startPage, endPage);
+  const all = useMemo(
+    () => (scoped ? scoped.map((s) => s.entry) : vocab),
+    [scoped, vocab]
+  );
   const total = all.length;
+  const scopedToRange = scoped != null;
 
   // File des mots pas encore posés sur le plateau.
   const poolRef = useRef<VocabEntry[]>([]);
@@ -109,13 +125,22 @@ export default function MatchGame() {
     }
   };
 
+  if (scopeLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-20 text-center" dir="ltr">
+        <p className="text-[var(--ds-n600)] text-sm">Recherche des mots de ta plage…</p>
+      </div>
+    );
+  }
+
   if (total < ARABIC_SLOTS) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20 text-center" dir="ltr">
         <p className="font-extrabold text-lg text-[var(--ds-green)]">Pas encore assez de mots.</p>
         <p className="text-[var(--ds-n600)] text-sm max-w-sm">
-          Ajoute au moins {ARABIC_SLOTS} mots à ton vocabulaire (onglet « Enregistrer ») pour
-          lancer le jeu d&apos;association.
+          {scopedToRange
+            ? `Ta plage (pages ${Math.min(startPage!, endPage!)}–${Math.max(startPage!, endPage!)}) ne contient que ${total} mot(s) de ton lexique. Élargis la plage ou ajoute des mots en lisant ces pages.`
+            : `Ajoute au moins ${ARABIC_SLOTS} mots à ton vocabulaire (onglet « Enregistrer ») pour lancer le jeu d'association.`}
         </p>
       </div>
     );
