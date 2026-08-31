@@ -65,6 +65,10 @@ export default function SequencedReadingPractice() {
   const [error, setError] = useState<string | null>(null);
 
   // ---- Déroulé ----
+  // Paysage = 2 pages côte à côte ; portrait = UNE seule page (celle du verset
+  // en cours) — le suivi de lecture avance alors page par page.
+  const orientation: Orientation = useOrientation();
+  const portrait = orientation === 'portrait';
   const [page, setPage] = useState(2);
   const [left, setLeft] = useState<PageVerses | null>(null);
   const [right, setRight] = useState<PageVerses | null>(null);
@@ -156,8 +160,8 @@ export default function SequencedReadingPractice() {
   }
 
   function followPage(p: number) {
-    const rp = p % 2 === 1 ? p : p - 1;
-    setPage((cur) => (cur === rp ? cur : rp));
+    const target = portrait ? p : p % 2 === 1 ? p : p - 1;
+    setPage((cur) => (cur === target ? cur : target));
   }
 
   // ---- Construction des tronçons selon l'unité choisie ----
@@ -421,7 +425,6 @@ export default function SequencedReadingPractice() {
 
   // Orientation réelle de l'écran : en paysage 2 pages côte à côte, en
   // portrait (web smartphone) 2 pages empilées — plus de paysage imposé.
-  const orientation: Orientation = useOrientation();
 
   // ---- Écran de configuration ----
   if (phase === 'config') {
@@ -593,11 +596,12 @@ export default function SequencedReadingPractice() {
       {/* Mushaf (versets révélés accumulés) */}
       <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
-        <div className="book-box">
+        <div className={portrait ? 'book-box book-box-single' : 'book-box'}>
         <MushafDoublePage
           leftPageVerses={left}
           rightPageVerses={right}
           pagePair={pair}
+          currentPage={page}
           orientation={orientation}
           revealedVerses={visible}
           visibleVerses={visible}

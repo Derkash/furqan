@@ -87,6 +87,8 @@ export default function RecitationPractice() {
 
   // Phase résultat : double page affichée (feuilletable sur tout le Mushaf)
   const [resultPair, setResultPair] = useState<PagePair | null>(null);
+  // Portrait : page UNIQUE affichée (celle du verset, puis feuilletage page à page).
+  const [viewPage, setViewPage] = useState<number | null>(null);
   // Sélection de mots en faute : "verseKey#position" → en attente de validation
   const [selectedWords, setSelectedWords] = useState<Map<string, { verseKey: string; position: number; page: number }>>(new Map());
   // Difficultés persistées ("verseKey#position" → 'diff-1'…'diff-4') : affichées
@@ -97,8 +99,9 @@ export default function RecitationPractice() {
 
   const audio = useAudio();
   const recorder = useAudioRecorder();
-  // Orientation réelle de l'écran (portrait web = pages empilées, responsive).
+  // Paysage = 2 pages côte à côte ; portrait = UNE seule page.
   const orientation = useOrientation();
+  const portrait = orientation === 'portrait';
 
   // Vitesse de réécoute de l'enregistrement (×2 par défaut).
   const [playbackRate, setPlaybackRate] = useState(2);
@@ -224,6 +227,7 @@ export default function RecitationPractice() {
       setTarget(verse);
       setPagePair(pair);
       setResultPair(pair);
+      setViewPage(verse.page);
       setLeftPageVerses(left);
       setRightPageVerses(right);
       setSelectedWords(new Map());
@@ -326,15 +330,46 @@ export default function RecitationPractice() {
   };
 
   // ---------- Feuilletage en phase résultat : TOUT le Mushaf (1 → 604) ----------
-  const canFlipPrev = !!(resultPair && resultPair.rightPage > 1);
-  const canFlipNext = !!(resultPair && resultPair.rightPage < 603);
+  // Portrait : page par page. Paysage : double page par double page.
+  const canFlipPrev = portrait ? (viewPage ?? 1) > 1 : !!(resultPair && resultPair.rightPage > 1);
+  const canFlipNext = portrait ? (viewPage ?? 604) < 604 : !!(resultPair && resultPair.rightPage < 603);
 
   const flipResult = (direction: 'prev' | 'next') => {
     if (!resultPair) return;
+    if (portrait) {
+      const cur = viewPage ?? resultPair.rightPage;
+      const t = Math.max(1, Math.min(604, cur + (direction === 'next' ? 1 : -1)));
+      if (t === cur) return;
+      setViewPage(t);
+      const np = getPagePair(t);
+      if (np.rightPage !== resultPair.rightPage) setResultPair(np);
+      return;
+    }
     let target2 = resultPair.rightPage + (direction === 'next' ? 2 : -2);
     target2 = Math.max(1, Math.min(603, target2));
-    if (target2 !== resultPair.rightPage) setResultPair(getPagePair(target2));
+    if (target2 !== resultPair.rightPage) {
+      setResultPair(getPagePair(target2));
+      setViewPage(target2);
+    }
   };
+
+  // Les versets suivent la double page affichée (le feuilletage en phase
+  // résultat changeait la paire sans recharger les pages).
+  useEffect(() => {
+    const pair = phase === 'result' ? resultPair : pagePair;
+    if (!pair) return;
+    let cancelled = false;
+    Promise.all([fetchPageVerses(pair.leftPage), fetchPageVerses(pair.rightPage)])
+      .then(([l, r]) => {
+        if (cancelled) return;
+        setLeftPageVerses(l);
+        setRightPageVerses(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, resultPair, pagePair]);
 
   // ---------- Sélection des mots en faute (phase résultat) ----------
   const handleZoneClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -653,11 +688,12 @@ export default function RecitationPractice() {
           {phase === 'result' && <span dir="ltr"> · {target.verseKey}</span>}
         </div>
         <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
-        <div className="book-box">
+        <div className={portrait ? 'book-box book-box-single' : 'book-box'}>
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
           pagePair={displayedPair}
+          currentPage={viewPage ?? undefined}
           orientation={orientation}
           revealedVerses={new Set([target.verseKey])}
           visibleVerses={new Set([target.verseKey])}

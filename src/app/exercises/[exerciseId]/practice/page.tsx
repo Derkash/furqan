@@ -262,10 +262,14 @@ function MushafPractice() {
     reset,
   } = useExercise();
 
-  // Orientation réelle de l'écran : paysage = 2 pages côte à côte, portrait
-  // (web smartphone) = pages empilées. L'app native reste verrouillée paysage.
+  // Orientation réelle de l'écran : paysage = 2 pages côte à côte, portrait =
+  // UNE seule page (feuilletage page à page). Rien n'est imposé.
   const orientation: Orientation = useOrientation();
+  const portrait = orientation === 'portrait';
   const audio = useAudio();
+  // Portrait : page unique affichée. Par défaut celle de la question en cours ;
+  // les flèches la déplacent d'une page à la fois (au lieu d'une double page).
+  const [viewPage, setViewPage] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
   // Dernier verset joué à l'audio dans le tour courant : permet de le faire
   // répéter à tout moment (bouton dans le bandeau), à toutes les étapes.
@@ -274,6 +278,31 @@ function MushafPractice() {
   const [readingMode, setReadingMode] = useState(false);
   const isHifz = exerciseId === 'hifz';
   const fullscreen = isHifz && readingMode;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setViewPage(displayedPage);
+  }, [displayedPage]);
+  const shownPage = viewPage ?? displayedPage;
+
+  // Feuilletage : d'une page en portrait, d'une double page en paysage.
+  const canPrev = portrait ? canFlipPrev || shownPage > pagePair.rightPage : canFlipPrev;
+  const canNext = portrait ? canFlipNext || shownPage < pagePair.leftPage : canFlipNext;
+  const flipView = (dir: 'prev' | 'next') => {
+    if (!portrait) {
+      flipPair(dir);
+      return;
+    }
+    const target = shownPage + (dir === 'next' ? 1 : -1);
+    if (target >= pagePair.rightPage && target <= pagePair.leftPage) {
+      setViewPage(target);
+      return;
+    }
+    if (dir === 'next' ? canFlipNext : canFlipPrev) {
+      flipPair(dir);
+      setViewPage(target);
+    }
+  };
 
   // Séquentiel : on ACCUMULE les versets révélés (début/milieu/fin) au fil des
   // pages ; ainsi, en passant de 77 à 78, ce qui a été montré sur 77 reste
@@ -1039,7 +1068,7 @@ function MushafPractice() {
       {/* Zone Mushaf */}
       <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" style={{ paddingLeft: isHifz ? 60 : 0 }} onClick={handleMushafClick}>
         <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
-        <div className="book-box">
+        <div className={portrait ? 'book-box book-box-single' : 'book-box'}>
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
@@ -1053,7 +1082,7 @@ function MushafPractice() {
           verseThemes={isHifz && showThemes ? tafsirGroups : null}
           loading={loading}
           singlePage={singlePage}
-          currentPage={singlePage ? displayedPage : undefined}
+          currentPage={portrait || singlePage ? shownPage : undefined}
           hifzLevel={exerciseId === 'hifz' ? hifzLevel : undefined}
           revealFraction={currentStep?.ui.revealFraction}
           onTap={handleTap}
@@ -1324,15 +1353,15 @@ function MushafPractice() {
             <button
               type="button"
               aria-label="Pages précédentes"
-              disabled={!canFlipPrev}
+              disabled={!canPrev}
               onClick={(e) => {
                 e.stopPropagation();
                 setPopover(null);
                 hapticLight();
-                flipPair('prev');
+                flipView('prev');
               }}
               className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
-                canFlipPrev
+                canPrev
                   ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
                   : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}
@@ -1346,16 +1375,16 @@ function MushafPractice() {
             <button
               type="button"
               aria-label="Pages suivantes"
-              disabled={!canFlipNext}
+              disabled={!canNext}
               onClick={(e) => {
                 e.stopPropagation();
                 setPopover(null);
                 hapticLight();
                 creditHifzPair();
-                flipPair('next');
+                flipView('next');
               }}
               className={`absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center shadow-lg border border-[var(--ds-gold)]/40 transition-opacity ${
-                canFlipNext
+                canNext
                   ? 'bg-[var(--ds-green)]/90 text-[var(--ds-bg)] hover:bg-[var(--ds-green)] active:scale-95'
                   : 'bg-[var(--ds-green)]/30 text-[var(--ds-bg)]/40 cursor-not-allowed'
               }`}

@@ -140,6 +140,11 @@ export default function LecturePractice() {
   const { verseMap } = useVerseMap();
   const recorder = useAudioRecorder(); // enregistrement micro + réécoute
 
+  // Paysage = 2 pages côte à côte ; portrait = UNE seule page (feuilletage
+  // page à page). Plus aucune orientation n'est imposée.
+  const orientation: Orientation = useOrientation();
+  const portrait = orientation === 'portrait';
+
   const [page, setPage] = useState(startPage);
   // Mémorise la dernière page lue : la sidebar « Lecture » rentre directement dedans.
   useEffect(() => {
@@ -260,8 +265,8 @@ export default function LecturePractice() {
 
   const pair = pairOf(page);
   // Navigation libre sur tout le Mushaf (pages de droite : 1 → 603).
-  const canPrev = pair.rightPage > 1;
-  const canNext = pair.rightPage < 603;
+  const canPrev = portrait ? page > 1 : pair.rightPage > 1;
+  const canNext = portrait ? page < 604 : pair.rightPage < 603;
 
   // ---- Crédit de lecture : quitter une double page vers l'AVANT après un
   // temps de lecture minimal = « versets récités ». Les mots en difficulté de
@@ -272,12 +277,18 @@ export default function LecturePractice() {
   const sessionFaultKeys = useRef<Set<string>>(new Set()); // fautes déclarées cette session
   useEffect(() => {
     pairShownAt.current = Date.now();
-  }, [pair.rightPage]);
+  }, [pair.rightPage, page]);
   const creditCurrentPair = () => {
     if (Date.now() - pairShownAt.current < MIN_READ_MS) return;
     const user = getCurrentUser();
     if (!user) return;
-    const keys = [...(right?.verses ?? []), ...(left?.verses ?? [])]
+    // Portrait : seule la page affichée est créditée (pas la double page).
+    const shown = portrait
+      ? page === pair.rightPage
+        ? (right?.verses ?? [])
+        : (left?.verses ?? [])
+      : [...(right?.verses ?? []), ...(left?.verses ?? [])];
+    const keys = shown
       .map((v) => v.verseKey)
       .filter((k) => !creditedVerses.current.has(k));
     if (keys.length === 0) return;
@@ -482,8 +493,8 @@ export default function LecturePractice() {
   // ---- Moteur de lecture ----
 
   function followPage(p: number) {
-    const rp = p % 2 === 1 ? p : p - 1;
-    setPage((cur) => (cur === rp ? cur : rp));
+    const target = portrait ? p : p % 2 === 1 ? p : p - 1;
+    setPage((cur) => (cur === target ? cur : target));
   }
 
   function playVerseArabic() {
@@ -949,6 +960,8 @@ export default function LecturePractice() {
     setVerseMenu(null);
     closeVerseLayer();
     setPage((p) => {
+      // Portrait : une page à la fois. Paysage : double page (pas de 2).
+      if (portrait) return Math.max(1, Math.min(604, p + (dir === 'next' ? 1 : -1)));
       const cur = p % 2 === 1 ? p : p - 1;
       let t = cur + (dir === 'next' ? 2 : -2);
       t = Math.max(1, Math.min(603, t));
@@ -1200,9 +1213,6 @@ export default function LecturePractice() {
     setLexicon(lexiconMatchSets()); // le nouveau mot se surligne aussitôt
   }, []);
 
-  // Orientation réelle de l'écran : en paysage 2 pages côte à côte, en
-  // portrait (web smartphone) 2 pages empilées — plus de paysage imposé.
-  const orientation: Orientation = useOrientation();
   const visibleVerses = useMemo(
     () => new Set([...(right?.verses ?? []), ...(left?.verses ?? [])].map((v) => v.verseKey)),
     [right, left]
@@ -1541,12 +1551,13 @@ export default function LecturePractice() {
           style={{ filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.35))' }}
         >
         <div
-          className={orientation === 'landscape' ? 'book-box' : 'h-full w-full'}
+          className={portrait ? 'book-box book-box-single' : 'book-box'}
         >
           <MushafDoublePage
             leftPageVerses={left}
             rightPageVerses={right}
             pagePair={pair}
+            currentPage={page}
             orientation={orientation}
             revealedVerses={visibleVerses}
             visibleVerses={visibleVerses}

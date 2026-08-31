@@ -30,10 +30,10 @@ interface MushafDoublePageProps {
 }
 
 /**
- * Affiche deux pages du Mushaf côte à côte (paysage) ou empilées (portrait)
- * Page IMPAIRE (1, 3, 5...) à DROITE
- * Page PAIRE (2, 4, 6...) à GAUCHE
- * Images collées bord à bord sans aucun espace
+ * PAYSAGE : toujours DEUX pages côte à côte — impaire (1, 3, 5…) à DROITE,
+ * paire (2, 4, 6…) à GAUCHE, collées bord à bord.
+ * PORTRAIT : toujours UNE SEULE page — celle passée en `currentPage` (les
+ * écrans feuillettent alors page par page), à défaut la page impaire du couple.
  */
 export default function MushafDoublePage({
   leftPageVerses,
@@ -58,10 +58,16 @@ export default function MushafDoublePage({
 }: MushafDoublePageProps) {
   const isLandscape = orientation === 'landscape';
 
-  // Mode page unique : afficher seulement la page courante
-  if (singlePage && currentPage !== undefined) {
-    const isCurrentPageRight = currentPage === pagePair.rightPage;
-    const pageVerses = isCurrentPageRight ? rightPageVerses : leftPageVerses;
+  // Page unique : demandé explicitement (singlePage) OU portrait — en portrait
+  // on n'empile plus deux pages, on n'en montre qu'UNE.
+  if (singlePage || !isLandscape) {
+    // La page à montrer : celle demandée si elle appartient au couple chargé,
+    // sinon la page impaire (droite) — jamais d'écran vide.
+    const shown =
+      currentPage === pagePair.leftPage || currentPage === pagePair.rightPage
+        ? currentPage
+        : pagePair.rightPage;
+    const pageVerses = shown === pagePair.rightPage ? rightPageVerses : leftPageVerses;
 
     return (
       <div
@@ -75,9 +81,9 @@ export default function MushafDoublePage({
           cursor: 'pointer',
         }}
       >
-        <div style={{ height: '100%', maxWidth: '100%', aspectRatio: '0.7' }}>
+        <div style={{ height: '100%', maxWidth: '100%', aspectRatio: '759 / 1080' }}>
           <MushafPage
-            pageNumber={currentPage}
+            pageNumber={shown}
             pageVerses={pageVerses}
             revealedVerses={revealedVerses}
             visibleVerses={visibleVerses}
@@ -97,16 +103,14 @@ export default function MushafDoublePage({
     );
   }
 
-  // Page impaire (rightPage) à DROITE, page paire (leftPage) à GAUCHE
-  // En flex row: on affiche d'abord gauche puis droite
-  // leftPage = page paire, rightPage = page impaire
-
+  // PAYSAGE — page impaire (rightPage) à DROITE, page paire (leftPage) à GAUCHE.
+  // En flex row (LTR forcé) : le premier enfant est donc la page PAIRE.
   return (
     <div
       onClick={onTap}
       style={{
         display: 'flex',
-        flexDirection: isLandscape ? 'row' : 'column',
+        flexDirection: 'row',
         direction: 'ltr', // Force LTR pour que le premier enfant soit à GAUCHE
         width: '100%',
         height: '100%',
@@ -116,91 +120,45 @@ export default function MushafDoublePage({
         cursor: 'pointer',
       }}
     >
-      {isLandscape ? (
-        <>
-          {/* GAUCHE de l'écran = page PAIRE (leftPage) */}
-          <div style={{ flex: 1, height: '100%', margin: 0, padding: 0 }}>
-            <MushafPage
-              pageNumber={pagePair.leftPage}
-              pageVerses={leftPageVerses}
-              revealedVerses={revealedVerses}
-              visibleVerses={visibleVerses}
-              highlightedVerseKey={highlightedVerseKey}
-              extraHighlightVerseKeys={extraHighlightVerseKeys}
-              isBlurred={isBlurred}
-              maskAll={maskAll}
-              wordMarks={wordMarks}
-              circledMarkerVerseKeys={circledMarkerVerseKeys}
-              verseThemes={verseThemes}
-              hifzLevel={hifzLevel}
-              revealFraction={revealFraction}
-              loading={loading && !leftPageVerses}
-            />
-          </div>
+      {/* GAUCHE de l'écran = page PAIRE (leftPage) */}
+      <div style={{ flex: 1, height: '100%', margin: 0, padding: 0 }}>
+        <MushafPage
+          pageNumber={pagePair.leftPage}
+          pageVerses={leftPageVerses}
+          revealedVerses={revealedVerses}
+          visibleVerses={visibleVerses}
+          highlightedVerseKey={highlightedVerseKey}
+          extraHighlightVerseKeys={extraHighlightVerseKeys}
+          isBlurred={isBlurred}
+          maskAll={maskAll}
+          wordMarks={wordMarks}
+          circledMarkerVerseKeys={circledMarkerVerseKeys}
+          verseThemes={verseThemes}
+          hifzLevel={hifzLevel}
+          revealFraction={revealFraction}
+          loading={loading && !leftPageVerses}
+        />
+      </div>
 
-          {/* DROITE de l'écran = page IMPAIRE (rightPage) */}
-          <div style={{ flex: 1, height: '100%', margin: 0, padding: 0 }}>
-            <MushafPage
-              pageNumber={pagePair.rightPage}
-              pageVerses={rightPageVerses}
-              revealedVerses={revealedVerses}
-              visibleVerses={visibleVerses}
-              highlightedVerseKey={highlightedVerseKey}
-              extraHighlightVerseKeys={extraHighlightVerseKeys}
-              isBlurred={isBlurred}
-              maskAll={maskAll}
-              wordMarks={wordMarks}
-              circledMarkerVerseKeys={circledMarkerVerseKeys}
-              verseThemes={verseThemes}
-              hifzLevel={hifzLevel}
-              revealFraction={revealFraction}
-              loading={loading && !rightPageVerses}
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* En portrait: page impaire en HAUT (on lit de haut en bas, droite d'abord) */}
-          <div style={{ flex: 1, minHeight: 0, margin: 0, padding: 0 }}>
-            <MushafPage
-              pageNumber={pagePair.rightPage}
-              pageVerses={rightPageVerses}
-              revealedVerses={revealedVerses}
-              visibleVerses={visibleVerses}
-              highlightedVerseKey={highlightedVerseKey}
-              extraHighlightVerseKeys={extraHighlightVerseKeys}
-              isBlurred={isBlurred}
-              maskAll={maskAll}
-              wordMarks={wordMarks}
-              circledMarkerVerseKeys={circledMarkerVerseKeys}
-              verseThemes={verseThemes}
-              hifzLevel={hifzLevel}
-              revealFraction={revealFraction}
-              loading={loading && !rightPageVerses}
-            />
-          </div>
-
-          {/* Page paire en BAS */}
-          <div style={{ flex: 1, minHeight: 0, margin: 0, padding: 0 }}>
-            <MushafPage
-              pageNumber={pagePair.leftPage}
-              pageVerses={leftPageVerses}
-              revealedVerses={revealedVerses}
-              visibleVerses={visibleVerses}
-              highlightedVerseKey={highlightedVerseKey}
-              extraHighlightVerseKeys={extraHighlightVerseKeys}
-              isBlurred={isBlurred}
-              maskAll={maskAll}
-              wordMarks={wordMarks}
-              circledMarkerVerseKeys={circledMarkerVerseKeys}
-              verseThemes={verseThemes}
-              hifzLevel={hifzLevel}
-              revealFraction={revealFraction}
-              loading={loading && !leftPageVerses}
-            />
-          </div>
-        </>
-      )}
+      {/* DROITE de l'écran = page IMPAIRE (rightPage) */}
+      <div style={{ flex: 1, height: '100%', margin: 0, padding: 0 }}>
+        <MushafPage
+          pageNumber={pagePair.rightPage}
+          pageVerses={rightPageVerses}
+          revealedVerses={revealedVerses}
+          visibleVerses={visibleVerses}
+          highlightedVerseKey={highlightedVerseKey}
+          extraHighlightVerseKeys={extraHighlightVerseKeys}
+          isBlurred={isBlurred}
+          maskAll={maskAll}
+          wordMarks={wordMarks}
+          circledMarkerVerseKeys={circledMarkerVerseKeys}
+          verseThemes={verseThemes}
+          hifzLevel={hifzLevel}
+          revealFraction={revealFraction}
+          loading={loading && !rightPageVerses}
+        />
+      </div>
     </div>
   );
 }

@@ -181,6 +181,9 @@ function VocabPageInner() {
 
 function ReadMode() {
   const { data: units } = useQuranUnits();
+  // Paysage = double page ; portrait = une seule page (feuilletage page à page).
+  const orientation: Orientation = useOrientation();
+  const portrait = orientation === 'portrait';
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
   const [started, setStarted] = useState(false);
   const [page, setPage] = useState(2);
@@ -227,12 +230,14 @@ function ReadMode() {
 
   const lo = startPage != null ? Math.min(startPage, endPage!) : 1;
   const hi = endPage != null ? Math.max(startPage!, endPage) : 604;
-  const canPrev = pair.rightPage > (lo % 2 === 1 ? lo : lo - 1);
-  const canNext = pair.rightPage < (hi % 2 === 1 ? hi : hi - 1);
+  const canPrev = portrait ? page > lo : pair.rightPage > (lo % 2 === 1 ? lo : lo - 1);
+  const canNext = portrait ? page < hi : pair.rightPage < (hi % 2 === 1 ? hi : hi - 1);
 
   const flip = (dir: 'prev' | 'next') => {
     setSelected(null);
     setPage((p) => {
+      // Portrait : une page à la fois. Paysage : on saute de double page.
+      if (portrait) return Math.max(lo, Math.min(hi, p + (dir === 'next' ? 1 : -1)));
       const cur = p % 2 === 1 ? p : p - 1;
       let t = cur + (dir === 'next' ? 2 : -2);
       const loP = lo % 2 === 1 ? lo : lo - 1;
@@ -278,14 +283,13 @@ function ReadMode() {
     );
   }
 
-  // Orientation réelle de l'écran (portrait = pages empilées, responsive web).
-  const orientation: Orientation = useOrientation();
   return (
     <div className="flex-1 min-h-0 relative" onClick={onMushafClick}>
       <MushafDoublePage
         leftPageVerses={left}
         rightPageVerses={right}
         pagePair={pair}
+        currentPage={page}
         orientation={orientation}
         revealedVerses={new Set()}
         visibleVerses={new Set()}
@@ -341,7 +345,9 @@ function ReadMode() {
 
       {/* Badge page */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-[var(--ds-green)]/85 text-[var(--ds-bg)] text-xs font-bold rounded-full px-3 py-1 pointer-events-none">
-        Pages {toArabicNumbers(pair.rightPage)}–{toArabicNumbers(pair.leftPage)}
+        {portrait
+          ? `Page ${toArabicNumbers(page)}`
+          : `Pages ${toArabicNumbers(pair.rightPage)}–${toArabicNumbers(pair.leftPage)}`}
       </div>
     </div>
   );

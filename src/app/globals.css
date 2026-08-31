@@ -126,6 +126,11 @@ body {
   aspect-ratio: 1518 / 1080;
   flex: none;
 }
+/* PORTRAIT : une seule page → même règle, ratio d'une demi-planche. */
+.book-box.book-box-single {
+  width: min(calc(100cqh * 0.7028), calc(100cqw / 0.875));
+  aspect-ratio: 759 / 1080;
+}
 
 /* Barre du bas (dans le flux, sous le livre) : montée douce. */
 @keyframes ds-rise-flow {
