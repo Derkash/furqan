@@ -11,6 +11,7 @@ export type ExerciseId =
   | 'recitation'
   | 'page-number'
   | 'verse-start'
+  | 'guess'
   | 'lecture';
 
 // ============================================
@@ -84,6 +85,13 @@ export interface ExerciseStepUI {
    * la page du tour) — ex. verset précédent situé sur la double page d'avant.
    */
   displayPage?: number;
+  /**
+   * Masque tout ce qui donne le numéro de la page (badge « sourate · n/total »
+   * de l'app ET numéro imprimé sur le scan) — exercice « Quelle page ? ».
+   */
+  hidePageNumber?: boolean;
+  /** Séparateurs de fin de verset à entourer en rouge (par verseKey). */
+  circledVerses?: string[];
 }
 
 export interface ExerciseStep {
@@ -164,6 +172,8 @@ export interface ExerciseConfig extends QuizConfig {
   revealContext?: boolean;
   /** Séquentiel : sens de progression dans la plage. */
   direction?: 'forward' | 'backward';
+  /** Devine : ce qu'il faut deviner — le verset masqué ou la page affichée. */
+  guessMode?: 'verse' | 'page';
 }
 
 // ============================================

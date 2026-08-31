@@ -22,6 +22,8 @@ interface MushafDoublePageProps {
   circledMarkerVerseKeys?: Set<string>;
   /** Thèmes de tafsir : verseKey → n° de groupe (teinte partagée par groupe). */
   verseThemes?: Record<string, number> | null;
+  /** Masque le numéro de page (badge app + numéro imprimé) — « Quelle page ? ». */
+  hidePageNumber?: boolean;
   singlePage?: boolean; // Afficher une seule page (la page courante)
   currentPage?: number; // Numéro de la page courante (pour mode singlePage)
   hifzLevel?: number; // Niveau de Hifz (0-8)
@@ -50,6 +52,7 @@ export default function MushafDoublePage({
   wordMarks,
   circledMarkerVerseKeys,
   verseThemes,
+  hidePageNumber = false,
   singlePage = false,
   currentPage,
   hifzLevel,
@@ -94,6 +97,7 @@ export default function MushafDoublePage({
               wordMarks={wordMarks}
               circledMarkerVerseKeys={circledMarkerVerseKeys}
               verseThemes={verseThemes}
+            hidePageNumber={hidePageNumber}
             hifzLevel={hifzLevel}
             revealFraction={revealFraction}
             loading={loading && !pageVerses}
@@ -134,6 +138,7 @@ export default function MushafDoublePage({
           wordMarks={wordMarks}
           circledMarkerVerseKeys={circledMarkerVerseKeys}
           verseThemes={verseThemes}
+          hidePageNumber={hidePageNumber}
           hifzLevel={hifzLevel}
           revealFraction={revealFraction}
           loading={loading && !leftPageVerses}
@@ -154,6 +159,7 @@ export default function MushafDoublePage({
           wordMarks={wordMarks}
           circledMarkerVerseKeys={circledMarkerVerseKeys}
           verseThemes={verseThemes}
+          hidePageNumber={hidePageNumber}
           hifzLevel={hifzLevel}
           revealFraction={revealFraction}
           loading={loading && !rightPageVerses}

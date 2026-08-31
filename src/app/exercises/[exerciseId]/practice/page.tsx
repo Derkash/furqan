@@ -237,6 +237,8 @@ function MushafPractice() {
   const revealTimeout = Number(searchParams.get('to')) || 0;
   // Début de verset : afficher aussi 1er/milieu/dernier verset à la révélation.
   const ctxParam = searchParams.get('ctx') === '1';
+  // Devine : ce qu'il faut deviner — le verset masqué ('verse') ou la page ('page').
+  const guessMode = searchParams.get('gm') === 'page' ? 'page' : 'verse';
 
   const {
     state,
@@ -284,6 +286,11 @@ function MushafPractice() {
     setViewPage(displayedPage);
   }, [displayedPage]);
   const shownPage = viewPage ?? displayedPage;
+  // Séparateurs de fin de verset à cercler en rouge (« Devine → Quelle page ? »).
+  const circledVerses = useMemo(
+    () => new Set(currentStep?.ui.circledVerses ?? []),
+    [currentStep]
+  );
 
   // Feuilletage : d'une page en portrait, d'une double page en paysage.
   const canPrev = portrait ? canFlipPrev || shownPage > pagePair.rightPage : canFlipPrev;
@@ -641,10 +648,11 @@ function MushafPractice() {
       answerMode,
       revealTimeout: revealTimeout > 0 ? revealTimeout : undefined,
       revealContext: ctxParam,
+      guessMode,
     }).then(() => {
       setInitialized(true);
     });
-  }, [exerciseId, startPage, endPage, startGlobal, endGlobal, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, ctxParam, initialize, initialized]);
+  }, [exerciseId, startPage, endPage, startGlobal, endGlobal, nParam, identifyParam, revealParam, showParam, dirParam, audioSeconds, fracParam, answerMode, revealTimeout, ctxParam, guessMode, initialize, initialized]);
 
   // Auto-start when initialized
   useEffect(() => {
@@ -773,7 +781,8 @@ function MushafPractice() {
     (exerciseId === 'audio-quiz' ||
       exerciseId === 'sequential' ||
       exerciseId === 'page-number' ||
-      exerciseId === 'verse-start');
+      exerciseId === 'verse-start' ||
+      exerciseId === 'guess');
   const roundTargets = useMemo(() => {
     const seen = new Map<string, number>();
     for (const step of state.currentRound?.steps ?? []) {
@@ -1068,7 +1077,7 @@ function MushafPractice() {
       {/* Zone Mushaf */}
       <div className="book-centered flex-1 min-h-0 relative overflow-hidden flex flex-col" style={{ paddingLeft: isHifz ? 60 : 0 }} onClick={handleMushafClick}>
         <div className="book-area w-full flex-1 min-h-0 flex justify-center items-start overflow-hidden">
-        <div className={portrait ? 'book-box book-box-single' : 'book-box'}>
+        <div className={portrait || singlePage ? 'book-box book-box-single' : 'book-box'}>
         <MushafDoublePage
           leftPageVerses={leftPageVerses}
           rightPageVerses={rightPageVerses}
@@ -1079,6 +1088,8 @@ function MushafPractice() {
           isBlurred={isBlurred}
           maskAll={maskAll}
           wordMarks={combinedWordMarks}
+          circledMarkerVerseKeys={circledVerses}
+          hidePageNumber={currentStep?.ui.hidePageNumber}
           verseThemes={isHifz && showThemes ? tafsirGroups : null}
           loading={loading}
           singlePage={singlePage}

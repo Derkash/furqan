@@ -16,6 +16,7 @@ const ICON: Record<string, string> = {
   recitation: '🎙️',
   'page-number': '🔢',
   'verse-start': '✳️',
+  guess: '❓',
   hifz: '🧠',
 };
 

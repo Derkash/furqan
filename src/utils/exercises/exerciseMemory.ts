@@ -35,6 +35,8 @@ export interface StoredSetup {
   direction?: 'forward' | 'backward';
   /** Nombre de questions souhaité (tous exercices sauf Hifz). */
   questionCount?: number;
+  /** Devine : deviner le verset masqué ou la page affichée. */
+  guessMode?: 'verse' | 'page';
 }
 
 const PREFIX = 'almuraja3a:setup:';

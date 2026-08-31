@@ -108,6 +108,12 @@ interface MushafPageProps {
    * alternée entre groupes voisins.
    */
   verseThemes?: Record<string, number> | null;
+  /**
+   * Masque tout ce qui révèle le numéro de la page : le badge « sourate · n/total »
+   * de l'app ET le numéro imprimé en bas du scan (recouvert d'une pastille
+   * couleur papier). Exercice « Devine → Quelle page ? ».
+   */
+  hidePageNumber?: boolean;
   frameConfig?: Partial<FrameConfig>;
   /**
    * Niveau de Hifz (0-8). 0 = tout visible, 8 = quasi rien.
@@ -264,6 +270,7 @@ export default function MushafPage({
   wordMarks,
   circledMarkerVerseKeys,
   verseThemes,
+  hidePageNumber = false,
   frameConfig,
   hifzLevel,
   revealFraction,
@@ -585,7 +592,7 @@ export default function MushafPage({
         {/* Progression dans la sourate (« An-Nisa · 1/30 ») : en haut AU CENTRE,
             seule zone de marge toujours vierge sur les scans (le nom de la
             sourate est imprimé en haut à gauche, le juz en haut à droite). */}
-        {surahPageLabel && (
+        {surahPageLabel && !hidePageNumber && (
           <div
             style={{
               position: 'absolute',
@@ -731,7 +738,7 @@ export default function MushafPage({
 
         {/* Numéro de page : le fond par page porte déjà le sien (authentique) —
             on ne le rend que pour les pages 1-2 (fond générique). */}
-        {!hasPageBg && (
+        {!hasPageBg && !hidePageNumber && (
         <div
           className="mushaf-page-number"
           style={{
@@ -750,6 +757,24 @@ export default function MushafPage({
         >
           {toArabicNumbers(pageNumber)}
         </div>
+        )}
+
+        {/* « Quelle page ? » : le numéro imprimé du scan est recouvert d'une
+            pastille à la couleur du papier (mesurée sur les scans). */}
+        {hidePageNumber && hasPageBg && (
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: '28%',
+              right: '28%',
+              bottom: '2.6%',
+              height: '4.2%',
+              background: 'rgb(250, 240, 214)',
+              borderRadius: '4px',
+              zIndex: 2,
+            }}
+          />
         )}
 
         {/* Repère de côté : point rouge en bas à DROITE pour une page de droite

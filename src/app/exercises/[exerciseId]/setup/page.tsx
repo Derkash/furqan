@@ -195,6 +195,7 @@ function SetupPageInner() {
   const isPageNumber = exerciseId === 'page-number';
   const isVerseStart = exerciseId === 'verse-start';
   const isRecitation = exerciseId === 'recitation';
+  const isGuess = exerciseId === 'guess';
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
@@ -217,6 +218,8 @@ function SetupPageInner() {
   // Début de verset : afficher aussi 1er/milieu/dernier verset à la révélation.
   const [revealContext, setRevealContext] = useState(false);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+  // Devine : deviner le verset masqué, ou deviner la page.
+  const [guessMode, setGuessMode] = useState<'verse' | 'page'>('verse');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
 
@@ -260,6 +263,7 @@ function SetupPageInner() {
     if (saved.revealContext != null) setRevealContext(!!saved.revealContext);
     if (saved.direction) setDirection(saved.direction);
     if (saved.questionCount) setQuestionCount(saved.questionCount);
+    if (saved.guessMode) setGuessMode(saved.guessMode);
   }, [exerciseId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -385,6 +389,9 @@ function SetupPageInner() {
     } else if (isPageNumber) {
       query.set('show', showPositions.join(','));
       saveSetup(exerciseId, { ...base, showPositions });
+    } else if (isGuess) {
+      query.set('gm', guessMode);
+      saveSetup(exerciseId, { ...base, guessMode });
     } else if (isVerseStart) {
       // Positions choisies (premier/milieu/dernier) ; vide = n'importe quel verset.
       if (showPositions.length > 0) query.set('show', showPositions.join(','));
@@ -624,6 +631,38 @@ function SetupPageInner() {
             )}
 
             {/* Choix spécifiques : Début verset — sur quel verset être interrogé */}
+            {isGuess && (
+              <OptionGroup label="Qu'est-ce que je devine ?">
+                <div className="flex gap-1.5">
+                  {([
+                    { value: 'verse', label: 'Quel verset ?' },
+                    { value: 'page', label: 'Quelle page ?' },
+                  ] as const).map((o) => {
+                    const active = guessMode === o.value;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setGuessMode(o.value)}
+                        className={`flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                          active
+                            ? 'bg-[var(--ds-green)] text-[var(--ds-bg)] border-[var(--ds-green)] shadow-md'
+                            : 'bg-white text-[var(--ds-sage)] border-[var(--ds-gold)]/30 hover:border-[var(--ds-gold)]'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {guessMode === 'verse'
+                    ? 'La page s’affiche avec UN verset masqué : retrouve-le, puis tape pour le révéler.'
+                    : 'Tout le texte est masqué : seuls les séparateurs de versets restent (celui du milieu en rouge) et le numéro de page est caché.'}
+                </p>
+              </OptionGroup>
+            )}
+
             {isVerseStart && (
               <>
                 <OptionGroup label="Verset interrogé">
@@ -651,7 +690,7 @@ function SetupPageInner() {
             )}
 
             {/* Auto-évaluation « Trouvé/Raté » — désactivée par défaut, réactivable */}
-            {(isAudioQuiz || isSequential || isPageNumber || isVerseStart || isRecitation) && (
+            {(isAudioQuiz || isSequential || isPageNumber || isVerseStart || isRecitation || isGuess) && (
               <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 bg-[var(--ds-bg)] cursor-pointer">
                 <span className="text-sm font-semibold text-[var(--ds-green)]">
                   Me demander si j&apos;ai bien répondu

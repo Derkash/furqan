@@ -505,6 +505,128 @@ export const hifzSteps: StepGenerator = (
 };
 
 // ============================================
+// DEVINE  (« Quel verset ? » / « Quelle page ? »)
+//
+// Mode VERSET : une page de la plage s'affiche, UN verset est masqué — à
+//   retrouver, puis tap pour le révéler (surligné).
+// Mode PAGE   : tout le texte est masqué, il ne reste que les séparateurs de
+//   fin de verset (celui du MILIEU cerclé de rouge) et le numéro de page est
+//   caché (badge de l'app + numéro imprimé du scan) — deviner la page, puis
+//   tap pour la réponse et le texte.
+// ============================================
+
+export const guessSteps: StepGenerator = (
+  pageVerses: PageVerses,
+  pageNumber: number,
+  config: ExerciseConfig,
+  verseMapData?: PageVerseMap | null
+): ExerciseStep[] => {
+  const verses = pageVerses.verses;
+  if (verses.length === 0) return [];
+
+  const allKeys = verses.map((v) => v.verseKey);
+  const middle = getMiddleVerse(pageVerses, verseMapData);
+
+  // Sourate dominante de la page (celle qui y a le plus de versets) → rang de
+  // la page DANS la sourate, comme dans « Numéro de page ».
+  const counts = new Map<number, number>();
+  for (const v of verses) counts.set(v.surah, (counts.get(v.surah) ?? 0) + 1);
+  let dominant = verses[0].surah;
+  let best = -1;
+  for (const [surah, c] of counts) {
+    if (c > best) {
+      best = c;
+      dominant = surah;
+    }
+  }
+  const info = getSurahPageInfo(dominant);
+  const ordinal = info ? pageNumber - info.startPage + 1 : 0;
+  const surahName = info?.nameSimple ?? '';
+  const pageAnswer = info
+    ? `Page ${pageNumber} — ${frOrdinal(ordinal)} page de ${surahName}`
+    : `Page ${pageNumber}`;
+
+  // ---- Mode PAGE : séparateurs seuls, milieu en rouge, numéro caché ----
+  if (config.guessMode === 'page') {
+    return [
+      {
+        type: 'questioning',
+        targetVerse: middle ?? pageVerses.firstVerse ?? undefined,
+        question: 'identify_page',
+        message: {
+          title: 'Quelle page est-ce ?',
+          subtitle:
+            'Seuls les séparateurs de versets sont visibles (celui du milieu en rouge) — tape pour la réponse',
+        },
+        ui: {
+          isBlurred: false,
+          maskAll: true,
+          visibleVerses: [],
+          singlePage: true,
+          hidePageNumber: true,
+          circledVerses: middle ? [middle.verseKey] : [],
+        },
+      },
+      {
+        type: 'revealing',
+        targetVerse: middle ?? pageVerses.firstVerse ?? undefined,
+        message: {
+          title: pageAnswer,
+          subtitle: 'Question suivante au tap',
+        },
+        ui: {
+          isBlurred: false,
+          maskAll: false,
+          visibleVerses: allKeys,
+          singlePage: true,
+          highlightedVerse: middle?.verseKey,
+        },
+      },
+    ];
+  }
+
+  // ---- Mode VERSET : un verset masqué sur la page ----
+  const target = verses[Math.floor(Math.random() * verses.length)];
+  const shown = allKeys.filter((k) => k !== target.verseKey);
+  const verseAnswer = surahName
+    ? `${surahName} ${target.verse}`
+    : `Verset ${target.verseKey}`;
+
+  return [
+    {
+      type: 'questioning',
+      targetVerse: target,
+      question: 'identify_verse',
+      message: {
+        title: 'Quel est le verset masqué ?',
+        subtitle: 'Récite-le, puis tape pour le révéler',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: shown,
+        singlePage: true,
+      },
+    },
+    {
+      type: 'revealing',
+      targetVerse: target,
+      message: {
+        title: verseAnswer,
+        subtitle: 'Question suivante au tap',
+      },
+      ui: {
+        isBlurred: false,
+        maskAll: true,
+        visibleVerses: allKeys,
+        highlightedVerse: target.verseKey,
+        singlePage: true,
+      },
+    },
+  ];
+};
+
+// ============================================
 // MAPPING EXERCICE → GÉNÉRATEUR
 // ============================================
 
@@ -515,6 +637,7 @@ export const STEP_GENERATORS: Record<ExerciseId, StepGenerator> = {
   sequential: sequentialSteps,
   'page-number': pageNumberSteps,
   'verse-start': verseStartSteps,
+  guess: guessSteps,
   hifz: hifzSteps,
   // La récitation n'utilise pas la machine à états Mushaf : interface dédiée
   // (RecitationPractice) ; ce générateur ne sert jamais.

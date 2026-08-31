@@ -97,6 +97,20 @@ export const EXERCISES: ExerciseDefinition[] = [
     difficulty: 4,
   },
   {
+    id: 'guess',
+    name: 'Devine',
+    nameArabic: 'خَمِّن',
+    description:
+      'Deux jeux : « Quel verset ? » — une page s’affiche avec un verset masqué, à toi de le retrouver ; « Quelle page ? » — tout le texte est masqué, seuls les séparateurs de versets restent (celui du milieu en rouge) et le numéro de page est caché',
+    category: 'random',
+    hasAudio: false,
+    progression: 'random',
+    versePositions: ['random', 'middle'],
+    questions: ['identify_verse', 'identify_page'],
+    icon: 'help-circle',
+    difficulty: 4,
+  },
+  {
     id: 'hifz',
     name: 'Hifz',
     nameArabic: 'حفظ',
