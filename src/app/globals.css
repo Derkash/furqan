@@ -42,6 +42,14 @@
   background: var(--ds-bg);
   font-family: var(--ds-font);
   color: var(--ds-text);
+  /* Zone sûre (encoche / Dynamic Island / barre d'accueil) portée par la COQUE,
+     et par elle seule — voir la note plus bas sur le double inset. La coque est
+     en h-dvh avec box-sizing:border-box : le padding est pris DANS la hauteur,
+     donc le bas de l'écran n'est jamais poussé hors cadre. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 .ds-card {
   background: var(--ds-surface);
@@ -90,9 +98,6 @@ html.capacitor .app-topbar {
 }
 html.capacitor .app-topbar-safe {
   padding-top: calc(0.375rem + env(safe-area-inset-top));
-}
-html.capacitor .ds-page {
-  padding-top: env(safe-area-inset-top);
 }
 /* Dans une coque .ds-page (déjà décalée de la zone sûre), les barres ne
    rajoutent PAS l'inset une seconde fois — sinon double décalage, très
@@ -308,15 +313,11 @@ html, body {
   /* Tablettes paysage et desktop */
 }
 
-/* Safe area pour les appareils avec encoche */
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-}
+/* Zone sûre (encoche / Dynamic Island / barre d'accueil) : portée UNIQUEMENT
+   par la coque .ds-page — surtout PAS par <body>, sinon l'inset est compté deux
+   fois (gros vide sous la barre d'état, et bas d'écran poussé hors cadre en
+   portrait). La coque est en h-dvh + box-sizing:border-box : le padding est
+   pris DANS la hauteur, donc rien ne déborde. */
 
 /* Empêcher le zoom sur double-tap mobile */
 * {

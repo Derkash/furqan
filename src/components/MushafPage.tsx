@@ -752,6 +752,23 @@ export default function MushafPage({
         </div>
         )}
 
+        {/* Repère de côté : point rouge en bas à DROITE pour une page de droite
+            (impaire), en bas à GAUCHE pour une page de gauche (paire). Utile en
+            portrait (une seule page à l'écran) — affiché aussi en paysage. */}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            bottom: '1.6%',
+            [isOddPage ? 'right' : 'left']: '3%',
+            width: '1.5cqi',
+            height: '1.5cqi',
+            borderRadius: '9999px',
+            background: '#d92d20',
+            zIndex: 3,
+          }}
+        />
+
         <BlurOverlay isActive={isBlurred} />
 
         {(loading || !data) && (

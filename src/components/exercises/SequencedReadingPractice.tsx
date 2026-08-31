@@ -632,11 +632,7 @@ export default function SequencedReadingPractice() {
       <div
         dir="ltr"
         className="absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[var(--ds-divider)] px-2.5 flex items-center gap-2 flex-wrap justify-center"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          minHeight: 'calc(46px + env(safe-area-inset-bottom))',
-          fontFamily: 'var(--ds-font)',
-        }}
+        style={{ minHeight: 46, fontFamily: 'var(--ds-font)' }}
       >
         <button
           onClick={stop}
