@@ -9,8 +9,18 @@ import Capacitor
 /// donc ici en paysage (la clé Info.plist UIRequiresFullScreen étant dépréciée
 /// et ignorée sur iPadOS 26).
 class MainViewController: CAPBridgeViewController {
+    /// Plugins locaux (non distribués en package) : enregistrés à la main.
+    override open func capacitorDidLoad() {
+        bridge?.registerPluginInstance(RecitationBridge())
+    }
+
+    /// iPad : verrou PAYSAGE (voir note ci-dessus). iPhone : portrait naturel —
+    /// la récitation (programme, widget, activité en direct) se vit en portrait.
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        return .landscape
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return .landscape
+        }
+        return [.portrait, .landscapeLeft, .landscapeRight]
     }
 
     override var shouldAutorotate: Bool {
@@ -22,14 +32,14 @@ class MainViewController: CAPBridgeViewController {
     // activement le retour en paysage à chaque apparition / changement.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        forceLandscape()
+        if UIDevice.current.userInterfaceIdiom == .pad { forceLandscape() }
     }
 
     override func viewWillTransition(
         to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator
     ) {
         super.viewWillTransition(to: size, with: coordinator)
-        if size.height > size.width {
+        if UIDevice.current.userInterfaceIdiom == .pad, size.height > size.width {
             DispatchQueue.main.async { [weak self] in self?.forceLandscape() }
         }
     }

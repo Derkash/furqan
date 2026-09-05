@@ -122,7 +122,29 @@ L'accueil actuel n'est pas remplacé — on y ajoute seulement la carte de synth
 - Une seule bonne récitation ne suffit pas à déclarer une page maîtrisée.
 - L'historique n'est jamais perdu quand le programme est modifié.
 
-## 6. Découpage proposé
+## 6. État d'avancement
+
+- ✅ **Phase 1** — moteur + migration 0004 + 34 vérifications (commit 5c9e5e9)
+- ✅ **Phases 2-3-5** — tous les écrans web (commit 6363bbe) : setup 4 étapes,
+  Mon programme, Récitation en cours, Maîtrise, Bilan, Historique, carte
+  d'accueil, entrée RÉCITATION, notifications locales, dayEngine (reports,
+  rattrapage, bascule de cycle), pont widgetSync côté JS
+- ✅ **Phase 4** — natif iPhone : plugin `RecitationBridge` (App Group +
+  WidgetCenter + ActivityKit), extension `RecitationWidget` (widget accueil
+  iOS 17+ ; Live Activity écran verrouillé + Dynamic Island), entitlements
+  App Group des deux côtés, deep link `almuraja3a://recitation/en-cours`,
+  orientation : verrou paysage restreint à l'iPad (iPhone libre/portrait),
+  SceneDelegate corrigé pour instancier MainViewController
+- ⚠️ **À faire côté utilisateur** :
+  1. Portail développeur Apple : la signature automatique devrait créer
+     l'App Group `group.com.almuraja3a.app` à la première build Xcode ;
+     sinon le créer manuellement (Certificates → Identifiers → App Groups).
+  2. Appliquer la migration : `supabase db push` (0004_recitation.sql).
+  3. Builder sur l'iPhone physique : `npm run build:ipad` puis Xcode → cible
+     App → son iPhone (widget + Live Activity ne se testent bien que sur
+     appareil réel).
+
+## 7. Découpage initial (mémoire)
 
 **Phase 1 — Moteur + données** (prérequis de tout le reste)
 Module de planification pur et testable, types, migration `0004_recitation.sql`, miroir local.

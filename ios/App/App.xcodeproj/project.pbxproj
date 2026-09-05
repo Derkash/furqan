@@ -7,19 +7,54 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1DACBA249B1BCD93D82274C1 /* RecitationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F1274962307A0EC227B0B16 /* RecitationBridge.swift */; };
+		28F7B92BA9B219106D1C583C /* RecitationShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90ECA11B049D977BB17858C /* RecitationShared.swift */; };
+		2EA4F1C56BC5ABC54135F68D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7D5D1113F53638EFCA1C1E33 /* WidgetKit.framework */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
+		4D5540F341E0F2A329F91E86 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 811C6E1706F97279C25CB394 /* SwiftUI.framework */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		7120B61A8A8D4C8AAE0F9473 /* RecitationShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90ECA11B049D977BB17858C /* RecitationShared.swift */; };
+		797E3EA4147FD5299EF01CB1 /* RecitationWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0340B3BA998CC64ACFD987B /* RecitationWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8B29FF2A40B226041FA6C859 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 471DAF8A23DAAC2FC46651F4 /* Foundation.framework */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		A80BCC1D8C71D55C9D8DE807 /* RecitationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8313EFDE5FA92705CD91F9DD /* RecitationWidget.swift */; };
+		B49357F71839D9A86633ED7B /* RecitationWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C2A9D41B643E1C2DA8C0A2 /* RecitationWidgetBundle.swift */; };
+		BD415A475FB88374E1C4608D /* RecitationLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537743288C2CC2EC101C1038 /* RecitationLiveActivity.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		299891F2C745DF9C6F70B343 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 45D1E34456F195FE90093479;
+			remoteInfo = RecitationWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F829FED93D7E3E0166DE86EA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				797E3EA4147FD5299EF01CB1 /* RecitationWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		471DAF8A23DAAC2FC46651F4 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -28,11 +63,32 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		537743288C2CC2EC101C1038 /* RecitationLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationLiveActivity.swift; sourceTree = "<group>"; };
+		5F1274962307A0EC227B0B16 /* RecitationBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationBridge.swift; sourceTree = "<group>"; };
+		63B47F8134EFC47D3BCFA584 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		73C2A9D41B643E1C2DA8C0A2 /* RecitationWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationWidgetBundle.swift; sourceTree = "<group>"; };
+		7D5D1113F53638EFCA1C1E33 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		811C6E1706F97279C25CB394 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		8313EFDE5FA92705CD91F9DD /* RecitationWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationWidget.swift; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		9D554FBFCC8C447D29475B52 /* App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		A3E92E9E0144D7A1E45B46B9 /* RecitationWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RecitationWidget.entitlements; sourceTree = "<group>"; };
+		D0340B3BA998CC64ACFD987B /* RecitationWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecitationWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E90ECA11B049D977BB17858C /* RecitationShared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationShared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		43420497D548149189240967 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B29FF2A40B226041FA6C859 /* Foundation.framework in Frameworks */,
+				2EA4F1C56BC5ABC54135F68D /* WidgetKit.framework in Frameworks */,
+				4D5540F341E0F2A329F91E86 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -50,6 +106,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				73A49A962865836EA24CA3E9 /* Frameworks */,
+				6653F5CF2586506108187A0C /* RecitationWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				D0340B3BA998CC64ACFD987B /* RecitationWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,13 +132,64 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				5F1274962307A0EC227B0B16 /* RecitationBridge.swift */,
+				E90ECA11B049D977BB17858C /* RecitationShared.swift */,
+				9D554FBFCC8C447D29475B52 /* App.entitlements */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		6653F5CF2586506108187A0C /* RecitationWidget */ = {
+			isa = PBXGroup;
+			children = (
+				73C2A9D41B643E1C2DA8C0A2 /* RecitationWidgetBundle.swift */,
+				8313EFDE5FA92705CD91F9DD /* RecitationWidget.swift */,
+				537743288C2CC2EC101C1038 /* RecitationLiveActivity.swift */,
+				63B47F8134EFC47D3BCFA584 /* Info.plist */,
+				A3E92E9E0144D7A1E45B46B9 /* RecitationWidget.entitlements */,
+			);
+			name = RecitationWidget;
+			path = RecitationWidget;
+			sourceTree = "<group>";
+		};
+		73A49A962865836EA24CA3E9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A400942AE2F122B5B373006C /* iOS */,
+				7D5D1113F53638EFCA1C1E33 /* WidgetKit.framework */,
+				811C6E1706F97279C25CB394 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A400942AE2F122B5B373006C /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				471DAF8A23DAAC2FC46651F4 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		45D1E34456F195FE90093479 /* RecitationWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9468A2B58BD09EA83652B3F7 /* Build configuration list for PBXNativeTarget "RecitationWidget" */;
+			buildPhases = (
+				FB2B4800FF5332D2B321A294 /* Sources */,
+				43420497D548149189240967 /* Frameworks */,
+				647D498FAC4A03341E132563 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RecitationWidget;
+			productName = RecitationWidget;
+			productReference = D0340B3BA998CC64ACFD987B /* RecitationWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -87,10 +197,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				F829FED93D7E3E0166DE86EA /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2CF1A07969D12E62C2623658 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -133,6 +245,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				45D1E34456F195FE90093479 /* RecitationWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -151,6 +264,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		647D498FAC4A03341E132563 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -160,10 +280,32 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				1DACBA249B1BCD93D82274C1 /* RecitationBridge.swift in Sources */,
+				7120B61A8A8D4C8AAE0F9473 /* RecitationShared.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FB2B4800FF5332D2B321A294 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B49357F71839D9A86633ED7B /* RecitationWidgetBundle.swift in Sources */,
+				A80BCC1D8C71D55C9D8DE807 /* RecitationWidget.swift in Sources */,
+				BD415A475FB88374E1C4608D /* RecitationLiveActivity.swift in Sources */,
+				28F7B92BA9B219106D1C583C /* RecitationShared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2CF1A07969D12E62C2623658 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RecitationWidget;
+			target = 45D1E34456F195FE90093479 /* RecitationWidget */;
+			targetProxy = 299891F2C745DF9C6F70B343 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -185,6 +327,36 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		08ECD27247AFEC7D5C9A036A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RecitationWidget/RecitationWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3ZPRX5D49W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RecitationWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Récitation";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.almuraja3a.app.RecitationWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -299,6 +471,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3ZPRX5D49W;
@@ -322,6 +495,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3ZPRX5D49W;
@@ -337,6 +511,37 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BDC2F5A91B03FD4C123DD71D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RecitationWidget/RecitationWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3ZPRX5D49W;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RecitationWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Récitation";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.almuraja3a.app.RecitationWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -357,6 +562,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9468A2B58BD09EA83652B3F7 /* Build configuration list for PBXNativeTarget "RecitationWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BDC2F5A91B03FD4C123DD71D /* Release */,
+				08ECD27247AFEC7D5C9A036A /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
