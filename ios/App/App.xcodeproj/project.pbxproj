@@ -24,6 +24,7 @@
 		8B29FF2A40B226041FA6C859 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 471DAF8A23DAAC2FC46651F4 /* Foundation.framework */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		A80BCC1D8C71D55C9D8DE807 /* RecitationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8313EFDE5FA92705CD91F9DD /* RecitationWidget.swift */; };
+		B1FFC4537F0989664296639B /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B640D77798FDA2C1339223 /* MainViewController.swift */; };
 		B49357F71839D9A86633ED7B /* RecitationWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C2A9D41B643E1C2DA8C0A2 /* RecitationWidgetBundle.swift */; };
 		BD415A475FB88374E1C4608D /* RecitationLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537743288C2CC2EC101C1038 /* RecitationLiveActivity.swift */; };
 /* End PBXBuildFile section */
@@ -75,6 +76,7 @@
 		9D554FBFCC8C447D29475B52 /* App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		A3E92E9E0144D7A1E45B46B9 /* RecitationWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RecitationWidget.entitlements; sourceTree = "<group>"; };
 		D0340B3BA998CC64ACFD987B /* RecitationWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecitationWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1B640D77798FDA2C1339223 /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		E90ECA11B049D977BB17858C /* RecitationShared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecitationShared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -135,6 +137,7 @@
 				5F1274962307A0EC227B0B16 /* RecitationBridge.swift */,
 				E90ECA11B049D977BB17858C /* RecitationShared.swift */,
 				9D554FBFCC8C447D29475B52 /* App.entitlements */,
+				D1B640D77798FDA2C1339223 /* MainViewController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -282,6 +285,7 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				1DACBA249B1BCD93D82274C1 /* RecitationBridge.swift in Sources */,
 				7120B61A8A8D4C8AAE0F9473 /* RecitationShared.swift in Sources */,
+				B1FFC4537F0989664296639B /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

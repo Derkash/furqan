@@ -45,8 +45,8 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func forceLandscape() {
-        setNeedsUpdateOfSupportedInterfaceOrientations()
         if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
             guard let scene = view.window?.windowScene else { return }
             scene.requestGeometryUpdate(
                 .iOS(interfaceOrientations: .landscape)
