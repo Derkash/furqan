@@ -152,4 +152,12 @@ export interface DayState {
   recitedPages: number[];
   /** Pages en attente d'évaluation (« évaluer plus tard »). */
   pendingEvaluations: number[];
+  /** Indices des créneaux déjà clôturés (SessionRecord journalisé). */
+  closedSlots: number[];
+  /** Report en attente de décision (mode « toujours demander »). */
+  pendingCarryOver: { fromSlot: number; pages: number[] } | null;
+  /** Pages ajoutées aujourd'hui par le renforcement (pour l'explication). */
+  reinforcementPages: number[];
+  /** Pages de journées manquées, en attente de rattrapage progressif. */
+  pendingCatchUp: number[];
 }

@@ -16,6 +16,7 @@ import OrientationControl from '@/components/OrientationControl';
 
 type IconName =
   | 'home'
+  | 'recitation'
   | 'revision'
   | 'lecture'
   | 'vocab'
@@ -40,6 +41,13 @@ function Icon({ name }: { name: IconName }) {
       return (
         <svg {...common}>
           <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+        </svg>
+      );
+    case 'recitation':
+      return (
+        <svg {...common}>
+          <path d="M12 6c-1.5-1.6-3.8-2.5-7-2.5v13c3.2 0 5.5.9 7 2.5 1.5-1.6 3.8-2.5 7-2.5v-13c-3.2 0-5.5.9-7 2.5z" />
+          <path d="M12 6v13" />
         </svg>
       );
     case 'revision':
@@ -101,6 +109,7 @@ function Icon({ name }: { name: IconName }) {
 // Le logo Muraja3a (en haut) sert d'Accueil — pas d'entrée « Accueil » dédiée.
 const NAV: { href: string; label: string; icon: IconName; match: (p: string) => boolean }[] = [
   { href: '/revision', label: 'Révision', icon: 'revision', match: (p) => p.startsWith('/revision') || /^\/exercises\/(?!lecture)[a-z-]+\//.test(p) },
+  { href: '/recitation', label: 'Récitation', icon: 'recitation', match: (p) => p.startsWith('/recitation') },
   { href: '/exercises/lecture/practice', label: 'Lecture', icon: 'lecture', match: (p) => p.startsWith('/exercises/lecture') },
   { href: '/vocab', label: 'Vocabulaire', icon: 'vocab', match: (p) => p.startsWith('/vocab') },
   { href: '/reperes', label: 'Repères', icon: 'reperes', match: (p) => p.startsWith('/reperes') },

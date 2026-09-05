@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell';
 import { isNativeApp } from '@/utils/audioStore';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import { computeHomeStats, DAILY_GOAL_VERSES, type HomeStats } from '@/utils/homeStats';
+import HomeRecitationCard from '@/components/recitation/HomeRecitationCard';
 
 /**
  * Accueil (design Application2) : salutation, progression du jour, reprise de
@@ -146,6 +147,9 @@ export default function AccueilPage() {
           </span>
         )}
       </header>
+
+      {/* Récitation du moment (programme de récitation) */}
+      <HomeRecitationCard />
 
       {/* Progression du jour + Reprendre */}
       <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 mb-8">

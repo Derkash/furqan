@@ -88,6 +88,15 @@ export function saveDayState(state: DayState): void {
   pushRemote('dayState', state);
 }
 
+/** Efface l'état du jour (reconstruit par ensureToday au prochain rendu). */
+export function clearDayState(): void {
+  if (isBrowser()) {
+    try {
+      window.localStorage.removeItem(KEYS.dayState);
+    } catch {}
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Historique en append (évaluations, sessions)
 // ---------------------------------------------------------------------------
