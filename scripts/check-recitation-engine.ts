@@ -22,7 +22,14 @@ import {
   masteryBreakdown,
   reinforcementDuePages,
 } from '../src/lib/recitation/mastery';
-import type { PageEvaluation, ScheduleConfig } from '../src/lib/recitation/types';
+import {
+  learningPagesForDay,
+  learningProgress,
+  learningSlot,
+  learningSpan,
+} from '../src/lib/recitation/learning';
+import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
+import type { LearningConfig, PageEvaluation, ScheduleConfig } from '../src/lib/recitation/types';
 
 let failures = 0;
 function check(label: string, actual: unknown, expected: unknown) {
@@ -97,6 +104,7 @@ const config: ScheduleConfig = {
   hours: { startMin: parseTime('08:00')!, endMin: parseTime('20:00')!, frequencyMin: 120 },
   remindersEnabled: true,
 };
+const config2Schedule = config;
 {
   const slots = slotsForWeekday(config, 1);
   check('6 créneaux', slots.length, 6);
@@ -171,6 +179,56 @@ console.log('§10 Agrégats : ventilation + pourcentage');
   check('2 évaluées / 2 jamais', [b.evaluated, b.neverEvaluated], [2, 2]);
   check('% = (100+40)/2 = 70', b.percent, 70);
   check('comptes', b.counts, { 'maitrisee': 1, 'plutot-maitrisee': 0, 'fragile': 1, 'a-retravailler': 0 });
+}
+
+// ---------------------------------------------------------------------------
+console.log('Sourate en cours (lâhiq) : séance quotidienne dédiée');
+{
+  // Al-Ma'idah = pages 106 à 127. Mémorisé jusqu'à la page 110.
+  const config: LearningConfig = { surah: 5, currentPage: 110, placement: 'end', dailyCap: null };
+  check('parcours = pages 106 à 110', learningSpan(config), [106, 107, 108, 109, 110]);
+  check('sans plafond, tout est récité chaque jour', learningPagesForDay(config, 0).length, 5);
+
+  const prog = learningProgress(config)!;
+  check('progression : 5 pages sur 22', [prog.done, prog.total], [5, 22]);
+  check('pas encore terminée', prog.complete, false);
+  check('terminée à la dernière page', learningProgress({ ...config, currentPage: 127 })!.complete, true);
+}
+
+console.log('Plafond : les pages récentes restent, le début tourne');
+{
+  // 12 pages mémorisées, plafond à 6 → 3 récentes fixes + fenêtre de 3.
+  const config: LearningConfig = { surah: 5, currentPage: 117, placement: 'end', dailyCap: 6 };
+  check('parcours complet = 12 pages', learningSpan(config).length, 12);
+  const d0 = learningPagesForDay(config, 0);
+  const d1 = learningPagesForDay(config, 1);
+  const d2 = learningPagesForDay(config, 2);
+  check('jour 0 : 6 pages', d0.length, 6);
+  check('les 3 dernières pages sont toujours là', d0.slice(-3), [115, 116, 117]);
+  check('jour 1 : fenêtre avancée', d1.slice(0, 3), [109, 110, 111]);
+  check('jour 2 : fenêtre suivante', d2.slice(0, 3), [112, 113, 114]);
+  check('rotation bouclée au jour 3', learningPagesForDay(config, 3).slice(0, 3), [106, 107, 108]);
+  const couvert = new Set([...d0, ...d1, ...d2]);
+  check('3 jours couvrent toute la sourate mémorisée', couvert.size, 12);
+}
+
+console.log('Placement de la séance hors des créneaux de révision');
+{
+  const config: LearningConfig = { surah: 5, currentPage: 108, placement: 'end', dailyCap: null };
+  const slotEnd = learningSlot(config, config2Schedule, 3)!;
+  check('fin de journée : commence à 20 h', slotEnd.startMin, 1200);
+  check('durée = 3 pages × 5 min', slotEnd.endMin - slotEnd.startMin, 15);
+  const slotStart = learningSlot({ ...config, placement: 'start' }, config2Schedule, 4)!;
+  check('début de journée : finit à 8 h', slotStart.endMin, 480);
+  check('commence 20 min avant', slotStart.startMin, 460);
+}
+
+console.log('Numérotation par sourate (02/page 1)');
+{
+  check('page 2 du mushaf = 02/page 1', pageRefLabel(2), '02/page 1');
+  check('page 106 avec préférence Al-Ma\'idah', pageRefLabel(106, 5), '05/page 1');
+  check('plage dans une sourate', pagesLabel([106, 107, 108], 5), '05/pages 1 à 3');
+  check('page unique', pagesLabel([3]), '02/page 2');
 }
 
 // ---------------------------------------------------------------------------

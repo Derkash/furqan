@@ -86,9 +86,19 @@ export interface Slot {
   endMin: number;
 }
 
+/**
+ * Nature d'une séance :
+ * - 'cycle'    : révision du périmètre mémorisé (le manzil) ;
+ * - 'learning' : consolidation quotidienne de la sourate en cours (le lâhiq),
+ *                toujours dans SA PROPRE séance — jamais mélangée au cycle.
+ */
+export type SlotKind = 'cycle' | 'learning';
+
 /** Un créneau planifié avec ses pages du jour. */
 export interface PlannedSlot extends Slot {
   pages: number[];
+  /** Absent = 'cycle' (compatibilité des états déjà enregistrés). */
+  kind?: SlotKind;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +107,27 @@ export interface PlannedSlot extends Slot {
 
 /** Comportement préféré quand un créneau se termine incomplet. */
 export type CarryOverMode = 'auto' | 'never' | 'ask';
+
+/**
+ * Sourate en cours d'apprentissage (le lâhiq) : à réciter chaque jour depuis
+ * son début jusqu'à la page atteinte, dans une séance dédiée.
+ */
+export interface LearningConfig {
+  surah: number;
+  /** Page atteinte dans la mémorisation (incluse). */
+  currentPage: number;
+  /** Où placer la séance dans la journée. */
+  placement: 'end' | 'start' | 'custom';
+  /** Heure de début (minutes depuis minuit) si placement 'custom'. */
+  customStartMin?: number;
+  /**
+   * Plafond de pages par jour. Au-delà, les dernières pages (les plus
+   * fragiles) restent toujours au programme et le début tourne par fenêtre :
+   * toute la sourate est couverte en quelques jours sans surcharge.
+   * null = tout réciter chaque jour.
+   */
+  dailyCap: number | null;
+}
 
 export interface Program {
   selections: MemorizedSelection[];
@@ -110,6 +141,8 @@ export interface Program {
   reinforcementEnabled: boolean;
   /** Rappel avant la fin d'un créneau, en minutes (null = désactivé). */
   endReminderMin: number | null;
+  /** Sourate en cours d'apprentissage — null si aucune. */
+  learning: LearningConfig | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
@@ -135,6 +168,8 @@ export type SessionStatus = 'done' | 'partial' | 'missed';
 export interface SessionRecord {
   date: string; // YYYY-MM-DD
   slot: Slot;
+  /** Absent = 'cycle'. */
+  kind?: SlotKind;
   plannedPages: number[];
   recitedPages: number[];
   status: SessionStatus;
@@ -148,8 +183,14 @@ export interface DayState {
   /** Index du jour dans le cycle. */
   cycleDayIndex: number;
   slots: PlannedSlot[];
-  /** Pages déjà récitées aujourd'hui (tous créneaux confondus). */
+  /**
+   * Pages du CYCLE récitées aujourd'hui. La séance d'apprentissage a son
+   * propre suivi : une page peut appartenir aux deux, et l'avoir récitée
+   * en révision ne dispense pas de la réciter dans la sourate en cours.
+   */
   recitedPages: number[];
+  /** Pages récitées dans la séance d'apprentissage du jour. */
+  learningRecited: number[];
   /** Pages en attente d'évaluation (« évaluer plus tard »). */
   pendingEvaluations: number[];
   /** Indices des créneaux déjà clôturés (SessionRecord journalisé). */

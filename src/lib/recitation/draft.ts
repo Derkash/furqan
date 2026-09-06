@@ -18,6 +18,8 @@ export interface ProgramDraft {
   carryOver: Program['carryOver'];
   reinforcementEnabled: boolean;
   endReminderMin: number | null;
+  /** Sourate en cours d'apprentissage (séance quotidienne dédiée). */
+  learning: Program['learning'];
 }
 
 const DRAFT_KEY = 'almuraja3a:recitation:draft';
@@ -37,6 +39,7 @@ export function emptyDraft(): ProgramDraft {
     carryOver: 'auto',
     reinforcementEnabled: true,
     endReminderMin: 15,
+    learning: null,
   };
 }
 
@@ -59,6 +62,7 @@ export function loadDraft(): ProgramDraft {
       carryOver: existing.carryOver,
       reinforcementEnabled: existing.reinforcementEnabled,
       endReminderMin: existing.endReminderMin,
+      learning: existing.learning ?? null,
     };
   }
   return emptyDraft();
@@ -100,6 +104,7 @@ export function finalizeProgram(draft: ProgramDraft, now: Date): { program: Prog
     carryOver: draft.carryOver,
     reinforcementEnabled: draft.reinforcementEnabled,
     endReminderMin: draft.endReminderMin,
+    learning: draft.learning,
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
   };

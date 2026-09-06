@@ -10,7 +10,7 @@ import AppShell from '@/components/AppShell';
 import EvaluationSheet from '@/components/recitation/EvaluationSheet';
 import VersePassage from '@/components/recitation/VersePassage';
 import { useRecitation } from '@/hooks/useRecitation';
-import { pagesLabel, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
+import { pageRefLabel, pagesLabel, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
 import { MASTERY_LABELS, reinforcementReason } from '@/lib/recitation/mastery';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
 import { evaluationsByPage, loadEvaluations } from '@/lib/recitation/store';
@@ -51,7 +51,13 @@ export default function EnCoursPage() {
     return dayState.slots.find((s) => s.startMin === ref.startMin) ?? null;
   }, [dayState, active, upcoming]);
 
-  const recitedSet = new Set(dayState?.recitedPages ?? []);
+  // La séance de la sourate en cours a son PROPRE suivi : réciter une page en
+  // révision ne la valide pas ici, et inversement.
+  const isLearning = slot?.kind === 'learning';
+  const learningSurah = isLearning ? ctx?.program.learning?.surah : undefined;
+  const recitedSet = new Set(
+    (isLearning ? dayState?.learningRecited : dayState?.recitedPages) ?? []
+  );
   const pages = slot?.pages ?? [];
   const done = pages.filter((p) => recitedSet.has(p)).length;
   const nextPage = pages.find((p) => !recitedSet.has(p)) ?? null;
@@ -78,7 +84,7 @@ export default function EnCoursPage() {
   }
 
   const markAndEvaluate = (page: number) => {
-    markRecited(page, true);
+    markRecited(page, true, slot.kind);
     setToEvaluate(page);
   };
 
@@ -89,13 +95,16 @@ export default function EnCoursPage() {
           ←
         </Link>
         <div>
-          <h1 className="ds-title text-3xl">Récitation en cours</h1>
+          <h1 className="ds-title text-3xl">
+            {isLearning ? 'Sourate en cours' : 'Récitation en cours'}
+          </h1>
           <p className="text-[var(--ds-n600)] mt-0.5">
+            {isLearning && 'Consolidation quotidienne · '}
             {active
-              ? `Votre objectif de ${formatTime(slot.startMin)} à ${formatTime(slot.endMin)}`
+              ? `${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`
               : upcoming
-                ? `Prochain créneau : ${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`
-                : `Dernier créneau de la journée (${formatTime(slot.startMin)} – ${formatTime(slot.endMin)})`}
+                ? `Prochaine séance : ${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`
+                : `Dernière séance de la journée (${formatTime(slot.startMin)} – ${formatTime(slot.endMin)})`}
           </p>
         </div>
       </header>
@@ -137,8 +146,8 @@ export default function EnCoursPage() {
                   >
                     {recitedSet.has(p) ? '✓' : p}
                   </span>
-                  <span className={`text-[10px] mt-1 ${p === nextPage ? 'font-extrabold' : 'text-white/70'}`}>
-                    p. {p}
+                  <span className={`text-[10px] mt-1 whitespace-nowrap ${p === nextPage ? 'font-extrabold' : 'text-white/70'}`}>
+                    {pageRefLabel(p, learningSurah)}
                   </span>
                 </div>
                 {i < pages.length - 1 && <div className="h-[2px] flex-1 mx-1 bg-white/25 rounded" />}
@@ -146,8 +155,11 @@ export default function EnCoursPage() {
             ))}
           </div>
 
-          <p className="text-2xl md:text-3xl font-extrabold mt-3">{pagesLabel(pages)}</p>
-          <p className="text-sm text-white/85">{surahSpanLabel(pages)}</p>
+          <p className="text-2xl md:text-3xl font-extrabold mt-3">{pagesLabel(pages, learningSurah)}</p>
+          <p className="text-sm text-white/85">
+            {surahSpanLabel(pages)}
+            {isLearning && ' · depuis le début de la sourate'}
+          </p>
         </section>
 
         {/* Parcours page par page */}
@@ -162,7 +174,7 @@ export default function EnCoursPage() {
                 <div key={p} className="py-3 flex items-center gap-3.5">
                   <button
                     type="button"
-                    onClick={() => (isDone ? markRecited(p, false) : markAndEvaluate(p))}
+                    onClick={() => (isDone ? markRecited(p, false, slot.kind) : markAndEvaluate(p))}
                     aria-label={isDone ? `Décocher la page ${p}` : `Marquer la page ${p} comme récitée`}
                     className={`flex-none w-9 h-9 rounded-full flex items-center justify-center text-sm font-extrabold border-2 transition-colors ${
                       isDone
@@ -176,7 +188,7 @@ export default function EnCoursPage() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-bold">
-                      Page {p}
+                      {pageRefLabel(p, learningSurah)}
                       {reinforcementSet.has(p) && (
                         <span
                           className="ml-2 text-[10px] font-extrabold tracking-wider text-[var(--ds-gold-700)] bg-[var(--ds-gold-100)] rounded-full px-2 py-0.5 align-middle"
@@ -217,7 +229,7 @@ export default function EnCoursPage() {
                 onClick={() => markAndEvaluate(nextPage)}
                 className="ds-btn-gold px-6 py-3.5 text-[15px]"
               >
-                Marquer la page {nextPage} comme récitée
+                Marquer {pageRefLabel(nextPage, learningSurah)} comme récitée
               </button>
               {done > 0 && (
                 <button
@@ -225,7 +237,7 @@ export default function EnCoursPage() {
                   onClick={() => parcoursRef.current?.scrollIntoView({ behavior: 'smooth' })}
                   className="ds-btn-ghost px-6 py-3 text-sm"
                 >
-                  Reprendre à la page {nextPage}
+                  Reprendre à {pageRefLabel(nextPage, learningSurah)}
                 </button>
               )}
             </>

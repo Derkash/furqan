@@ -20,6 +20,7 @@ import {
   toDateKey,
   weekdayOf,
 } from './schedule';
+import { buildLearningSlot } from './learning';
 import { reinforcementDuePages } from './mastery';
 import {
   evaluationsByPage,
@@ -39,6 +40,7 @@ import type {
   Program,
   SessionRecord,
   SessionStatus,
+  SlotKind,
 } from './types';
 
 export interface TodayContext {
@@ -87,15 +89,23 @@ function buildDayState(
 ): DayState {
   const slots = slotsForWeekday(program.schedule, weekdayOf(todayKey));
   const { pages, reinforcement } = pagesForDay(program, cycle, cycleDayIndex, todayKey, catchUp);
-  const planned: PlannedSlot[] =
+  const planned: PlannedSlot[] = (
     program.slotSplit.mode === 'custom'
       ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
-      : splitPagesAcrossSlots(pages, slots);
+      : splitPagesAcrossSlots(pages, slots)
+  ).map((s) => ({ ...s, kind: 'cycle' as SlotKind }));
+
+  // Séance de la sourate en cours (lâhiq) : à part, jamais fondue dans le
+  // cycle. Insérée à sa place chronologique parmi les créneaux.
+  const learning = buildLearningSlot(program.learning, program.schedule, program.createdAt, todayKey);
+  const all = learning ? [...planned, learning].sort((a, b) => a.startMin - b.startMin) : planned;
+
   return {
     date: todayKey,
     cycleDayIndex,
-    slots: planned,
+    slots: all,
     recitedPages: [],
+    learningRecited: [],
     pendingEvaluations: [],
     closedSlots: [],
     pendingCarryOver: null,
@@ -108,6 +118,11 @@ function buildDayState(
 // Clôture d'un créneau / d'une journée
 // ---------------------------------------------------------------------------
 
+/** Ensemble des pages récitées applicable à un créneau, selon sa nature. */
+function recitedFor(state: DayState, kind: SlotKind | undefined): Set<number> {
+  return new Set(kind === 'learning' ? (state.learningRecited ?? []) : state.recitedPages);
+}
+
 function slotStatus(slot: PlannedSlot, recited: Set<number>): SessionStatus {
   if (!slot.pages.length) return 'done';
   const done = slot.pages.filter((p) => recited.has(p)).length;
@@ -119,11 +134,12 @@ function slotStatus(slot: PlannedSlot, recited: Set<number>): SessionStatus {
 function closeSlot(state: DayState, slotIndex: number, carried: number[]): number[] {
   const slot = state.slots[slotIndex];
   if (!slot || state.closedSlots.includes(slotIndex)) return [];
-  const recited = new Set(state.recitedPages);
+  const recited = recitedFor(state, slot.kind);
   const remaining = slot.pages.filter((p) => !recited.has(p));
   const record: SessionRecord = {
     date: state.date,
     slot: { startMin: slot.startMin, endMin: slot.endMin },
+    kind: slot.kind ?? 'cycle',
     plannedPages: slot.pages,
     recitedPages: slot.pages.filter((p) => recited.has(p)),
     status: slotStatus(slot, recited),
@@ -139,10 +155,14 @@ function closePastDay(state: DayState): void {
   for (let i = 0; i < state.slots.length; i++) closeSlot(state, i, []);
 }
 
-/** Pages non récitées d'une journée (pour le rattrapage progressif). */
+/**
+ * Pages non récitées d'une journée pour le rattrapage. Seul le CYCLE est
+ * rattrapé : la sourate en cours se récite le jour même ou pas du tout —
+ * la reporter reviendrait à doubler la séance du lendemain.
+ */
 function unrecitedPages(state: DayState): number[] {
   const recited = new Set(state.recitedPages);
-  const all = state.slots.flatMap((s) => s.pages);
+  const all = state.slots.filter((s) => s.kind !== 'learning').flatMap((s) => s.pages);
   return [...new Set(all.filter((p) => !recited.has(p)))];
 }
 
@@ -219,9 +239,19 @@ function loadSessionDates(): Set<string> {
 // Actions
 // ---------------------------------------------------------------------------
 
-/** Coche/décoche une page récitée. Renvoie l'état mis à jour. */
-export function setPageRecited(state: DayState, page: number, recited: boolean): DayState {
-  const set = new Set(state.recitedPages);
+/**
+ * Coche/décoche une page récitée. Le suivi est SÉPARÉ selon la nature de la
+ * séance : avoir récité une page en révision ne la valide pas dans la sourate
+ * en cours, et inversement.
+ */
+export function setPageRecited(
+  state: DayState,
+  page: number,
+  recited: boolean,
+  kind: SlotKind = 'cycle'
+): DayState {
+  const source = kind === 'learning' ? (state.learningRecited ?? []) : state.recitedPages;
+  const set = new Set(source);
   const pending = new Set(state.pendingEvaluations);
   if (recited) {
     set.add(page);
@@ -230,9 +260,10 @@ export function setPageRecited(state: DayState, page: number, recited: boolean):
     set.delete(page);
     pending.delete(page);
   }
+  const sorted = [...set].sort((a, b) => a - b);
   const next: DayState = {
     ...state,
-    recitedPages: [...set].sort((a, b) => a - b),
+    ...(kind === 'learning' ? { learningRecited: sorted } : { recitedPages: sorted }),
     pendingEvaluations: [...pending].sort((a, b) => a - b),
   };
   saveDayState(next);
@@ -263,9 +294,15 @@ export function tick(program: Program, state: DayState, now: Date): DayState {
   for (let i = 0; i < next.slots.length; i++) {
     const slot = next.slots[i];
     if (slot.endMin > nowMin || next.closedSlots.includes(i)) continue;
-    const recited = new Set(next.recitedPages);
+    const recited = recitedFor(next, slot.kind);
     const remaining = slot.pages.filter((p) => !recited.has(p));
     changed = true;
+
+    // La séance d'apprentissage ne se reporte pas : on la clôt telle quelle.
+    if (slot.kind === 'learning') {
+      closeSlot(next, i, []);
+      continue;
+    }
 
     if (!remaining.length || program.carryOver === 'never' || i === next.slots.length - 1) {
       closeSlot(next, i, []);
@@ -333,7 +370,7 @@ export function resolveMissedDays(
   const next: DayState = { ...state, slots: state.slots.map((s) => ({ ...s })) };
   const openSlots = next.slots
     .map((s, i) => ({ s, i }))
-    .filter(({ i }) => !next.closedSlots.includes(i));
+    .filter(({ s, i }) => s.kind !== 'learning' && !next.closedSlots.includes(i));
   if (!openSlots.length) return state;
   const queue = [...new Set(missedPages)];
   for (const { s, i } of openSlots) {
@@ -357,6 +394,7 @@ export function cycleProgress(cycle: Cycle, state: DayState | null): { recited: 
   const cyclePages = new Set(cycle.days.flatMap((d) => d.pages));
   const recited = new Set<number>();
   for (const s of loadSessions()) {
+    if (s.kind === 'learning') continue; // la sourate en cours n'avance pas le cycle
     if (s.date >= cycle.startDate) for (const p of s.recitedPages) if (cyclePages.has(p)) recited.add(p);
   }
   if (state) for (const p of state.recitedPages) if (cyclePages.has(p)) recited.add(p);

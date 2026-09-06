@@ -25,7 +25,14 @@ public struct RecitationSession: Codable, Hashable {
     public var endEpoch: Int
     public var slotLabel: String    // « 11 h – 12 h »
     public var dayLabel: String     // vide si aujourd'hui
-    public var pagesLabel: String   // « Pages 4 à 5 »
+    public var pagesLabel: String   // « 02/pages 1 à 4 » (repère de sourate)
+    /// "cycle" (révision du périmètre) ou "learning" (sourate en cours).
+    public var kind: String
+    /// Titre de la séance, calculé côté app.
+    public var title: String
+    /// Repères de page en numérotation de sourate, pour les étiquettes.
+    public var firstPageLabel: String
+    public var lastPageLabel: String
     public var firstPage: Int
     public var lastPage: Int
     public var totalPages: Int
@@ -37,6 +44,7 @@ public struct RecitationSession: Codable, Hashable {
     public var endDate: Date { Date(timeIntervalSince1970: TimeInterval(endEpoch)) }
     public var remainingPages: Int { max(0, totalPages - recitedPages) }
     public var isComplete: Bool { totalPages > 0 && recitedPages >= totalPages }
+    public var isLearning: Bool { kind == "learning" }
 
     /// « à 11 h » / « mardi 8 septembre, à 8 h » — début de la session.
     public var whenLabel: String {

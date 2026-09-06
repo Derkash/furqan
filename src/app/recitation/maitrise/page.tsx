@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import AppShell from '@/components/AppShell';
-import { formatDateKey, surahsOfPage } from '@/lib/recitation/labels';
+import { formatDateKey, pageRefLabel, surahsOfPage } from '@/lib/recitation/labels';
 import {
   MASTERY_LABELS,
   currentLevel,
@@ -79,7 +79,7 @@ function PageSheet({ page, onClose }: { page: number; onClose: () => void }) {
       <button type="button" aria-label="Fermer" className="absolute inset-0 bg-black/35" onClick={onClose} />
       <div className="relative w-full md:max-w-md bg-white rounded-t-[28px] md:rounded-[28px] p-6 shadow-[var(--ds-shadow-lg)] max-h-[85dvh] overflow-y-auto">
         <p className="ds-kicker">
-          Page {page} · {surahsOfPage(page).map((s) => s.nameSimple).join(' · ')}
+          {pageRefLabel(page)} · {surahsOfPage(page).map((s) => s.nameSimple).join(' · ')}
         </p>
         <div className="mt-2">
           <LevelBadge level={level} />
@@ -269,7 +269,7 @@ export default function MaitrisePage() {
                         onClick={() => setSheet(p)}
                         className="flex items-center justify-between rounded-xl border border-[var(--ds-divider)] px-3 py-2 hover:border-[var(--ds-gold)] transition-colors"
                       >
-                        <span className="text-[13px] font-bold">p. {p}</span>
+                        <span className="text-[13px] font-bold">{pageRefLabel(p)}</span>
                         <LevelBadge level={currentLevel(evals.get(p) ?? [])} />
                       </button>
                     ))}

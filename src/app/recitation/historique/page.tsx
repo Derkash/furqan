@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import AppShell from '@/components/AppShell';
-import { formatDateKey, pagesLabel } from '@/lib/recitation/labels';
+import { formatDateKey, pageRefLabel, pagesLabel } from '@/lib/recitation/labels';
 import { masteryBreakdown } from '@/lib/recitation/mastery';
 import { formatTime, toDateKey, addDays } from '@/lib/recitation/schedule';
 import { JUZ_PAGES } from '@/lib/recitation/unitPages';
@@ -143,7 +143,7 @@ export default function HistoriquePage() {
             <div className="flex flex-wrap gap-2">
               {stale.map((s) => (
                 <span key={s.page} className="rounded-full bg-[var(--ds-sage-100)] px-3.5 py-1.5 text-[13px] font-bold text-[var(--ds-green)]">
-                  p. {s.page}
+                  {pageRefLabel(s.page)}
                   <span className="text-[var(--ds-n500)] font-semibold">
                     {' '}· {s.last ? formatDateKey(s.last).replace(/^\w+ /, '') : 'jamais'}
                   </span>

@@ -75,7 +75,9 @@ extension RecitationSession {
     static let placeholder = RecitationSession(
         startEpoch: Int(Date.now.addingTimeInterval(-23 * 60).timeIntervalSince1970),
         endEpoch: Int(Date.now.addingTimeInterval(37 * 60).timeIntervalSince1970),
-        slotLabel: "18 h – 19 h", dayLabel: "", pagesLabel: "Pages 3 à 6",
+        slotLabel: "18 h – 19 h", dayLabel: "", pagesLabel: "02/pages 2 à 5",
+        kind: "cycle", title: "Récitation en cours",
+        firstPageLabel: "02/page 2", lastPageLabel: "02/page 5",
         firstPage: 3, lastPage: 6, totalPages: 4, recitedPages: 2,
         startVerse: "إِنَّ ٱلَّذِينَ كَفَرُوا۟ سَوَآءٌ عَلَيْهِمْ ءَأَنذَرْتَهُمْ أَمْ لَمْ تُنذِرْهُمْ …",
         endVerse: "هُوَ ٱلَّذِى خَلَقَ لَكُم مَّا فِى ٱلْأَرْضِ جَمِيعًا …"
@@ -152,8 +154,10 @@ struct RecitationWidgetView: View {
 
     private func header(_ s: RecitationSession, size: CGFloat) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: size - 1))
-            Text("Récitation en cours")
+            Image(systemName: s.isLearning ? "sparkles" : "book.fill")
+                .foregroundStyle(gold)
+                .font(.system(size: size - 1))
+            Text(s.title)
                 .font(.system(size: size, weight: .bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -244,11 +248,11 @@ struct RecitationWidgetView: View {
             }
             PageSegments(total: s.totalPages, done: s.recitedPages)
             if !s.startVerse.isEmpty {
-                VerseBlock(label: "DÉBUT · PAGE \(s.firstPage)", text: s.startVerse, lines: 2, size: 17)
+                VerseBlock(label: "DÉBUT · \(s.firstPageLabel)", text: s.startVerse, lines: 2, size: 17)
             }
             if !s.endVerse.isEmpty {
                 Divider().overlay(Color.white.opacity(0.15))
-                VerseBlock(label: "FIN · PAGE \(s.lastPage)", text: s.endVerse, lines: 2, size: 17)
+                VerseBlock(label: "FIN · \(s.lastPageLabel)", text: s.endVerse, lines: 2, size: 17)
             }
             Spacer(minLength: 0)
             Text(s.remainingLabel)
@@ -296,7 +300,7 @@ struct RecitationWidgetView: View {
                 Image(systemName: done ? "checkmark.seal.fill" : "book.fill")
                     .foregroundStyle(gold)
                     .font(.system(size: 14))
-                Text(done ? "Récitation terminée" : "Prochaine récitation")
+                Text(done ? "Séance terminée" : (n.isLearning ? "Prochaine : sourate en cours" : "Prochaine récitation"))
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -314,12 +318,12 @@ struct RecitationWidgetView: View {
                 .lineLimit(1)
             if family == .systemLarge {
                 if !n.startVerse.isEmpty {
-                    VerseBlock(label: "DÉBUT · PAGE \(n.firstPage)", text: n.startVerse, lines: 2, size: 17)
+                    VerseBlock(label: "DÉBUT · \(n.firstPageLabel)", text: n.startVerse, lines: 2, size: 17)
                         .padding(.top, 4)
                 }
                 if !n.endVerse.isEmpty {
                     Divider().overlay(Color.white.opacity(0.15))
-                    VerseBlock(label: "FIN · PAGE \(n.lastPage)", text: n.endVerse, lines: 2, size: 17)
+                    VerseBlock(label: "FIN · \(n.lastPageLabel)", text: n.endVerse, lines: 2, size: 17)
                 }
                 Spacer(minLength: 0)
             }

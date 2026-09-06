@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { SetupFrame } from '@/components/recitation/SetupSteps';
 import { loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
+import { pageRefLabel } from '@/lib/recitation/labels';
 import { perimeterPages, perimeterSummary } from '@/lib/recitation/perimeter';
 import { buildCycleDays } from '@/lib/recitation/planner';
 import { SURAH_PAGES } from '@/utils/exercises/surahPages';
@@ -298,7 +299,7 @@ export default function PerimetrePage() {
                 {summary.totalPages} page{summary.totalPages > 1 ? 's' : ''} mémorisée{summary.totalPages > 1 ? 's' : ''}
               </p>
               <p className="text-white/85 mt-1">
-                Pages {summary.firstPage} → {summary.lastPage} · {summary.surahs.length} sourate{summary.surahs.length > 1 ? 's' : ''} ·{' '}
+                {pageRefLabel(summary.firstPage!)} → {pageRefLabel(summary.lastPage!)} · {summary.surahs.length} sourate{summary.surahs.length > 1 ? 's' : ''} ·{' '}
                 {summary.juzs.length} juz’ touché{summary.juzs.length > 1 ? 's' : ''}
                 {summary.completeJuzs.length > 0 && ` (dont ${summary.completeJuzs.length} complet${summary.completeJuzs.length > 1 ? 's' : ''})`}
               </p>

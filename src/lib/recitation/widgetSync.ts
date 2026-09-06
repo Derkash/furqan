@@ -12,7 +12,8 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { TodayContext } from './dayEngine';
-import { pagesLabel } from './labels';
+import { pageRefLabel, pagesLabel } from './labels';
+import { buildLearningSlot } from './learning';
 import { passageHeads } from './passageText';
 import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
 import { formatTime, slotsForWeekday, weekdayOf } from './schedule';
@@ -28,7 +29,14 @@ export interface WidgetSession {
   endEpoch: number;
   slotLabel: string;   // « 11 h – 12 h »
   dayLabel: string;    // '' si aujourd'hui, sinon « mardi 8 septembre »
-  pagesLabel: string;  // « Pages 4 à 5 »
+  pagesLabel: string;  // « 02/pages 1 à 4 »
+  /** 'cycle' (révision) ou 'learning' (sourate en cours). */
+  kind: string;
+  /** Titre de la séance : « Récitation en cours » / « Sourate Al-Ma'idah ». */
+  title: string;
+  /** Repères de page en numérotation de sourate, pour les étiquettes. */
+  firstPageLabel: string;
+  lastPageLabel: string;
   firstPage: number;
   lastPage: number;
   totalPages: number;
@@ -67,19 +75,28 @@ function dayLabelOf(dateKey: string): string {
 
 function makeSession(
   dateKey: string,
-  slot: { startMin: number; endMin: number },
+  slot: { startMin: number; endMin: number; kind?: string },
   pages: number[],
   recited: Set<number>,
-  isToday: boolean
+  isToday: boolean,
+  learningSurah?: number
 ): WidgetSession {
+  const isLearning = slot.kind === 'learning';
+  const preferred = isLearning ? learningSurah : undefined;
+  const first = pages[0] ?? 0;
+  const last = pages[pages.length - 1] ?? 0;
   return {
     startEpoch: epochOf(dateKey, slot.startMin),
     endEpoch: epochOf(dateKey, slot.endMin),
     slotLabel: `${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`,
     dayLabel: isToday ? '' : dayLabelOf(dateKey),
-    pagesLabel: pagesLabel(pages),
-    firstPage: pages[0] ?? 0,
-    lastPage: pages[pages.length - 1] ?? 0,
+    pagesLabel: pagesLabel(pages, preferred),
+    kind: isLearning ? 'learning' : 'cycle',
+    title: isLearning ? 'Sourate en cours' : 'Récitation en cours',
+    firstPageLabel: first ? pageRefLabel(first, preferred) : '',
+    lastPageLabel: last ? pageRefLabel(last, preferred) : '',
+    firstPage: first,
+    lastPage: last,
     totalPages: pages.length,
     recitedPages: pages.filter((p) => recited.has(p)).length,
     startVerse: '',
@@ -96,10 +113,14 @@ export function buildSessions(ctx: TodayContext | null): WidgetSession[] {
   const { program, cycle, dayState, todayKey, dayDates } = ctx;
   const sessions: WidgetSession[] = [];
 
+  const learningSurah = program.learning?.surah;
   if (dayState) {
-    const recited = new Set(dayState.recitedPages);
+    const cycleRecited = new Set(dayState.recitedPages);
+    const learningRecited = new Set(dayState.learningRecited ?? []);
     for (const slot of dayState.slots) {
-      if (slot.pages.length) sessions.push(makeSession(todayKey, slot, slot.pages, recited, true));
+      if (!slot.pages.length) continue;
+      const recited = slot.kind === 'learning' ? learningRecited : cycleRecited;
+      sessions.push(makeSession(todayKey, slot, slot.pages, recited, true, learningSurah));
     }
   }
 
@@ -115,8 +136,11 @@ export function buildSessions(ctx: TodayContext | null): WidgetSession[] {
         ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
         : splitPagesAcrossSlots(pages, slots);
     for (const slot of planned) {
-      if (slot.pages.length) sessions.push(makeSession(date, slot, slot.pages, new Set(), false));
+      if (slot.pages.length) sessions.push(makeSession(date, slot, slot.pages, new Set(), false, learningSurah));
     }
+    // La sourate en cours se récite aussi les jours suivants.
+    const learn = buildLearningSlot(program.learning, program.schedule, program.createdAt, date);
+    if (learn) sessions.push(makeSession(date, learn, learn.pages, new Set(), false, learningSurah));
   }
 
   return sessions.sort((a, b) => a.startEpoch - b.startEpoch);

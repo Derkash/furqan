@@ -18,7 +18,7 @@ import {
 import { appendEvaluation } from '@/lib/recitation/store';
 import { cancelSlotFollowUps, scheduleRecitationNotifications } from '@/lib/recitation/notifications';
 import { syncNative } from '@/lib/recitation/widgetSync';
-import type { DayState, MasteryLevel } from '@/lib/recitation/types';
+import type { DayState, MasteryLevel, SlotKind } from '@/lib/recitation/types';
 
 export interface RecitationApi {
   ctx: TodayContext | null;
@@ -26,7 +26,7 @@ export interface RecitationApi {
   ready: boolean;
   now: Date;
   cycleStats: { recited: number; total: number } | null;
-  markRecited: (page: number, recited: boolean) => void;
+  markRecited: (page: number, recited: boolean, kind?: SlotKind) => void;
   evaluate: (page: number, level: MasteryLevel, note?: string) => void;
   skipEvaluation: (page: number) => void;
   decideCarryOver: (accept: boolean) => void;
@@ -82,8 +82,10 @@ export function useRecitation(): RecitationApi {
         syncNative(next, new Date());
         // Séance accomplie → on retire ses relances : ne jamais annoncer une
         // « séance non terminée » à quelqu'un qui vient de tout réciter.
-        const recited = new Set(nextState.recitedPages);
         nextState.slots.forEach((slot, i) => {
+          const recited = new Set(
+            slot.kind === 'learning' ? (nextState.learningRecited ?? []) : nextState.recitedPages
+          );
           if (slot.pages.length && slot.pages.every((p) => recited.has(p))) {
             cancelSlotFollowUps(i).catch(() => {});
           }
@@ -95,7 +97,8 @@ export function useRecitation(): RecitationApi {
   );
 
   const markRecited = useCallback(
-    (page: number, recited: boolean) => withState((s) => setPageRecited(s, page, recited)),
+    (page: number, recited: boolean, kind: SlotKind = 'cycle') =>
+      withState((s) => setPageRecited(s, page, recited, kind)),
     [withState]
   );
 

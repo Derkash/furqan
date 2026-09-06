@@ -15,7 +15,8 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { pagesLabel } from './labels';
 import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
 import { addDays, cycleDayDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
-import type { Cycle, DayState, Program } from './types';
+import { buildLearningSlot } from './learning';
+import type { Cycle, DayState, PlannedSlot, Program } from './types';
 
 /** Jours planifiés à l'avance (re-planifié à chaque ouverture). */
 const HORIZON_DAYS = 3;
@@ -80,15 +81,21 @@ function plannedSlotsFor(
   dayDates: string[],
   dateKey: string,
   dayState: DayState | null
-): { startMin: number; endMin: number; pages: number[] }[] {
+): PlannedSlot[] {
   if (dayState && dayState.date === dateKey) return dayState.slots;
   const idx = dayDates.indexOf(dateKey);
   const pages = cycle.days[idx]?.pages ?? [];
   const slots = slotsForWeekday(program.schedule, weekdayOf(dateKey));
-  if (!pages.length || !slots.length) return [];
-  return program.slotSplit.mode === 'custom'
-    ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
-    : splitPagesAcrossSlots(pages, slots);
+  const cycleSlots: PlannedSlot[] =
+    pages.length && slots.length
+      ? (program.slotSplit.mode === 'custom'
+          ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
+          : splitPagesAcrossSlots(pages, slots)
+        ).map((s) => ({ ...s, kind: 'cycle' as const }))
+      : [];
+  // La sourate en cours a sa séance dédiée, y compris les jours suivants.
+  const learning = buildLearningSlot(program.learning, program.schedule, program.createdAt, dateKey);
+  return learning ? [...cycleSlots, learning].sort((a, b) => a.startMin - b.startMin) : cycleSlots;
 }
 
 /**
@@ -121,10 +128,16 @@ export async function scheduleRecitationNotifications(
 
     slots.forEach((slot, i) => {
       if (!slot.pages.length) return;
-      const recited = new Set(offset === 0 ? (dayState?.recitedPages ?? []) : []);
+      const isLearning = slot.kind === 'learning';
+      const recited = new Set(
+        offset === 0
+          ? (isLearning ? (dayState?.learningRecited ?? []) : (dayState?.recitedPages ?? []))
+          : []
+      );
       const remaining = slot.pages.filter((p) => !recited.has(p));
       if (!remaining.length) return; // créneau déjà accompli : aucun rappel
-      const label = pagesLabel(slot.pages).toLowerCase();
+      const surah = isLearning ? program.learning?.surah : undefined;
+      const label = pagesLabel(slot.pages, surah);
       const count = remaining.length;
 
       // 1. Ouverture du créneau.
@@ -132,8 +145,8 @@ export async function scheduleRecitationNotifications(
       if (start > now) {
         notifications.push({
           id: notifId(offset, i, 0),
-          title: 'C’est l’heure de votre récitation',
-          body: `${pagesLabel(slot.pages)} — jusqu’à ${formatTime(slot.endMin)}. Qu’Allah vous facilite.`,
+          title: isLearning ? 'Votre sourate en cours' : 'C’est l’heure de votre récitation',
+          body: `${label} — jusqu’à ${formatTime(slot.endMin)}. Qu’Allah vous facilite.`,
           schedule: { at: start },
           extra: { route: '/recitation/en-cours' },
         });
@@ -162,7 +175,7 @@ export async function scheduleRecitationNotifications(
           notifications.push({
             id: notifId(offset, i, 2),
             title: 'Séance non terminée',
-            body: `${pagesLabel(slot.pages)} vous attendent encore. Vous pouvez les reprendre maintenant.`,
+            body: `${label} — vous pouvez reprendre maintenant.`,
             schedule: { at: followUpAt },
             extra: { route: '/recitation/en-cours' },
           });
