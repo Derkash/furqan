@@ -59,8 +59,33 @@ extension SharedRecitationState {
         phase: "active", date: "", slotStartMin: 1080, slotEndMin: 1140,
         slotEndEpoch: Int(Date.now.addingTimeInterval(37 * 60).timeIntervalSince1970),
         totalPages: 4, recitedPages: 2, firstPage: 3, lastPage: 6,
-        pagesLabel: "Pages 3 à 6", slotLabel: "18 h – 19 h"
+        pagesLabel: "Pages 3 à 6", slotLabel: "18 h – 19 h",
+        startVerse: "إِنَّ ٱلَّذِينَ كَفَرُوا۟ …", endVerse: "وَهُوَ بِكُلِّ شَىْءٍ …",
+        nextSlotLabel: "20 h", nextPagesLabel: "Pages 7 à 10", nextDayLabel: "aujourd’hui"
     )
+}
+
+/// Une ligne de verset arabe : repère de DÉBUT ou de FIN du passage.
+/// Texte Unicode othmanien (les polices QCF de la WebView, par page et en
+/// woff2, ne sont pas utilisables ici) — une seule ligne, tronquée côté JS.
+struct VerseLine: View {
+    let label: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.system(size: 9, weight: .heavy))
+                .foregroundStyle(gold)
+                .fixedSize()
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .environment(\.layoutDirection, .rightToLeft)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
 }
 
 /// Barre de progression segmentée (une barrette par page, or = récitée).
@@ -85,8 +110,14 @@ struct RecitationWidgetView: View {
     var body: some View {
         Group {
             if let state = entry.state, state.isActive {
-                if family == .systemSmall { small(state) } else { medium(state) }
-            } else if let state = entry.state, state.phase == "upcoming" {
+                if family == .systemSmall { small(state) }
+                else if family == .systemLarge { large(state) }
+                else { medium(state) }
+            } else if let state = entry.state, state.isDone, state.hasNext {
+                // Objectif atteint : la progression n'apprend plus rien, on
+                // affiche uniquement la prochaine récitation.
+                finished(state)
+            } else if let state = entry.state, state.hasNext {
                 upcoming(state)
             } else {
                 idle
@@ -124,11 +155,12 @@ struct RecitationWidgetView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Text("récitées")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
                 PageSegments(total: state.totalPages, done: state.recitedPages)
-                    .padding(.top, 3)
+                    .padding(.top, 2)
+                if !state.startVerse.isEmpty {
+                    VerseLine(label: "DÉBUT", text: state.startVerse)
+                        .padding(.top, 1)
+                }
                 Text(state.remainingLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
@@ -138,6 +170,77 @@ struct RecitationWidgetView: View {
             gauge(state)
         }
         .padding(2)
+    }
+
+    /// Grand format : la carte complète — progression, anneau, et les DEUX
+    /// repères du passage (début et fin), un par ligne.
+    private func large(_ state: SharedRecitationState) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 15))
+                Text("Récitation en cours")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 4)
+                Text(state.slotLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(gold)
+                    .fixedSize()
+            }
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(state.recitedPages) / \(state.totalPages) pages")
+                        .font(.system(size: 32, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(state.pagesLabel)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                gauge(state)
+            }
+            PageSegments(total: state.totalPages, done: state.recitedPages)
+            VStack(alignment: .leading, spacing: 7) {
+                if !state.startVerse.isEmpty { VerseLine(label: "DÉBUT", text: state.startVerse) }
+                if !state.endVerse.isEmpty { VerseLine(label: "FIN", text: state.endVerse) }
+            }
+            .padding(.top, 2)
+            Spacer(minLength: 0)
+            Text(state.remainingLabel)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+    }
+
+    /// Objectif du créneau atteint : uniquement la prochaine récitation.
+    private func finished(_ state: SharedRecitationState) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(gold).font(.system(size: 15))
+                Text("Récitation terminée")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+            Text("Prochaine \(state.nextLabel)")
+                .font(.system(size: family == .systemSmall ? 19 : 24, weight: .heavy))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+            if !state.nextPagesLabel.isEmpty {
+                Text(state.nextPagesLabel)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(gold)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func small(_ state: SharedRecitationState) -> some View {
@@ -207,14 +310,21 @@ struct RecitationWidgetView: View {
                 Text("Prochaine récitation")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
-            Text(state.slotLabel)
-                .font(.system(size: 24, weight: .heavy))
+            Text(state.nextLabel)
+                .font(.system(size: family == .systemSmall ? 19 : 24, weight: .heavy))
                 .foregroundStyle(gold)
-            Text(state.pagesLabel)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+            if !state.nextPagesLabel.isEmpty {
+                Text(state.nextPagesLabel)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -242,6 +352,6 @@ struct RecitationWidget: Widget {
         }
         .configurationDisplayName("Récitation")
         .description("Suivez votre créneau de récitation : pages récitées et temps restant.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

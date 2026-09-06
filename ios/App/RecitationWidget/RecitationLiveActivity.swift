@@ -127,7 +127,17 @@ private struct LockScreenView: View {
                     .font(.system(size: 17, weight: .heavy))
                     .foregroundStyle(.white)
                 Segments(total: context.state.totalPages, done: context.state.recitedPages)
-                    .frame(maxWidth: 150)
+                    .frame(maxWidth: 160)
+                // Repère de reprise : le début du passage, d'un coup d'œil.
+                if !context.state.startVerse.isEmpty {
+                    Text(context.state.startVerse)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .environment(\.layoutDirection, .rightToLeft)
+                        .frame(maxWidth: 170, alignment: .trailing)
+                }
             }
             Spacer(minLength: 8)
             Countdown(end: context.state.endDate)

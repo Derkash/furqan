@@ -20,7 +20,9 @@ public let recitationStateKey = "recitationWidgetState"
 
 /// Miroir Swift de l'état construit côté TypeScript (widgetSync.ts).
 public struct SharedRecitationState: Codable {
-    public var phase: String        // "active" | "upcoming" | "idle"
+    /// "active" (créneau en cours, pages restantes) | "done" (objectif atteint
+    /// → on montre la prochaine session) | "upcoming" | "idle"
+    public var phase: String
     public var date: String
     public var slotStartMin: Int
     public var slotEndMin: Int
@@ -31,6 +33,14 @@ public struct SharedRecitationState: Codable {
     public var lastPage: Int
     public var pagesLabel: String   // « Pages 3 à 6 »
     public var slotLabel: String    // « 18 h – 19 h »
+    /// Début du premier / dernier verset à réciter (Unicode othmanien,
+    /// tronqué côté JS). Vide tant que le texte n'est pas chargé.
+    public var startVerse: String
+    public var endVerse: String
+    // Prochaine session (phases "done" et "upcoming")
+    public var nextSlotLabel: String
+    public var nextPagesLabel: String
+    public var nextDayLabel: String
 
     public static func load() -> SharedRecitationState? {
         guard
@@ -42,6 +52,14 @@ public struct SharedRecitationState: Codable {
     }
 
     public var isActive: Bool { phase == "active" && totalPages > 0 }
+    public var isDone: Bool { phase == "done" }
+    public var hasNext: Bool { !nextSlotLabel.isEmpty }
+    /// « à 11 h » ou « mardi 8 septembre, à 8 h »
+    public var nextLabel: String {
+        if nextSlotLabel.isEmpty { return "" }
+        if nextDayLabel.isEmpty || nextDayLabel == "aujourd’hui" { return "à \(nextSlotLabel)" }
+        return "\(nextDayLabel), à \(nextSlotLabel)"
+    }
     public var remainingPages: Int { max(0, totalPages - recitedPages) }
     public var slotEndDate: Date { Date(timeIntervalSince1970: TimeInterval(slotEndEpoch)) }
     /// « Encore 2 pages avant 19 h » (fin du créneau en heure locale).
@@ -63,11 +81,14 @@ public struct RecitationActivityAttributes: ActivityAttributes {
         public var totalPages: Int
         public var pagesLabel: String
         public var slotEndEpoch: Int
-        public init(recitedPages: Int, totalPages: Int, pagesLabel: String, slotEndEpoch: Int) {
+        /// Début du prochain verset à réciter (Unicode othmanien, tronqué).
+        public var startVerse: String
+        public init(recitedPages: Int, totalPages: Int, pagesLabel: String, slotEndEpoch: Int, startVerse: String) {
             self.recitedPages = recitedPages
             self.totalPages = totalPages
             self.pagesLabel = pagesLabel
             self.slotEndEpoch = slotEndEpoch
+            self.startVerse = startVerse
         }
     }
     public var slotLabel: String

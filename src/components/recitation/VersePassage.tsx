@@ -95,20 +95,25 @@ async function loadExcerpt(page: number, which: 'first' | 'last'): Promise<Excer
   };
 }
 
-function GlyphLine({ excerpt, clampFrom }: { excerpt: Excerpt; clampFrom: 'start' | 'end' }) {
-  // DÉBUT : les premiers mots. FIN : les derniers mots. Sens de lecture RTL.
+function GlyphLine({ excerpt }: { excerpt: Excerpt }) {
+  // TOUJOURS le DÉBUT du verset — c'est lui qui permet de l'identifier, aussi
+  // bien pour savoir où commencer que pour reconnaître le dernier verset à
+  // réciter. L'ellipse porte sa PROPRE police : les polices QCF ne contiennent
+  // que les glyphes de leur page, « … » y sortirait en carré vide.
   const MAX = 9;
   const truncated = excerpt.glyphs.length > MAX;
-  const shown = clampFrom === 'start' ? excerpt.glyphs.slice(0, MAX) : excerpt.glyphs.slice(-MAX);
   return (
     <p
       dir="rtl"
       className="text-[26px] md:text-[30px] leading-[2] text-[#1f2a26] select-none"
       style={{ fontFamily: `'${excerpt.fontFamily}', serif` }}
     >
-      {clampFrom === 'end' && truncated && <span className="text-[var(--ds-n400)]">… </span>}
-      {shown.join(' ')}
-      {clampFrom === 'start' && truncated && <span className="text-[var(--ds-n400)]"> …</span>}
+      {excerpt.glyphs.slice(0, MAX).join(' ')}
+      {truncated && (
+        <span className="text-[var(--ds-n400)]" style={{ fontFamily: 'var(--ds-font)' }}>
+          {' '}…
+        </span>
+      )}
     </p>
   );
 }
@@ -138,11 +143,15 @@ function Marker({
       </p>
       <p className="text-xs text-[var(--ds-n500)] flex-none text-right">
         {isStart ? 'Commencez ici' : 'Terminez ici'}
-        {partial && (
-          <span className="block text-[10px] text-[var(--ds-n400)]">
-            {isStart ? 'verset commencé avant' : 'verset achevé après'}
-          </span>
-        )}
+        <span className="block text-[10px] text-[var(--ds-n400)]">
+          {partial
+            ? isStart
+              ? 'verset commencé avant'
+              : 'verset achevé après'
+            : isStart
+              ? 'début du premier verset'
+              : 'début du dernier verset'}
+        </span>
       </p>
     </div>
   );
@@ -180,7 +189,7 @@ export default function VersePassage({ firstPage, lastPage }: { firstPage: numbe
       <Marker kind="start" page={firstPage} surahName={startSurah?.nameSimple} partial={start?.partial ?? false} />
       <div className="border-l-2 border-dashed border-[var(--ds-sage-200)] ml-[4px] pl-4 my-1 min-h-[56px]">
         {start ? (
-          <GlyphLine excerpt={start} clampFrom="start" />
+          <GlyphLine excerpt={start} />
         ) : (
           <div className="h-10 rounded-lg bg-[var(--ds-sage-100)] animate-pulse mt-2" />
         )}
@@ -191,7 +200,7 @@ export default function VersePassage({ firstPage, lastPage }: { firstPage: numbe
       </div>
       <div className="ml-[4px] pl-4 min-h-[56px]">
         {end ? (
-          <GlyphLine excerpt={end} clampFrom="end" />
+          <GlyphLine excerpt={end} />
         ) : (
           <div className="h-10 rounded-lg bg-[var(--ds-sage-100)] animate-pulse mt-2" />
         )}

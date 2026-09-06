@@ -97,7 +97,8 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
             recitedPages: state.recitedPages,
             totalPages: state.totalPages,
             pagesLabel: state.pagesLabel,
-            slotEndEpoch: state.slotEndEpoch
+            slotEndEpoch: state.slotEndEpoch,
+            startVerse: state.startVerse
         )
     }
 

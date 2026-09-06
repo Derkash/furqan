@@ -50,7 +50,7 @@ export function useRecitation(): RecitationApi {
     }
     setCtx(next);
     setReady(true);
-    syncNative(next?.program ?? null, next?.dayState ?? null, current);
+    syncNative(next, current);
     // (Re)planifie les notifications une fois par montage.
     if (next && !notifiedRef.current) {
       notifiedRef.current = true;
@@ -79,7 +79,7 @@ export function useRecitation(): RecitationApi {
         if (!prev?.dayState) return prev;
         const nextState = fn(prev.dayState);
         const next = { ...prev, dayState: nextState };
-        syncNative(next.program, nextState, new Date());
+        syncNative(next, new Date());
         return next;
       });
     },
