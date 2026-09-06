@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useRecitation } from '@/hooks/useRecitation';
+import { dailyLoad } from '@/lib/recitation/dayEngine';
 import { formatDateKey, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
 import { clearDraft } from '@/lib/recitation/draft';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
@@ -64,14 +65,15 @@ export default function RecitationPage() {
   const active = dayState ? currentSlot(dayState.slots, nowMin) : null;
   const upcoming = dayState ? nextSlot(dayState.slots, nowMin) : null;
   const recitedSet = new Set(dayState?.recitedPages ?? []);
-  const todayPages = dayState?.slots.flatMap((s) => s.pages) ?? [];
-  const todayDone = todayPages.filter((p) => recitedSet.has(p)).length;
+  const learningSet = new Set(dayState?.learningRecited ?? []);
+  const load = dailyLoad(dayState);
   const dayNumber = (dayState?.cycleDayIndex ?? dayDates.indexOf(todayKey)) + 1;
   const endDate = dayDates[dayDates.length - 1];
 
   const slotStatusLabel = (i: number) => {
     const slot = dayState!.slots[i];
-    const done = slot.pages.every((p) => recitedSet.has(p)) && slot.pages.length > 0;
+    const set = slot.kind === 'learning' ? learningSet : recitedSet;
+    const done = slot.pages.every((p) => set.has(p)) && slot.pages.length > 0;
     if (done) return { label: 'Terminée', cls: 'text-[var(--ds-sage)]' };
     if (active && slot.startMin === active.startMin) return { label: 'En cours', cls: 'text-[var(--ds-gold-700)]' };
     if (slot.endMin <= nowMin) return { label: 'Passée', cls: 'text-[var(--ds-n500)]' };
@@ -146,10 +148,17 @@ export default function RecitationPage() {
           {dayState ? (
             <>
               <p className="text-2xl font-extrabold mt-1">
-                {todayDone} / {todayPages.length} pages récitées
+                {load.cycleDone + load.learningDone} / {load.totalPages} pages récitées
               </p>
+              {/* Le total additionne DEUX programmes distincts : l'objectif du
+                  cycle ne dit rien de la sourate en cours, qui s'y ajoute. */}
               <p className="text-sm text-white/85 mt-1">
-                {pagesLabel(todayPages)} · {surahSpanLabel(todayPages)}
+                Révision {load.cycleDone}/{load.cyclePages}
+                {load.learningPages > 0 && (
+                  <> · Sourate en cours {load.learningDone}/{load.learningPages}</>
+                )}
+                {' · ~'}
+                {Math.round(load.estimatedMinutes / 5) * 5} min
               </p>
               {cycleStats && (
                 <p className="text-sm text-white/85 mt-0.5">
@@ -205,14 +214,25 @@ export default function RecitationPage() {
           <div className="ds-card divide-y divide-[var(--ds-divider)]">
             {dayState.slots.map((slot, i) => {
               const st = slotStatusLabel(i);
-              const done = slot.pages.filter((p) => recitedSet.has(p)).length;
+              const isLearning = slot.kind === 'learning';
+              const set = isLearning ? learningSet : recitedSet;
+              const done = slot.pages.filter((p) => set.has(p)).length;
+              const surah = isLearning ? ctx.program.learning?.surah : undefined;
               return (
-                <div key={i} className="px-5 py-3.5 flex items-center gap-3">
+                <div
+                  key={i}
+                  className={`px-5 py-3.5 flex items-center gap-3 ${isLearning ? 'bg-[var(--ds-gold-100)]' : ''}`}
+                >
                   <span className="flex-none w-28 text-sm font-extrabold text-[var(--ds-green)]">
                     {formatTime(slot.startMin)} – {formatTime(slot.endMin)}
                   </span>
                   <span className="text-sm font-semibold flex-1">
-                    {pagesLabel(slot.pages) || 'Aucune page'}
+                    {isLearning && (
+                      <span className="text-[10px] font-extrabold tracking-wider text-[var(--ds-gold-700)] mr-2">
+                        SOURATE EN COURS
+                      </span>
+                    )}
+                    {pagesLabel(slot.pages, surah) || 'Aucune page'}
                     {slot.pages.length > 0 && (
                       <span className="text-[var(--ds-n500)] font-normal"> · {done}/{slot.pages.length}</span>
                     )}

@@ -19,7 +19,8 @@ import {
   learningSpan,
   nextSurah,
 } from '@/lib/recitation/learning';
-import { clearDayState, loadProgram, saveProgram } from '@/lib/recitation/store';
+import { loadProgram, saveProgram } from '@/lib/recitation/store';
+import { dailyLoad, learningOverlapsCycle, rebuildToday } from '@/lib/recitation/dayEngine';
 import { refreshRecitationNative } from '@/lib/recitation/appSync';
 import { toDateKey } from '@/lib/recitation/schedule';
 import { SURAH_PAGES } from '@/utils/exercises/surahPages';
@@ -37,12 +38,17 @@ export default function ApprentissagePage() {
   const [search, setSearch] = useState('');
   // Date figée au montage : le rendu reste pur (pas de Date.now() en rendu).
   const [today] = useState(() => new Date());
+  const [load, setLoad] = useState(() => dailyLoad(null));
+  const [overlap, setOverlap] = useState(false);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const p = loadProgram();
     setProgram(p);
     setConfig(p?.learning ?? null);
+    const ctx = rebuildToday(new Date());
+    setLoad(dailyLoad(ctx?.dayState ?? null));
+    setOverlap(learningOverlapsCycle(ctx?.dayState ?? null));
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -52,7 +58,10 @@ export default function ApprentissagePage() {
     const updated: Program = { ...program, learning: next, updatedAt: new Date().toISOString() };
     setProgram(updated);
     saveProgram(updated);
-    clearDayState(); // la journée est reconstruite avec (ou sans) la séance
+    // Reconstruire la journée SANS perdre ce qui a déjà été récité aujourd'hui.
+    const ctx = rebuildToday(new Date());
+    setLoad(dailyLoad(ctx?.dayState ?? null));
+    setOverlap(learningOverlapsCycle(ctx?.dayState ?? null));
     refreshRecitationNative(new Date());
   };
 
@@ -196,7 +205,7 @@ export default function ApprentissagePage() {
                             saveProgram(withSurah);
                             setProgram(withSurah);
                             setConfig(withSurah.learning);
-                            clearDayState();
+                            rebuildToday(new Date());
                             refreshRecitationNative(new Date());
                           }}
                           className="ds-btn-gold px-4 py-2 text-[13px]"
@@ -243,6 +252,46 @@ export default function ApprentissagePage() {
                     Plafonner à 10 pages par jour
                   </button>
                 </div>
+              )}
+            </section>
+
+            {/* Charge totale de la journée — le point que l'objectif du cycle
+                ne dit pas : la séance de la sourate s'AJOUTE à la révision. */}
+            <section className="ds-card p-5">
+              <p className="text-sm font-extrabold mb-2">Votre charge quotidienne</p>
+              <div className="flex items-end gap-4">
+                <div>
+                  <p className="text-2xl font-extrabold text-[var(--ds-green)]">{load.cyclePages}</p>
+                  <p className="text-[12px] text-[var(--ds-n600)] font-semibold">pages de révision</p>
+                </div>
+                <span className="text-xl text-[var(--ds-n400)] pb-1">+</span>
+                <div>
+                  <p className="text-2xl font-extrabold text-[var(--ds-gold-700)]">{load.learningPages}</p>
+                  <p className="text-[12px] text-[var(--ds-n600)] font-semibold">pages de sourate</p>
+                </div>
+                <span className="text-xl text-[var(--ds-n400)] pb-1">=</span>
+                <div>
+                  <p className="text-2xl font-extrabold text-[var(--ds-text)]">{load.totalPages}</p>
+                  <p className="text-[12px] text-[var(--ds-n600)] font-semibold">
+                    pages · ~{Math.round(load.estimatedMinutes / 5) * 5} min
+                  </p>
+                </div>
+              </div>
+              {load.estimatedMinutes > 90 && (
+                <p className="text-[12px] text-[var(--ds-gold-700)] font-semibold mt-2.5">
+                  Plus d’une heure et demie par jour, révision comprise. Un plafond sur la sourate,
+                  ou un{' '}
+                  <Link href="/recitation/objectif" className="underline">
+                    cycle plus long
+                  </Link>{' '}
+                  rendrait le rythme plus tenable.
+                </p>
+              )}
+              {overlap && (
+                <p className="text-[12px] text-[#b3542e] font-semibold mt-2.5">
+                  Cette séance chevauche un créneau de révision : à cette heure-là, deux séances se
+                  disputeraient l’écran. Choisissez un autre moment.
+                </p>
               )}
             </section>
 

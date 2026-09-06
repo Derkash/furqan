@@ -9,6 +9,7 @@
 //   applyCarryOver(...)→ décision de report (mode « toujours demander »)
 
 import {
+  DEFAULT_MIN_PER_PAGE,
   buildCycleDays,
   carryOverPages,
   splitPagesAcrossSlots,
@@ -23,6 +24,7 @@ import {
 import { buildLearningSlot } from './learning';
 import { reinforcementDuePages } from './mastery';
 import {
+  clearDayState,
   evaluationsByPage,
   loadCycle,
   loadDayState,
@@ -233,6 +235,125 @@ export function ensureToday(now: Date): TodayContext | null {
 
 function loadSessionDates(): Set<string> {
   return new Set(loadSessions().map((s) => s.date));
+}
+
+// ---------------------------------------------------------------------------
+// Reconstruction de la journée sans perdre la progression
+// ---------------------------------------------------------------------------
+
+/**
+ * Recalcule les créneaux du jour depuis le programme courant (après ajout ou
+ * modification de la sourate en cours, par exemple) EN CONSERVANT ce qui a
+ * déjà été fait aujourd'hui : pages récitées, évaluations en attente, et les
+ * créneaux déjà clôturés — repérés par leurs horaires et non par leur index,
+ * qui change quand une séance s'insère.
+ *
+ * Effacer purement l'état du jour ferait perdre la récitation du matin dès
+ * qu'on touche au programme l'après-midi.
+ */
+export function rebuildToday(now: Date): TodayContext | null {
+  const program = loadProgram();
+  const cycle = loadCycle();
+  const previous = loadDayState();
+  if (!program || !cycle) return null;
+
+  const todayKey = toDateKey(now);
+  if (!previous || previous.date !== todayKey) {
+    clearDayState();
+    return ensureToday(now);
+  }
+
+  const dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  const index = dayDates.indexOf(todayKey);
+  if (index === -1) {
+    clearDayState();
+    return ensureToday(now);
+  }
+
+  const fresh = buildDayState(program, cycle, todayKey, index, previous.pendingCatchUp ?? []);
+  const closedSignatures = new Set(
+    previous.closedSlots.map((i) => {
+      const slot = previous.slots[i];
+      return slot ? `${slot.startMin}-${slot.endMin}` : '';
+    })
+  );
+  const merged: DayState = {
+    ...fresh,
+    recitedPages: previous.recitedPages,
+    learningRecited: previous.learningRecited ?? [],
+    pendingEvaluations: previous.pendingEvaluations,
+    pendingCarryOver: previous.pendingCarryOver,
+    closedSlots: fresh.slots
+      .map((slot, i) => (closedSignatures.has(`${slot.startMin}-${slot.endMin}`) ? i : -1))
+      .filter((i) => i >= 0),
+  };
+  saveDayState(merged);
+  return ensureToday(now);
+}
+
+// ---------------------------------------------------------------------------
+// Charge de la journée
+// ---------------------------------------------------------------------------
+
+/** Volume réellement demandé aujourd'hui : révision + sourate en cours. */
+export interface DailyLoad {
+  cyclePages: number;
+  learningPages: number;
+  totalPages: number;
+  /** Durée estimée, toutes séances confondues. */
+  estimatedMinutes: number;
+  cycleDone: number;
+  learningDone: number;
+}
+
+export function dailyLoad(state: DayState | null): DailyLoad {
+  const empty: DailyLoad = {
+    cyclePages: 0, learningPages: 0, totalPages: 0,
+    estimatedMinutes: 0, cycleDone: 0, learningDone: 0,
+  };
+  if (!state) return empty;
+  const cycleRecited = new Set(state.recitedPages);
+  const learningRecited = new Set(state.learningRecited ?? []);
+  let cyclePages = 0;
+  let learningPages = 0;
+  let cycleDone = 0;
+  let learningDone = 0;
+  for (const slot of state.slots) {
+    if (slot.kind === 'learning') {
+      learningPages += slot.pages.length;
+      learningDone += slot.pages.filter((p) => learningRecited.has(p)).length;
+    } else {
+      cyclePages += slot.pages.length;
+      cycleDone += slot.pages.filter((p) => cycleRecited.has(p)).length;
+    }
+  }
+  const total = cyclePages + learningPages;
+  return {
+    cyclePages,
+    learningPages,
+    totalPages: total,
+    estimatedMinutes: total * DEFAULT_MIN_PER_PAGE,
+    cycleDone,
+    learningDone,
+  };
+}
+
+/**
+ * Chevauchement entre la séance d'apprentissage et un créneau de révision :
+ * deux séances au même moment rendraient l'affichage ambigu (laquelle est
+ * « en cours » ?). L'UI s'en sert pour prévenir.
+ */
+export function learningOverlapsCycle(state: DayState | null): boolean {
+  if (!state) return false;
+  const learning = state.slots.find((s) => s.kind === 'learning');
+  if (!learning) return false;
+  return state.slots.some(
+    (s) =>
+      s.kind !== 'learning' &&
+      s.pages.length > 0 &&
+      s.startMin < learning.endMin &&
+      learning.startMin < s.endMin
+  );
 }
 
 // ---------------------------------------------------------------------------

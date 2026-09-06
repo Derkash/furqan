@@ -4,6 +4,7 @@
 // cycle jour par jour avec les pages réellement prévues et les dates estimées.
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { SetupFrame } from '@/components/recitation/SetupSteps';
@@ -12,6 +13,8 @@ import { formatDateKey, pagesLabel, surahSpanLabel } from '@/lib/recitation/labe
 import { perimeterPages } from '@/lib/recitation/perimeter';
 import { buildCycleDays } from '@/lib/recitation/planner';
 import { addDays, cycleDayDates, toDateKey } from '@/lib/recitation/schedule';
+import { learningPagesForDay, learningProgress } from '@/lib/recitation/learning';
+import { loadProgram } from '@/lib/recitation/store';
 import type { Objective } from '@/lib/recitation/types';
 
 type PresetId = 'half-juz' | 'one-juz' | 'two-juz' | 'pages' | 'days';
@@ -63,6 +66,13 @@ export default function ObjectifPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const pages = useMemo(() => (draft ? perimeterPages(draft.selections) : []), [draft]);
+  // La sourate en cours n'est PAS dans cet objectif : elle s'y ajoute chaque
+  // jour, dans sa propre séance. Le dire ici évite de sous-estimer sa journée.
+  const learning = useMemo(() => {
+    const cfg = draft?.learning ?? loadProgram()?.learning ?? null;
+    if (!cfg) return null;
+    return { config: cfg, pages: learningPagesForDay(cfg, 0), progress: learningProgress(cfg) };
+  }, [draft]);
   const objective = preset ? toObjective(preset, pagesPerDay, days) : null;
   const cycleDays = useMemo(
     () => (objective ? buildCycleDays(pages, objective) : []),
@@ -146,11 +156,29 @@ export default function ObjectifPage() {
           ))}
         </div>
 
+        {/* La sourate en cours s'ajoute à cet objectif */}
+        {learning?.progress && learning.pages.length > 0 && (
+          <section className="rounded-[20px] border border-[var(--ds-gold)] bg-[var(--ds-gold-100)] p-4 mt-4">
+            <p className="text-[13px] font-extrabold text-[var(--ds-gold-700)]">
+              S’ajoute à cet objectif : {learning.progress.surahName}
+            </p>
+            <p className="text-[13px] text-[var(--ds-n700)] mt-0.5">
+              {learning.pages.length} page{learning.pages.length > 1 ? 's' : ''} de plus chaque jour,
+              dans une séance séparée —{' '}
+              <Link href="/recitation/apprentissage" className="underline font-semibold">
+                sourate en cours
+              </Link>
+              .
+            </p>
+          </section>
+        )}
+
         {/* Aperçu du cycle */}
         {cycleDays.length > 0 && (
           <section className="ds-card p-5 mt-4">
             <h2 className="text-base font-extrabold mb-3">
               Aperçu — cycle de {cycleDays.length} jour{cycleDays.length > 1 ? 's' : ''}
+              {learning?.pages.length ? ' (révision seule)' : ''}
             </h2>
             <div className="flex flex-col divide-y divide-[var(--ds-divider)] max-h-[300px] overflow-y-auto">
               {cycleDays.map((day, i) => (
