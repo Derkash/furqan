@@ -82,6 +82,18 @@ function pagesForDay(
   return { pages, reinforcement };
 }
 
+/** Pages déjà récitées AUJOURD'HUI d'après le journal des séances closes. */
+function recitedTodayFromJournal(todayKey: string): { cycle: number[]; learning: number[] } {
+  const cycle = new Set<number>();
+  const learning = new Set<number>();
+  for (const rec of loadSessions()) {
+    if (rec.date !== todayKey) continue;
+    const target = rec.kind === 'learning' ? learning : cycle;
+    for (const p of rec.recitedPages) target.add(p);
+  }
+  return { cycle: [...cycle].sort((a, b) => a - b), learning: [...learning].sort((a, b) => a - b) };
+}
+
 function buildDayState(
   program: Program,
   cycle: Cycle,
@@ -102,12 +114,18 @@ function buildDayState(
   const learning = buildLearningSlot(program.learning, program.schedule, program.createdAt, todayKey);
   const all = learning ? [...planned, learning].sort((a, b) => a.startMin - b.startMin) : planned;
 
+  // INTÉGRITÉ : une journée reconstruite (programme modifié, resynchro…)
+  // repart du journal — ce qui a été récité aujourd'hui reste récité.
+  // C'est ce qui manquait quand « Modifier » remettait la journée à 0/20
+  // alors que le cycle affichait déjà 12 pages faites.
+  const seed = recitedTodayFromJournal(todayKey);
+
   return {
     date: todayKey,
     cycleDayIndex,
     slots: all,
-    recitedPages: [],
-    learningRecited: [],
+    recitedPages: seed.cycle,
+    learningRecited: seed.learning,
     pendingEvaluations: [],
     closedSlots: [],
     overdueDecision: null,
@@ -240,6 +258,27 @@ function loadSessionDates(): Set<string> {
 // ---------------------------------------------------------------------------
 // Reconstruction de la journée sans perdre la progression
 // ---------------------------------------------------------------------------
+
+/**
+ * Journalise les créneaux ouverts qui portent déjà des pages récitées.
+ * À appeler AVANT clearDayState (modification du programme) : le journal
+ * devient alors la mémoire du jour, et buildDayState la ressème.
+ */
+export function archiveToday(now: Date): void {
+  const state = loadDayState();
+  if (!state || state.date !== toDateKey(now)) return;
+  const next: DayState = { ...state, closedSlots: [...state.closedSlots] };
+  let changed = false;
+  for (let i = 0; i < next.slots.length; i++) {
+    if (next.closedSlots.includes(i)) continue;
+    const slot = next.slots[i];
+    const recited = recitedFor(next, slot.kind);
+    if (!slot.pages.some((p) => recited.has(p))) continue;
+    closeSlot(next, i, slot.pages.filter((p) => !recited.has(p)));
+    changed = true;
+  }
+  if (changed) saveDayState(next);
+}
 
 /**
  * Recalcule les créneaux du jour depuis le programme courant (après ajout ou
@@ -387,6 +426,74 @@ export function setPageRecited(
     ...(kind === 'learning' ? { learningRecited: sorted } : { recitedPages: sorted }),
     pendingEvaluations: [...pending].sort((a, b) => a - b),
   };
+  saveDayState(next);
+  return next;
+}
+
+/**
+ * Coche PLUSIEURS pages d'un coup (récitation improvisée) — une seule
+ * écriture, sans passer par l'évaluation page à page.
+ */
+export function setPagesRecited(state: DayState, pages: number[], kind: SlotKind): DayState {
+  const source = kind === 'learning' ? (state.learningRecited ?? []) : state.recitedPages;
+  const set = new Set(source);
+  for (const p of pages) set.add(p);
+  const sorted = [...set].sort((a, b) => a - b);
+  const next: DayState = {
+    ...state,
+    ...(kind === 'learning' ? { learningRecited: sorted } : { recitedPages: sorted }),
+  };
+  saveDayState(next);
+  return next;
+}
+
+/**
+ * RÉ-ÉTALE la journée après une récitation improvisée : toutes les pages de
+ * révision restantes sont redistribuées équitablement sur les créneaux
+ * encore ouverts (celui en cours compris). « 10 pages faites le matin →
+ * une page par heure sur le reste de la journée. »
+ *
+ * Les créneaux passés sont délestés de leurs pages non récitées (reprises
+ * dans la redistribution) : le retard affiché reste exact, sans doublon.
+ * La séance de la sourate en cours n'est pas touchée.
+ */
+export function rebalanceToday(state: DayState, nowMin: number): DayState {
+  const recited = new Set(state.recitedPages);
+  const remaining = [
+    ...new Set(
+      state.slots
+        .filter((s) => (s.kind ?? 'cycle') === 'cycle')
+        .flatMap((s) => s.pages)
+        .filter((p) => !recited.has(p))
+    ),
+  ].sort((a, b) => a - b);
+
+  const open = state.slots
+    .map((slot, i) => ({ slot, i }))
+    .filter(
+      ({ slot, i }) =>
+        (slot.kind ?? 'cycle') === 'cycle' && slot.endMin > nowMin && !state.closedSlots.includes(i)
+    );
+
+  const slots = state.slots.map((slot) => ({ ...slot }));
+  if (open.length) {
+    const split = splitPagesAcrossSlots(
+      remaining,
+      open.map(({ slot }) => ({ startMin: slot.startMin, endMin: slot.endMin }))
+    );
+    open.forEach(({ i }, j) => {
+      slots[i] = { ...slots[i], pages: split[j].pages };
+    });
+    // Les créneaux passés ne gardent que leurs pages récitées (journal) —
+    // leurs restes viennent d'être redistribués devant.
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      if ((slot.kind ?? 'cycle') !== 'cycle' || slot.endMin > nowMin) continue;
+      slots[i] = { ...slot, pages: slot.pages.filter((p) => recited.has(p)) };
+    }
+  }
+
+  const next: DayState = { ...state, slots };
   saveDayState(next);
   return next;
 }

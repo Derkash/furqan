@@ -145,9 +145,11 @@ export function Sidebar() {
   const pathname = usePathname() ?? '';
   const [streak, setStreak] = useState(0);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setStreak(computeHomeStats().streakDays);
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <aside
@@ -203,7 +205,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="h-full hidden md:block">
           <Sidebar />
         </div>
-        <div className="flex-1 min-w-0 h-full overflow-y-auto">
+        {/* overflow-x-hidden : aucun contenu (frise, tableau, texte long) ne
+            doit jamais élargir la page — le rendu « zoom web » sur iPhone
+            venait d'un débordement horizontal. */}
+        <div className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden">
           <MobileNav />
           <main className="px-5 md:px-9 py-6 md:py-8 max-w-[1100px]">{children}</main>
         </div>

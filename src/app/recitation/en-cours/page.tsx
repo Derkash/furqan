@@ -12,7 +12,7 @@ import VersePassage from '@/components/recitation/VersePassage';
 import { useRecitation } from '@/hooks/useRecitation';
 import { duePages } from '@/lib/recitation/dayEngine';
 import { pageFirstVerseHead } from '@/lib/recitation/passageText';
-import { pageRefLabel, pagesLabel, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
+import { pageRefLabel, pagesLabel, surahPageRef, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
 import { MASTERY_LABELS, reinforcementReason } from '@/lib/recitation/mastery';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
 import { evaluationsByPage, loadEvaluations } from '@/lib/recitation/store';
@@ -133,7 +133,7 @@ export default function EnCoursPage() {
           ←
         </Link>
         <div>
-          <h1 className="ds-title text-3xl">
+          <h1 className="ds-title text-2xl md:text-3xl">
             {isLearning ? 'Sourate en cours' : 'Récitation en cours'}
           </h1>
           <p className="text-[var(--ds-n600)] mt-0.5">
@@ -169,31 +169,28 @@ export default function EnCoursPage() {
             )}
           </div>
 
-          {/* Frise des pages (limitée à 8 : les jours de rattrapage sont longs) */}
-          <div className="flex items-center mt-4 mb-1">
-            {pages.slice(0, 8).map((p, i, shown) => (
-              <div key={p} className="flex items-center" style={{ flex: i < shown.length - 1 ? 1 : 'none' }}>
-                <div className="flex flex-col items-center">
-                  <span
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-extrabold border-2 ${
-                      recitedSet.has(p)
-                        ? 'bg-[var(--ds-gold)] border-[var(--ds-gold)] text-white'
-                        : p === nextPage
-                          ? 'bg-white border-[var(--ds-gold)] text-[var(--ds-gold-700)]'
-                          : 'bg-white/15 border-white/25 text-white/80'
-                    }`}
-                  >
-                    {recitedSet.has(p) ? '✓' : p}
-                  </span>
-                  <span className={`text-[10px] mt-1 whitespace-nowrap ${p === nextPage ? 'font-extrabold' : 'text-white/70'}`}>
-                    {pageRefLabel(p, learningSurah)}
-                  </span>
-                </div>
+          {/* Frise des pages : pastille = rang DANS LA SOURATE (cohérent avec
+              « 02/pages 13 à 20 » au-dessus), limitée à 6 — les sous-labels
+              nowrap faisaient déborder toute la page horizontalement. */}
+          <div className="flex items-center mt-4 mb-1 overflow-hidden">
+            {pages.slice(0, 6).map((p, i, shown) => (
+              <div key={p} className="flex items-center min-w-0" style={{ flex: i < shown.length - 1 ? 1 : 'none' }}>
+                <span
+                  className={`w-8 h-8 flex-none rounded-full flex items-center justify-center text-[13px] font-extrabold border-2 ${
+                    recitedSet.has(p)
+                      ? 'bg-[var(--ds-gold)] border-[var(--ds-gold)] text-white'
+                      : p === nextPage
+                        ? 'bg-white border-[var(--ds-gold)] text-[var(--ds-gold-700)]'
+                        : 'bg-white/15 border-white/25 text-white/80'
+                  }`}
+                >
+                  {recitedSet.has(p) ? '✓' : (surahPageRef(p, learningSurah)?.index ?? p)}
+                </span>
                 {i < shown.length - 1 && <div className="h-[2px] flex-1 mx-1 bg-white/25 rounded" />}
               </div>
             ))}
-            {pages.length > 8 && (
-              <span className="text-[11px] font-bold text-white/70 ml-2 flex-none">+{pages.length - 8}</span>
+            {pages.length > 6 && (
+              <span className="text-[11px] font-bold text-white/70 ml-2 flex-none">+{pages.length - 6}</span>
             )}
           </div>
 
@@ -226,7 +223,7 @@ export default function EnCoursPage() {
                           : 'border-[var(--ds-divider)] text-[var(--ds-n500)]'
                     }`}
                   >
-                    {isDone ? '✓' : p}
+                    {isDone ? '✓' : (surahPageRef(p, learningSurah)?.index ?? p)}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-bold">
@@ -298,6 +295,9 @@ export default function EnCoursPage() {
                   Reprendre à {pageRefLabel(nextPage, learningSurah)}
                 </button>
               )}
+              <Link href="/recitation/improvisation" className="ds-btn-ghost px-6 py-3 text-sm text-center">
+                J’ai récité d’autres pages en avance
+              </Link>
             </>
           ) : (
             <div className="ds-card p-5 text-center">

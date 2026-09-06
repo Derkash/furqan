@@ -188,9 +188,17 @@ export default function RecitationPage() {
                     ? `Prochaine récitation à ${formatTime(upcoming.startMin)}`
                     : 'Journée terminée — qu’Allah accepte.'}
               </p>
-              <Link href="/recitation/en-cours" className="ds-btn-gold inline-block px-6 py-2.5 text-sm mt-4">
-                {active ? 'Continuer la récitation' : 'Voir la session'}
-              </Link>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <Link href="/recitation/en-cours" className="ds-btn-gold inline-block px-6 py-2.5 text-sm">
+                  {active ? 'Continuer la récitation' : 'Voir la session'}
+                </Link>
+                <Link
+                  href="/recitation/improvisation"
+                  className="rounded-full bg-white/15 px-5 py-2.5 text-sm font-bold hover:bg-white/25 transition-colors"
+                >
+                  J’ai récité en avance
+                </Link>
+              </div>
             </>
           ) : (
             <>

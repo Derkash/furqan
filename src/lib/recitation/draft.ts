@@ -4,6 +4,7 @@
 // Modifier le programme plus tard réutilise le même brouillon, pré-rempli —
 // l'historique (sessions, évaluations) n'est JAMAIS touché (brief §19).
 
+import { archiveToday } from './dayEngine';
 import { buildCycleDays } from './planner';
 import { perimeterPages } from './perimeter';
 import { toDateKey } from './schedule';
@@ -116,7 +117,9 @@ export function finalizeProgram(draft: ProgramDraft, now: Date): { program: Prog
   };
   saveProgram(program);
   saveCycle(cycle);
-  // L'état du jour sera reconstruit par ensureToday au prochain rendu.
+  // Sauver l'acquis du jour dans le journal AVANT la remise à zéro : la
+  // journée reconstruite ressèmera ces pages comme récitées.
+  archiveToday(now);
   clearDayState();
   clearDraft();
   return { program, cycle };

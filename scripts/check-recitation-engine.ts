@@ -29,7 +29,7 @@ import {
   learningSpan,
 } from '../src/lib/recitation/learning';
 import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
-import { duePages, pendingOverdue } from '../src/lib/recitation/dayEngine';
+import { duePages, pendingOverdue, rebalanceToday } from '../src/lib/recitation/dayEngine';
 import { buildNotificationPlan } from '../src/lib/recitation/notifications';
 import type {
   DayState,
@@ -362,6 +362,45 @@ console.log('Rappels horaires : tant que des pages sont dues, un ping par heure'
   // Mode « jamais reporter » → pas de dû après le créneau → pas de ping.
   const planNever = buildNotificationPlan(mkProgram('never'), cycle, now, state);
   check('mode « jamais » → aucun ping', planNever.filter((n) => n.id >= 739000).length, 0);
+}
+
+// ---------------------------------------------------------------------------
+console.log('Récitation improvisée : le reste de la journée se ré-étale');
+{
+  // 20 pages sur 5 créneaux de 12 h à 22 h (4 pages chacun). À 9 h,
+  // l'utilisateur récite les 10 premières en avance.
+  const slots = Array.from({ length: 5 }, (_, i) => ({
+    startMin: (12 + 2 * i) * 60,
+    endMin: (14 + 2 * i) * 60,
+    pages: [11 + 4 * i, 12 + 4 * i, 13 + 4 * i, 14 + 4 * i],
+    kind: 'cycle' as const,
+  }));
+  const state = { ...mkState(slots), recitedPages: Array.from({ length: 10 }, (_, i) => 11 + i) };
+  const rebalanced = rebalanceToday(state, 9 * 60);
+  const perSlot = rebalanced.slots.map((s) => s.pages.length);
+  check('10 pages restantes → 2 par créneau sur 5 créneaux', perSlot, [2, 2, 2, 2, 2]);
+  check('ordre du mushaf conservé', rebalanced.slots.flatMap((s) => s.pages), Array.from({ length: 10 }, (_, i) => 21 + i));
+  check('rien de dû à 9 h (aucun créneau commencé)', duePages(mkProgram('auto'), rebalanced, 9 * 60, 'cycle').all, []);
+  check('à 13 h le premier créneau est dû', duePages(mkProgram('auto'), rebalanced, 13 * 60, 'cycle').all, [21, 22]);
+}
+
+console.log('Ré-étalement en cours de journée : les créneaux passés sont délestés');
+{
+  const slots = [
+    { startMin: 600, endMin: 660, pages: [3, 4], kind: 'cycle' as const },   // 10-11 h, passé
+    { startMin: 900, endMin: 960, pages: [5, 6], kind: 'cycle' as const },   // 15-16 h
+    { startMin: 1080, endMin: 1140, pages: [7, 8], kind: 'cycle' as const }, // 18-19 h
+    { startMin: 1200, endMin: 1230, pages: [106], kind: 'learning' as const },
+  ];
+  // À 13 h : il déclare avoir récité 3, 5 et 7 en improvisation.
+  const state = { ...mkState(slots), recitedPages: [3, 5, 7] };
+  const rebalanced = rebalanceToday(state, 13 * 60);
+  check('restantes [4,6,8] ré-étalées sur les 2 créneaux ouverts',
+    rebalanced.slots.slice(1, 3).map((s) => s.pages),
+    [[4, 6], [8]]);
+  check('le créneau passé ne garde que sa page récitée (journal)', rebalanced.slots[0].pages, [3]);
+  check('la séance de sourate est intouchée', rebalanced.slots[3].pages, [106]);
+  check('plus aucun retard fantôme à 13 h', duePages(mkProgram('auto'), rebalanced, 13 * 60, 'cycle').overdue, []);
 }
 
 // ---------------------------------------------------------------------------
