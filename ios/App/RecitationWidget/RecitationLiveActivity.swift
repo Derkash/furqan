@@ -18,7 +18,13 @@ struct RecitationLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RecitationActivityAttributes.self) { context in
             // ---- Écran verrouillé (maquette 3) ----
+            // .privacySensitive(false) : iOS applique par défaut la redaction
+            // `.privacy` (contenu flouté tant que l'appareil n'est pas
+            // déverrouillé). Rien ici n'est confidentiel — un nombre de pages
+            // et un décompte — donc on renonce explicitement au floutage pour
+            // que l'activité reste lisible écran verrouillé.
             LockScreenView(context: context)
+                .privacySensitive(false)
                 .activityBackgroundTint(Color.black.opacity(0.55))
                 .activitySystemActionForegroundColor(gold)
         } dynamicIsland: { context in
@@ -35,13 +41,15 @@ struct RecitationLiveActivity: Widget {
                                 .foregroundStyle(.white)
                         }
                     }
+                    .privacySensitive(false)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Countdown(end: context.state.endDate)
+                    Countdown(end: context.state.endDate).privacySensitive(false)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     Segments(total: context.state.totalPages, done: context.state.recitedPages)
                         .padding(.top, 4)
+                        .privacySensitive(false)
                 }
             } compactLeading: {
                 Image(systemName: "book.fill").foregroundStyle(gold)

@@ -32,9 +32,22 @@ struct RecitationProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<RecitationEntry>) -> Void) {
         let state = SharedRecitationState.load()
         var entries = [RecitationEntry(date: .now, state: state)]
-        // À la fin du créneau, le widget bascule tout seul sur un état neutre ;
-        // la prochaine synchronisation de l'app fournira le créneau suivant.
+
+        // Créneau actif : une entrée par minute jusqu'à la fin. Les entrées
+        // d'UNE MÊME timeline sont rendues par le système sans nouvelle
+        // requête — elles ne consomment pas le budget de rechargement. C'est
+        // ce qui permet à l'anneau de temps d'être exact sans scaleEffect ni
+        // ProgressView non maîtrisable.
         if let state, state.isActive, state.slotEndDate > .now {
+            let step: TimeInterval = 60
+            var t = Date.now.addingTimeInterval(step)
+            var guardCount = 0
+            while t < state.slotEndDate, guardCount < 180 {
+                entries.append(RecitationEntry(date: t, state: state))
+                t = t.addingTimeInterval(step)
+                guardCount += 1
+            }
+            // Fin du créneau : état neutre jusqu'à la prochaine synchro de l'app.
             entries.append(RecitationEntry(date: state.slotEndDate, state: nil))
         }
         completion(Timeline(entries: entries, policy: .never))
@@ -87,30 +100,40 @@ struct RecitationWidgetView: View {
 
     private func medium(_ state: SharedRecitationState) -> some View {
         HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 7) {
-                    Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 15))
+            VStack(alignment: .leading, spacing: 3) {
+                // Une seule ligne pour le titre + le créneau, chacun autorisé à
+                // se réduire : l'anneau a désormais une largeur fixe, plus rien
+                // ne déborde par-dessus.
+                HStack(spacing: 6) {
+                    Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 13))
                     Text("Récitation en cours")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
-                    Spacer(minLength: 0)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 4)
                     Text(state.slotLabel)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(gold)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 Spacer(minLength: 0)
                 Text("\(state.recitedPages) / \(state.totalPages) pages")
-                    .font(.system(size: 30, weight: .heavy))
+                    .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("récitées")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
                 PageSegments(total: state.totalPages, done: state.recitedPages)
                     .padding(.top, 3)
                 Text(state.remainingLabel)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             gauge(state)
         }
@@ -134,36 +157,45 @@ struct RecitationWidgetView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
             PageSegments(total: state.totalPages, done: state.recitedPages)
-            Text(timerInterval: Date.now...state.slotEndDate, countsDown: true)
+            Text(timerInterval: entry.date...state.slotEndDate, countsDown: true)
                 .font(.system(size: 13, weight: .bold).monospacedDigit())
                 .foregroundStyle(gold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 
-    /// Jauge circulaire : ProgressView(timerInterval:) défile sans recharge.
+    /// Anneau de temps restant, DESSINÉ (Circle().trim) : entièrement contenu
+    /// dans son cadre, contrairement à un ProgressView circulaire agrandi.
+    /// La fraction est calculée pour l'instant de l'entrée de timeline —
+    /// exacte à la minute — et le décompte central reste vivant à la seconde.
     private func gauge(_ state: SharedRecitationState) -> some View {
-        ZStack {
-            ProgressView(
-                timerInterval: Date.now...state.slotEndDate,
-                countsDown: true,
-                label: { EmptyView() },
-                currentValueLabel: { EmptyView() }
-            )
-            .progressViewStyle(.circular)
-            .tint(gold)
-            .scaleEffect(2.4)
+        let total = max(1, TimeInterval(state.slotEndMin - state.slotStartMin) * 60)
+        let left = max(0, state.slotEndDate.timeIntervalSince(entry.date))
+        let fraction = min(1, max(0, left / total))
+
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.18), lineWidth: 8)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(gold, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
-                Text(timerInterval: Date.now...state.slotEndDate, countsDown: true)
-                    .font(.system(size: 15, weight: .heavy).monospacedDigit())
+                Text(timerInterval: entry.date...state.slotEndDate, countsDown: true)
+                    .font(.system(size: 16, weight: .heavy).monospacedDigit())
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                    .frame(width: 64)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
                 Text("restantes")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
             }
+            .padding(.horizontal, 6)
         }
-        .frame(width: 92, height: 92)
+        .frame(width: 84, height: 84)
+        .padding(.leading, 2)
     }
 
     // ---- Prochaine session / repos ----
