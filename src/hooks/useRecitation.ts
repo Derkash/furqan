@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   cycleProgress,
   ensureToday,
-  resolveCarryOver,
+  resolveOverdue,
   resolveMissedDays,
   setPageRecited,
   clearPendingEvaluation,
@@ -29,7 +29,7 @@ export interface RecitationApi {
   markRecited: (page: number, recited: boolean, kind?: SlotKind) => void;
   evaluate: (page: number, level: MasteryLevel, note?: string) => void;
   skipEvaluation: (page: number) => void;
-  decideCarryOver: (accept: boolean) => void;
+  decideOverdue: (accept: boolean) => void;
   decideMissed: (mode: 'catch-up' | 'skip') => void;
   refresh: () => void;
 }
@@ -115,8 +115,8 @@ export function useRecitation(): RecitationApi {
     [withState]
   );
 
-  const decideCarryOver = useCallback(
-    (accept: boolean) => withState((s) => resolveCarryOver(s, accept)),
+  const decideOverdue = useCallback(
+    (accept: boolean) => withState((s) => resolveOverdue(s, accept)),
     [withState]
   );
 
@@ -141,7 +141,7 @@ export function useRecitation(): RecitationApi {
     markRecited,
     evaluate,
     skipEvaluation,
-    decideCarryOver,
+    decideOverdue,
     decideMissed,
     refresh,
   };

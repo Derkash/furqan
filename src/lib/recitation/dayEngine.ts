@@ -110,7 +110,7 @@ function buildDayState(
     learningRecited: [],
     pendingEvaluations: [],
     closedSlots: [],
-    pendingCarryOver: null,
+    overdueDecision: null,
     reinforcementPages: reinforcement,
     pendingCatchUp: [],
   };
@@ -282,7 +282,7 @@ export function rebuildToday(now: Date): TodayContext | null {
     recitedPages: previous.recitedPages,
     learningRecited: previous.learningRecited ?? [],
     pendingEvaluations: previous.pendingEvaluations,
-    pendingCarryOver: previous.pendingCarryOver,
+    overdueDecision: previous.overdueDecision ?? null,
     closedSlots: fresh.slots
       .map((slot, i) => (closedSignatures.has(`${slot.startMin}-${slot.endMin}`) ? i : -1))
       .filter((i) => i >= 0),
@@ -402,64 +402,97 @@ export function clearPendingEvaluation(state: DayState, page: number): DayState 
 }
 
 /**
- * Fait vivre la journée : clôt les créneaux terminés (endMin ≤ now) et applique
- * la politique de report. En mode « toujours demander », le report est mis en
- * attente (`pendingCarryOver`) pour que l'UI pose la question.
+ * Fait vivre la journée : JOURNALISE les créneaux terminés (endMin ≤ now).
+ * Rien d'autre — les pages ne sont jamais déplacées ni supprimées. Ce qui
+ * reste à réciter se lit à tout instant via duePages() : une page d'un
+ * créneau passé reste due jusqu'à minuit (selon la préférence de report).
+ *
+ * L'ancien report par MUTATION (fusionner les restes dans le créneau
+ * suivant) jetait les pages du dernier créneau de la journée et pouvait
+ * déverser des pages de révision dans la séance de sourate — d'où des
+ * pages « sautées ». Le calcul du dû rend ces pertes impossibles.
  */
-export function tick(program: Program, state: DayState, now: Date): DayState {
+export function tick(_program: Program, state: DayState, now: Date): DayState {
   if (toDateKey(now) !== state.date) return state; // minuit passé : ensureToday s'en charge
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const next: DayState = { ...state, slots: state.slots.map((s) => ({ ...s })), closedSlots: [...state.closedSlots] };
+  const next: DayState = { ...state, closedSlots: [...state.closedSlots] };
   let changed = false;
 
   for (let i = 0; i < next.slots.length; i++) {
     const slot = next.slots[i];
     if (slot.endMin > nowMin || next.closedSlots.includes(i)) continue;
     const recited = recitedFor(next, slot.kind);
-    const remaining = slot.pages.filter((p) => !recited.has(p));
+    // carriedOver du journal = ce qui reste dû après ce créneau.
+    closeSlot(next, i, slot.pages.filter((p) => !recited.has(p)));
     changed = true;
-
-    // La séance d'apprentissage ne se reporte pas : on la clôt telle quelle.
-    if (slot.kind === 'learning') {
-      closeSlot(next, i, []);
-      continue;
-    }
-
-    if (!remaining.length || program.carryOver === 'never' || i === next.slots.length - 1) {
-      closeSlot(next, i, []);
-      continue;
-    }
-    if (program.carryOver === 'auto') {
-      closeSlot(next, i, remaining);
-      next.slots[i + 1] = {
-        ...next.slots[i + 1],
-        pages: carryOverPages(remaining, next.slots[i + 1].pages),
-      };
-      continue;
-    }
-    // 'ask' : on clôt le créneau mais la décision de report revient à l'UI.
-    if (!next.pendingCarryOver) {
-      closeSlot(next, i, []);
-      next.pendingCarryOver = { fromSlot: i, pages: remaining };
-    }
   }
 
   if (changed) saveDayState(next);
   return changed ? next : state;
 }
 
-/** Décision de l'utilisateur sur un report en attente (mode « demander »). */
-export function resolveCarryOver(state: DayState, accept: boolean): DayState {
-  const pending = state.pendingCarryOver;
-  if (!pending) return state;
-  const next: DayState = { ...state, slots: state.slots.map((s) => ({ ...s })), pendingCarryOver: null };
-  if (accept) {
-    const target = Math.min(pending.fromSlot + 1, next.slots.length - 1);
-    next.slots[target] = {
-      ...next.slots[target],
-      pages: carryOverPages(pending.pages, next.slots[target].pages),
-    };
+// ---------------------------------------------------------------------------
+// Le dû : ce qu'il reste à réciter MAINTENANT
+// ---------------------------------------------------------------------------
+
+export interface DuePages {
+  /** Pages du créneau (de cette nature) en cours, non récitées. */
+  current: number[];
+  /** Pages des créneaux passés, non récitées — le retard du jour. */
+  overdue: number[];
+  /** current + overdue, ordre du mushaf, sans doublon. */
+  all: number[];
+}
+
+/**
+ * Pages dues à cet instant pour une nature de séance. Le retard n'est
+ * compté que si la préférence l'autorise : 'auto' toujours, 'ask' après
+ * accord (overdueDecision), 'never' jamais (repris au cycle suivant).
+ */
+export function duePages(
+  program: Program,
+  state: DayState,
+  nowMin: number,
+  kind: SlotKind
+): DuePages {
+  const recited = recitedFor(state, kind);
+  const includeOverdue =
+    kind === 'learning'
+      ? true // la sourate en cours se doit en entier jusqu'à minuit
+      : program.carryOver === 'auto' ||
+        (program.carryOver === 'ask' && state.overdueDecision === 'accepted');
+
+  const current: number[] = [];
+  const overdue: number[] = [];
+  for (const slot of state.slots) {
+    if ((slot.kind ?? 'cycle') !== kind) continue;
+    if (slot.startMin > nowMin) continue; // pas encore commencé
+    const target = slot.endMin <= nowMin ? overdue : current;
+    for (const p of slot.pages) if (!recited.has(p)) target.push(p);
   }
+  const kept = includeOverdue ? overdue : [];
+  return {
+    current: [...new Set(current)].sort((a, b) => a - b),
+    overdue: [...new Set(kept)].sort((a, b) => a - b),
+    all: [...new Set([...kept, ...current])].sort((a, b) => a - b),
+  };
+}
+
+/** Y a-t-il un retard en attente de décision (mode « demander ») ? */
+export function pendingOverdue(program: Program, state: DayState, nowMin: number): number[] {
+  if (program.carryOver !== 'ask' || state.overdueDecision != null) return [];
+  const recited = recitedFor(state, 'cycle');
+  const late: number[] = [];
+  for (const slot of state.slots) {
+    if ((slot.kind ?? 'cycle') !== 'cycle' || slot.endMin > nowMin) continue;
+    for (const p of slot.pages) if (!recited.has(p)) late.push(p);
+  }
+  return [...new Set(late)].sort((a, b) => a - b);
+}
+
+/** Décision sur le retard du jour (mode « demander »). */
+export function resolveOverdue(state: DayState, accept: boolean): DayState {
+  const next: DayState = { ...state, overdueDecision: accept ? 'accepted' : 'declined' };
   saveDayState(next);
   return next;
 }

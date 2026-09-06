@@ -1,9 +1,10 @@
 //
 //  RecitationLiveActivity.swift
-//  Activité en direct (brief §13, maquette 3) : suivi de la session sur
-//  l'écran verrouillé et la Dynamic Island, dans l'esprit d'un suivi
-//  d'exercice. Mise à jour par RecitationBridge à chaque page validée ;
-//  disparaît à la fin de la session.
+//  Activité en direct (brief §13) : présente sur l'écran verrouillé du matin
+//  au soir tant qu'une récitation est due ou à venir — pas seulement pendant
+//  un créneau. Trois phases : créneau en cours, retard, prochaine séance.
+//  Mise à jour par RecitationBridge ; jamais floutée (.privacySensitive(false),
+//  rien de confidentiel ici).
 //
 
 import ActivityKit
@@ -12,31 +13,27 @@ import SwiftUI
 
 private let gold = Color(red: 0.77, green: 0.63, blue: 0.35)
 private let greenDeep = Color(red: 0.10, green: 0.26, blue: 0.20)
+private let rust = Color(red: 0.85, green: 0.45, blue: 0.25)
 
 @available(iOS 16.2, *)
 struct RecitationLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RecitationActivityAttributes.self) { context in
-            // ---- Écran verrouillé (maquette 3) ----
-            // .privacySensitive(false) : iOS applique par défaut la redaction
-            // `.privacy` (contenu flouté tant que l'appareil n'est pas
-            // déverrouillé). Rien ici n'est confidentiel — un nombre de pages
-            // et un décompte — donc on renonce explicitement au floutage pour
-            // que l'activité reste lisible écran verrouillé.
-            LockScreenView(context: context)
+            LockScreenView(state: context.state)
                 .privacySensitive(false)
                 .activityBackgroundTint(Color.black.opacity(0.55))
                 .activitySystemActionForegroundColor(gold)
         } dynamicIsland: { context in
-            DynamicIsland {
+            let s = context.state
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
-                        BookBadge()
+                        BookBadge(overdue: s.isOverdue)
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Al Muraja3a")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.8))
-                            Text("\(context.state.recitedPages) / \(context.state.totalPages) pages")
+                            Text(headline(s))
                                 .font(.system(size: 16, weight: .heavy))
                                 .foregroundStyle(.white)
                         }
@@ -44,23 +41,26 @@ struct RecitationLiveActivity: Widget {
                     .privacySensitive(false)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Countdown(end: context.state.endDate).privacySensitive(false)
+                    Countdown(state: s).privacySensitive(false)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Segments(total: context.state.totalPages, done: context.state.recitedPages)
-                        .padding(.top, 4)
-                        .privacySensitive(false)
+                    bottomLine(s).privacySensitive(false)
                 }
             } compactLeading: {
-                Image(systemName: "book.fill").foregroundStyle(gold)
+                Image(systemName: s.isOverdue ? "exclamationmark.circle.fill" : "book.fill")
+                    .foregroundStyle(s.isOverdue ? rust : gold)
+                    .privacySensitive(false)
             } compactTrailing: {
-                Text(timerInterval: Date.now...context.state.endDate, countsDown: true)
+                Text(timerInterval: Date.now...s.refDate, countsDown: true)
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(gold)
+                    .foregroundStyle(s.isOverdue ? rust : gold)
                     .frame(maxWidth: 52)
                     .multilineTextAlignment(.trailing)
+                    .privacySensitive(false)
             } minimal: {
-                Image(systemName: "book.fill").foregroundStyle(gold)
+                Image(systemName: s.isOverdue ? "exclamationmark.circle.fill" : "book.fill")
+                    .foregroundStyle(s.isOverdue ? rust : gold)
+                    .privacySensitive(false)
             }
             .widgetURL(URL(string: "almuraja3a://recitation/en-cours"))
         }
@@ -68,15 +68,35 @@ struct RecitationLiveActivity: Widget {
 }
 
 @available(iOS 16.2, *)
-private extension RecitationActivityAttributes.ContentState {
-    var endDate: Date { Date(timeIntervalSince1970: TimeInterval(slotEndEpoch)) }
+private func headline(_ s: RecitationActivityAttributes.ContentState) -> String {
+    switch s.phase {
+    case "active": return "\(s.recitedPages) / \(s.totalPages) pages"
+    case "overdue": return "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") en retard"
+    default: return "Prochaine récitation"
+    }
+}
+
+@available(iOS 16.2, *)
+@ViewBuilder
+private func bottomLine(_ s: RecitationActivityAttributes.ContentState) -> some View {
+    if s.isActive {
+        Segments(total: s.totalPages, done: s.recitedPages).padding(.top, 4)
+    } else {
+        Text(s.pagesLabel)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.8))
+            .lineLimit(1)
+    }
 }
 
 private struct BookBadge: View {
+    var overdue = false
     var body: some View {
         ZStack {
             Circle().fill(greenDeep)
-            Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 15))
+            Image(systemName: overdue ? "exclamationmark.circle.fill" : "book.fill")
+                .foregroundStyle(overdue ? rust : gold)
+                .font(.system(size: 15))
         }
         .frame(width: 34, height: 34)
     }
@@ -96,16 +116,17 @@ private struct Segments: View {
     }
 }
 
+@available(iOS 16.2, *)
 private struct Countdown: View {
-    let end: Date
+    let state: RecitationActivityAttributes.ContentState
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
-            Text(timerInterval: Date.now...end, countsDown: true)
+            Text(timerInterval: Date.now...state.refDate, countsDown: true)
                 .font(.system(size: 26, weight: .heavy).monospacedDigit())
-                .foregroundStyle(gold)
+                .foregroundStyle(state.isOverdue ? rust : gold)
                 .frame(maxWidth: 86)
                 .multilineTextAlignment(.trailing)
-            Text("restantes")
+            Text(state.isActive ? "restantes" : state.isOverdue ? "avant la suite" : "avant le début")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
         }
@@ -114,33 +135,40 @@ private struct Countdown: View {
 
 @available(iOS 16.2, *)
 private struct LockScreenView: View {
-    let context: ActivityViewContext<RecitationActivityAttributes>
+    let state: RecitationActivityAttributes.ContentState
 
     var body: some View {
         HStack(spacing: 12) {
-            BookBadge()
+            BookBadge(overdue: state.isOverdue)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Al Muraja3a")
+                Text(state.isActive ? "Al Muraja3a · \(state.slotLabel)" : "Al Muraja3a")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
-                Text("\(context.state.recitedPages) / \(context.state.totalPages) pages")
+                    .lineLimit(1)
+                Text(headline(state))
                     .font(.system(size: 17, weight: .heavy))
                     .foregroundStyle(.white)
-                Segments(total: context.state.totalPages, done: context.state.recitedPages)
-                    .frame(maxWidth: 160)
-                // Repère de reprise : le début du passage, d'un coup d'œil.
-                if !context.state.startVerse.isEmpty {
-                    Text(context.state.startVerse)
+                if state.isActive {
+                    Segments(total: state.totalPages, done: state.recitedPages)
+                        .frame(maxWidth: 160)
+                }
+                if !state.startVerse.isEmpty {
+                    Text(state.startVerse)
                         .font(.system(size: 13))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .environment(\.layoutDirection, .rightToLeft)
                         .frame(maxWidth: 170, alignment: .trailing)
+                } else if !state.isActive {
+                    Text(state.pagesLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(1)
                 }
             }
             Spacer(minLength: 8)
-            Countdown(end: context.state.endDate)
+            Countdown(state: state)
         }
         .padding(14)
     }

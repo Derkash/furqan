@@ -29,7 +29,51 @@ import {
   learningSpan,
 } from '../src/lib/recitation/learning';
 import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
-import type { LearningConfig, PageEvaluation, ScheduleConfig } from '../src/lib/recitation/types';
+import { duePages, pendingOverdue } from '../src/lib/recitation/dayEngine';
+import { buildNotificationPlan } from '../src/lib/recitation/notifications';
+import type {
+  DayState,
+  LearningConfig,
+  PageEvaluation,
+  PlannedSlot,
+  Program,
+  ScheduleConfig,
+} from '../src/lib/recitation/types';
+
+function mkProgram(carryOver: Program['carryOver']): Program {
+  return {
+    selections: [],
+    perimeterPages: [3, 4, 5, 6],
+    objective: { kind: 'pagesPerDay', pages: 4 },
+    schedule: {
+      activeWeekdays: [0, 1, 2, 3, 4, 5, 6],
+      hours: { startMin: 600, endMin: 720, frequencyMin: 60 },
+      remindersEnabled: true,
+    },
+    slotSplit: { mode: 'auto' },
+    carryOver,
+    reinforcementEnabled: false,
+    endReminderMin: 15,
+    learning: null,
+    createdAt: '2026-09-01T08:00:00.000Z',
+    updatedAt: '2026-09-01T08:00:00.000Z',
+  };
+}
+
+function mkState(slots: PlannedSlot[]): DayState {
+  return {
+    date: '2026-09-06',
+    cycleDayIndex: 0,
+    slots,
+    recitedPages: [],
+    learningRecited: [],
+    pendingEvaluations: [],
+    closedSlots: [],
+    overdueDecision: null,
+    reinforcementPages: [],
+    pendingCatchUp: [],
+  };
+}
 
 let failures = 0;
 function check(label: string, actual: unknown, expected: unknown) {
@@ -229,6 +273,74 @@ console.log('Numérotation par sourate (02/page 1)');
   check('page 106 avec préférence Al-Ma\'idah', pageRefLabel(106, 5), '05/page 1');
   check('plage dans une sourate', pagesLabel([106, 107, 108], 5), '05/pages 1 à 3');
   check('page unique', pagesLabel([3]), '02/page 2');
+}
+
+// ---------------------------------------------------------------------------
+console.log('Le dû : une page manquée ne disparaît JAMAIS (bug du 6 sept.)');
+{
+  // Scénario réel du bug : créneaux 10-11 h et 11-12 h (2 pages chacun),
+  // rien récité, il est 14 h. L'ancien report jetait les pages du dernier
+  // créneau ; le dû doit les garder TOUTES.
+  const state = mkState([
+    { startMin: 600, endMin: 660, pages: [3, 4], kind: 'cycle' },
+    { startMin: 660, endMin: 720, pages: [5, 6], kind: 'cycle' },
+  ]);
+  const due = duePages(mkProgram('auto'), state, 14 * 60, 'cycle');
+  check('les 4 pages restent dues à 14 h', due.all, [3, 4, 5, 6]);
+  check('toutes en retard (créneaux passés)', due.overdue, [3, 4, 5, 6]);
+
+  // À 11 h 30 : créneau 2 en cours, créneau 1 passé.
+  const due2 = duePages(mkProgram('auto'), state, 11 * 60 + 30, 'cycle');
+  check('11 h 30 : dû = retard [3,4] + courant [5,6]', [due2.overdue, due2.current], [[3, 4], [5, 6]]);
+
+  // Pages récitées : sorties du dû.
+  const done = { ...state, recitedPages: [3, 5] };
+  const due3 = duePages(mkProgram('auto'), done, 14 * 60, 'cycle');
+  check('récitées 3 et 5 → dû [4,6]', due3.all, [4, 6]);
+}
+
+console.log('Préférence de report : auto / jamais / demander');
+{
+  const state = mkState([{ startMin: 600, endMin: 660, pages: [3, 4], kind: 'cycle' }]);
+  check('« jamais » : rien de dû après le créneau', duePages(mkProgram('never'), state, 800, 'cycle').all, []);
+  check('« demander », sans réponse : pas dû', duePages(mkProgram('ask'), state, 800, 'cycle').all, []);
+  check('« demander », en attente de décision', pendingOverdue(mkProgram('ask'), state, 800), [3, 4]);
+  const accepted = { ...state, overdueDecision: 'accepted' as const };
+  check('« demander », accepté : dû', duePages(mkProgram('ask'), accepted, 800, 'cycle').all, [3, 4]);
+  const declined = { ...state, overdueDecision: 'declined' as const };
+  check('« demander », refusé : plus demandé', pendingOverdue(mkProgram('ask'), declined, 800), []);
+}
+
+console.log('Le dû sépare cycle et sourate en cours');
+{
+  const state = mkState([
+    { startMin: 600, endMin: 660, pages: [3, 4], kind: 'cycle' },
+    { startMin: 1200, endMin: 1230, pages: [106, 107], kind: 'learning' },
+  ]);
+  const mixed = { ...state, recitedPages: [3], learningRecited: [106] };
+  const cycle = duePages(mkProgram('auto'), mixed, 21 * 60, 'cycle');
+  const learning = duePages(mkProgram('auto'), mixed, 21 * 60, 'learning');
+  check('cycle : page 4 due', cycle.all, [4]);
+  check('sourate : page 107 due (106 validée côté learning seulement)', learning.all, [107]);
+  check('la sourate reste due même en mode « jamais »', duePages(mkProgram('never'), mixed, 21 * 60, 'learning').all, [107]);
+}
+
+console.log('Plan de notifications : pur, trié, plafonné');
+{
+  const program = mkProgram('auto');
+  const cycle = { number: 1, startDate: '2026-09-07', days: [{ index: 0, pages: [3, 4, 5, 6] }] };
+  const now = new Date(2026, 8, 7, 9, 30); // lundi 7 sept, 9 h 30
+  const plan = buildNotificationPlan(program, cycle, now, null);
+  check('un plan non vide', plan.length > 0, true);
+  check('trié par date', plan.every((n, i) => i === 0 || plan[i - 1].at <= n.at), true);
+  check('jamais plus de 60 (limite iOS 64)', plan.length <= 60, true);
+  const kinds = new Set(plan.map((n) => n.id % 10));
+  check('les trois moments présents (début, rappel, relance)', [...kinds].sort(), [0, 1, 2]);
+  const first = plan[0];
+  check('la première est à venir', first.at > now, true);
+  // Rappels désactivés → plan vide
+  const off = { ...program, schedule: { ...program.schedule, remindersEnabled: false } };
+  check('rappels désactivés → aucun', buildNotificationPlan(off, cycle, now, null).length, 0);
 }
 
 // ---------------------------------------------------------------------------

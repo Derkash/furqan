@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useRecitation } from '@/hooks/useRecitation';
-import { dailyLoad } from '@/lib/recitation/dayEngine';
+import { dailyLoad, duePages, pendingOverdue } from '@/lib/recitation/dayEngine';
 import { formatDateKey, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
 import { clearDraft } from '@/lib/recitation/draft';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
@@ -49,7 +49,7 @@ function EmptyState() {
 }
 
 export default function RecitationPage() {
-  const { ctx, ready, now, cycleStats, decideCarryOver, decideMissed } = useRecitation();
+  const { ctx, ready, now, cycleStats, decideOverdue, decideMissed } = useRecitation();
 
   if (!ready) return <AppShell><div /></AppShell>;
   if (!ctx) {
@@ -67,6 +67,10 @@ export default function RecitationPage() {
   const recitedSet = new Set(dayState?.recitedPages ?? []);
   const learningSet = new Set(dayState?.learningRecited ?? []);
   const load = dailyLoad(dayState);
+  const dueCycle = dayState
+    ? duePages(ctx.program, dayState, nowMin, 'cycle')
+    : { current: [], overdue: [], all: [] };
+  const askOverdue = dayState ? pendingOverdue(ctx.program, dayState, nowMin) : [];
   const dayNumber = (dayState?.cycleDayIndex ?? dayDates.indexOf(todayKey)) + 1;
   const endDate = dayDates[dayDates.length - 1];
 
@@ -119,22 +123,34 @@ export default function RecitationPage() {
         </section>
       )}
 
-      {/* Report en attente (mode « demander ») */}
-      {dayState?.pendingCarryOver && (
+      {/* Retard en attente de décision (mode « toujours demander ») */}
+      {dayState && askOverdue.length > 0 && (
         <section className="rounded-[20px] border border-[var(--ds-gold)] bg-[var(--ds-gold-100)] p-5 mb-5">
           <p className="text-sm font-extrabold text-[var(--ds-gold-700)]">
-            Créneau incomplet — {dayState.pendingCarryOver.pages.length} page
-            {dayState.pendingCarryOver.pages.length > 1 ? 's' : ''} restante
-            {dayState.pendingCarryOver.pages.length > 1 ? 's' : ''} ({pagesLabel(dayState.pendingCarryOver.pages)})
+            {askOverdue.length} page{askOverdue.length > 1 ? 's' : ''} non récitée
+            {askOverdue.length > 1 ? 's' : ''} sur les créneaux passés ({pagesLabel(askOverdue)})
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
-            <button type="button" onClick={() => decideCarryOver(true)} className="ds-btn-gold px-4 py-2 text-[13px]">
-              Reporter au créneau suivant
+            <button type="button" onClick={() => decideOverdue(true)} className="ds-btn-gold px-4 py-2 text-[13px]">
+              Les garder pour aujourd’hui
             </button>
-            <button type="button" onClick={() => decideCarryOver(false)} className="ds-btn-ghost px-4 py-2 text-[13px]">
-              Continuer sans modifier la suite
+            <button type="button" onClick={() => decideOverdue(false)} className="ds-btn-ghost px-4 py-2 text-[13px]">
+              Les reprendre au prochain cycle
             </button>
           </div>
+        </section>
+      )}
+
+      {/* Retard du jour (visible, jamais silencieux) */}
+      {dayState && dueCycle.overdue.length > 0 && (
+        <section className="rounded-[20px] border border-[#e7c9b2] bg-[#fbf3ec] p-4 mb-5">
+          <p className="text-[13px] font-extrabold text-[#b3542e]">
+            En retard aujourd’hui : {dueCycle.overdue.length} page{dueCycle.overdue.length > 1 ? 's' : ''}{' '}
+            ({pagesLabel(dueCycle.overdue)}) — toujours à réciter, rien n’est perdu.
+          </p>
+          <Link href="/recitation/en-cours" className="ds-btn-gold inline-block px-4 py-2 text-[13px] mt-2.5">
+            Rattraper maintenant
+          </Link>
         </section>
       )}
 

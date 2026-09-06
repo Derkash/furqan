@@ -47,6 +47,8 @@ export interface WidgetSession {
 
 export interface WidgetState {
   generatedAt: number;
+  /** Le retard reste-t-il dû (préférence de report ≠ « jamais ») ? */
+  carryOverDue: boolean;
   sessions: WidgetSession[];
 }
 
@@ -146,27 +148,132 @@ export function buildSessions(ctx: TodayContext | null): WidgetSession[] {
   return sessions.sort((a, b) => a.startEpoch - b.startEpoch);
 }
 
+/** Contenu de l'activité en direct (miroir du ContentState Swift). */
+export interface LiveContent {
+  /** 'active' | 'overdue' | 'upcoming' — l'écran verrouillé couvre TOUT. */
+  phase: string;
+  /** Pages dues maintenant (retard compris pour le cycle). */
+  dueCount: number;
+  recitedPages: number;
+  totalPages: number;
+  pagesLabel: string;
+  /** Époque de référence du décompte : fin du créneau actif, ou début du prochain. */
+  refEpoch: number;
+  slotLabel: string;
+  startVerse: string;
+}
+
+function endOfToday(now: Date): number {
+  const end = new Date(now);
+  end.setHours(23, 59, 0, 0);
+  return Math.floor(end.getTime() / 1000);
+}
+
+/**
+ * L'activité en direct doit être là DÈS qu'une récitation est due ou à venir
+ * aujourd'hui — pas seulement pendant un créneau. iOS n'autorise le démarrage
+ * qu'app ouverte : on la démarre donc à la première occasion (lancement,
+ * retour au premier plan) et on ne la termine qu'une fois la journée pliée.
+ */
+export function buildLiveContent(state: WidgetState, now: Date): LiveContent | null {
+  const t = Math.floor(now.getTime() / 1000);
+  const today = state.sessions.filter((s) => s.startEpoch < endOfToday(now));
+  const active = today.find((s) => t >= s.startEpoch && t < s.endEpoch) ?? null;
+  const next = today.find((s) => s.startEpoch > t) ?? null;
+  // Retard cumulé : pages restantes des sessions passées (si la préférence
+  // les garde dues). Les sessions portent leur avancement.
+  const overdue = state.carryOverDue
+    ? today
+        .filter((s) => s.endEpoch <= t)
+        .reduce((sum, s) => sum + Math.max(0, s.totalPages - s.recitedPages), 0)
+    : 0;
+
+  if (active && active.recitedPages < active.totalPages) {
+    return {
+      phase: 'active',
+      dueCount: active.totalPages - active.recitedPages + (active.kind === 'cycle' ? overdue : 0),
+      recitedPages: active.recitedPages,
+      totalPages: active.totalPages,
+      pagesLabel: active.pagesLabel,
+      refEpoch: active.endEpoch,
+      slotLabel: active.slotLabel,
+      startVerse: active.startVerse,
+    };
+  }
+  if (overdue > 0) {
+    return {
+      phase: 'overdue',
+      dueCount: overdue,
+      recitedPages: 0,
+      totalPages: overdue,
+      pagesLabel: next ? `Prochaine séance ${next.slotLabel}` : 'À rattraper avant ce soir',
+      refEpoch: next?.startEpoch ?? endOfToday(now),
+      slotLabel: next?.slotLabel ?? '',
+      startVerse: '',
+    };
+  }
+  if (next) {
+    return {
+      phase: 'upcoming',
+      dueCount: next.totalPages,
+      recitedPages: 0,
+      totalPages: next.totalPages,
+      pagesLabel: next.pagesLabel,
+      refEpoch: next.startEpoch,
+      slotLabel: next.slotLabel,
+      startVerse: next.startVerse,
+    };
+  }
+  return null; // journée pliée : plus rien de dû ni de prévu aujourd'hui
+}
+
 let lastPayload = '';
+let lastLivePayload = '';
 let liveActivityRunning = false;
 
-function push(state: WidgetState, active: WidgetSession | null): void {
+/** Dernière erreur du pont natif — affichée par l'écran Diagnostic. */
+const NATIVE_ERROR_KEY = 'almuraja3a:recitation:nativeError';
+function recordNativeError(context: string, e: unknown): void {
+  try {
+    window.localStorage.setItem(
+      NATIVE_ERROR_KEY,
+      JSON.stringify({ context, message: String(e), at: new Date().toISOString() })
+    );
+  } catch {}
+}
+export function getNativeError(): { context: string; message: string; at: string } | null {
+  try {
+    const raw = window.localStorage.getItem(NATIVE_ERROR_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function push(state: WidgetState, now: Date): void {
   const payload = JSON.stringify(state);
   if (payload !== lastPayload) {
     lastPayload = payload;
-    RecitationBridge.syncState({ state: payload }).catch(() => {});
+    RecitationBridge.syncState({ state: payload }).catch((e) => recordNativeError('widget', e));
   }
-  // Activité en direct : uniquement pendant un créneau en cours non terminé.
-  const running = active && active.recitedPages < active.totalPages;
-  if (running) {
-    const body = JSON.stringify({ ...active, generatedAt: state.generatedAt });
-    const call = liveActivityRunning
-      ? RecitationBridge.updateLiveActivity({ state: body })
-      : RecitationBridge.startLiveActivity({ state: body });
-    liveActivityRunning = true;
-    call.catch(() => {});
+  const live = buildLiveContent(state, now);
+  if (live) {
+    const body = JSON.stringify(live);
+    if (body !== lastLivePayload || !liveActivityRunning) {
+      lastLivePayload = body;
+      const call = liveActivityRunning
+        ? RecitationBridge.updateLiveActivity({ state: body })
+        : RecitationBridge.startLiveActivity({ state: body });
+      liveActivityRunning = true;
+      call.catch((e) => {
+        liveActivityRunning = false;
+        recordNativeError('liveActivity', e);
+      });
+    }
   } else if (liveActivityRunning) {
     liveActivityRunning = false;
-    RecitationBridge.endLiveActivity().catch(() => {});
+    lastLivePayload = '';
+    RecitationBridge.endLiveActivity().catch((e) => recordNativeError('endLiveActivity', e));
   }
 }
 
@@ -184,8 +291,16 @@ export function sessionAt(sessions: WidgetSession[], now: Date): WidgetSession |
 export function syncNative(ctx: TodayContext | null, now: Date): void {
   if (!Capacitor.isNativePlatform()) return;
   const sessions = buildSessions(ctx);
-  const state: WidgetState = { generatedAt: Math.floor(now.getTime() / 1000), sessions };
-  push(state, sessionAt(sessions, now));
+  const carryOverDue = ctx
+    ? ctx.program.carryOver === 'auto' ||
+      (ctx.program.carryOver === 'ask' && ctx.dayState?.overdueDecision === 'accepted')
+    : false;
+  const state: WidgetState = {
+    generatedAt: Math.floor(now.getTime() / 1000),
+    carryOverDue,
+    sessions,
+  };
+  push(state, now);
 
   // Versets des prochaines sessions (mise en cache : les pages se répètent).
   const toLoad = sessions
@@ -200,7 +315,7 @@ export function syncNative(ctx: TodayContext | null, now: Date): void {
         return i === -1 ? s : { ...s, startVerse: heads[i].start, endVerse: heads[i].end };
       });
       const next: WidgetState = { ...state, sessions: enriched };
-      push(next, sessionAt(enriched, now));
+      push(next, now);
     })
     .catch(() => {});
 }

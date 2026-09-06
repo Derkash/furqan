@@ -10,6 +10,7 @@ import AppShell from '@/components/AppShell';
 import EvaluationSheet from '@/components/recitation/EvaluationSheet';
 import VersePassage from '@/components/recitation/VersePassage';
 import { useRecitation } from '@/hooks/useRecitation';
+import { duePages } from '@/lib/recitation/dayEngine';
 import { pageRefLabel, pagesLabel, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
 import { MASTERY_LABELS, reinforcementReason } from '@/lib/recitation/mastery';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
@@ -58,9 +59,21 @@ export default function EnCoursPage() {
   const recitedSet = new Set(
     (isLearning ? dayState?.learningRecited : dayState?.recitedPages) ?? []
   );
-  const pages = slot?.pages ?? [];
-  const done = pages.filter((p) => recitedSet.has(p)).length;
-  const nextPage = pages.find((p) => !recitedSet.has(p)) ?? null;
+  // Le parcours du moment = TOUT le dû de cette nature : le retard des
+  // créneaux passés d'abord, puis le créneau courant. Une page manquée ne
+  // disparaît jamais — elle reste ici jusqu'à minuit.
+  const due =
+    ctx && dayState
+      ? duePages(ctx.program, dayState, nowMin, isLearning ? 'learning' : 'cycle')
+      : { current: [], overdue: [], all: [] };
+  const overdueSet = new Set(due.overdue);
+  const slotRecited = (slot?.pages ?? []).filter((p) => recitedSet.has(p));
+  // Affichage : retard + pages du créneau courant (récitées comprises, pour
+  // pouvoir décocher), ordre du mushaf.
+  const pages = [...new Set([...due.overdue, ...(slot?.pages ?? [])])].sort((a, b) => a - b);
+  const done = slotRecited.length;
+  const dueCount = due.all.length;
+  const nextPage = due.all[0] ?? null;
   const reinforcementSet = new Set(dayState?.reinforcementPages ?? []);
   const evalsByPage = useMemo(() => evaluationsByPage(loadEvaluations()), []);
 
@@ -117,7 +130,8 @@ export default function EnCoursPage() {
         >
           <div className="flex items-center justify-between gap-3">
             <p className="text-[12px] font-bold tracking-[0.14em] text-white/85">
-              {done} PAGE{done > 1 ? 'S' : ''} SUR {pages.length}
+              {dueCount} PAGE{dueCount > 1 ? 'S' : ''} À RÉCITER
+              {due.overdue.length > 0 && ` · DONT ${due.overdue.length} EN RETARD`}
             </p>
             {active && (
               <p className="text-sm text-white/90 flex items-center gap-1.5">
@@ -130,10 +144,10 @@ export default function EnCoursPage() {
             )}
           </div>
 
-          {/* Frise des pages */}
+          {/* Frise des pages (limitée à 8 : les jours de rattrapage sont longs) */}
           <div className="flex items-center mt-4 mb-1">
-            {pages.map((p, i) => (
-              <div key={p} className="flex items-center" style={{ flex: i < pages.length - 1 ? 1 : 'none' }}>
+            {pages.slice(0, 8).map((p, i, shown) => (
+              <div key={p} className="flex items-center" style={{ flex: i < shown.length - 1 ? 1 : 'none' }}>
                 <div className="flex flex-col items-center">
                   <span
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-extrabold border-2 ${
@@ -150,9 +164,12 @@ export default function EnCoursPage() {
                     {pageRefLabel(p, learningSurah)}
                   </span>
                 </div>
-                {i < pages.length - 1 && <div className="h-[2px] flex-1 mx-1 bg-white/25 rounded" />}
+                {i < shown.length - 1 && <div className="h-[2px] flex-1 mx-1 bg-white/25 rounded" />}
               </div>
             ))}
+            {pages.length > 8 && (
+              <span className="text-[11px] font-bold text-white/70 ml-2 flex-none">+{pages.length - 8}</span>
+            )}
           </div>
 
           <p className="text-2xl md:text-3xl font-extrabold mt-3">{pagesLabel(pages, learningSurah)}</p>
@@ -189,6 +206,11 @@ export default function EnCoursPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-bold">
                       {pageRefLabel(p, learningSurah)}
+                      {overdueSet.has(p) && (
+                        <span className="ml-2 text-[10px] font-extrabold tracking-wider text-[#b3542e] bg-[#fbf3ec] rounded-full px-2 py-0.5 align-middle">
+                          EN RETARD
+                        </span>
+                      )}
                       {reinforcementSet.has(p) && (
                         <span
                           className="ml-2 text-[10px] font-extrabold tracking-wider text-[var(--ds-gold-700)] bg-[var(--ds-gold-100)] rounded-full px-2 py-0.5 align-middle"
@@ -217,8 +239,8 @@ export default function EnCoursPage() {
           </div>
         </section>
 
-        {/* Votre passage */}
-        {pages.length > 0 && <VersePassage firstPage={pages[0]} lastPage={pages[pages.length - 1]} />}
+        {/* Votre passage : bornes du dû réel (retard compris) */}
+        {due.all.length > 0 && <VersePassage firstPage={due.all[0]} lastPage={due.all[due.all.length - 1]} />}
 
         {/* Actions */}
         <div className="flex flex-col gap-2.5 mt-5 pb-10">

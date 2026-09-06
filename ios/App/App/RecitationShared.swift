@@ -63,6 +63,8 @@ public struct RecitationSession: Codable, Hashable {
 /// État partagé complet : toutes les sessions à venir.
 public struct SharedRecitationState: Codable {
     public var generatedAt: Int
+    /// Le retard reste-t-il dû (préférence de report ≠ « jamais ») ?
+    public var carryOverDue: Bool?
     public var sessions: [RecitationSession]
 
     public static func load() -> SharedRecitationState? {
@@ -90,28 +92,42 @@ public struct SharedRecitationState: Codable {
     public var boundaries: [Date] {
         sessions.flatMap { [$0.startDate, $0.endDate] }.sorted()
     }
+
+    /// Pages en retard à cet instant : restes des sessions passées du jour.
+    /// Le widget peut ainsi afficher le retard SANS que l'app soit ouverte.
+    public func overdueCount(at date: Date) -> Int {
+        guard carryOverDue ?? true else { return 0 }
+        let t = Int(date.timeIntervalSince1970)
+        let cal = Calendar.current
+        return sessions
+            .filter { $0.endEpoch <= t && cal.isDate($0.startDate, inSameDayAs: date) }
+            .reduce(0) { $0 + max(0, $1.totalPages - $1.recitedPages) }
+    }
 }
 
 #if canImport(ActivityKit)
 /// Attributs de l'activité en direct (écran verrouillé + Dynamic Island).
 @available(iOS 16.2, *)
 public struct RecitationActivityAttributes: ActivityAttributes {
+    /// L'activité couvre TOUTE la journée : trois phases.
+    /// 'active'   — créneau en cours (décompte vers sa fin) ;
+    /// 'overdue'  — pages en retard hors créneau (décompte vers la prochaine) ;
+    /// 'upcoming' — rien de dû, prochaine séance (décompte vers son début).
     public struct ContentState: Codable, Hashable {
+        public var phase: String
+        public var dueCount: Int
         public var recitedPages: Int
         public var totalPages: Int
         public var pagesLabel: String
-        public var slotEndEpoch: Int
-        /// Début du premier verset à réciter (Unicode othmanien, tronqué).
+        /// Époque de référence du décompte (fin du créneau ou début du prochain).
+        public var refEpoch: Int
+        public var slotLabel: String
         public var startVerse: String
-        public init(recitedPages: Int, totalPages: Int, pagesLabel: String, slotEndEpoch: Int, startVerse: String) {
-            self.recitedPages = recitedPages
-            self.totalPages = totalPages
-            self.pagesLabel = pagesLabel
-            self.slotEndEpoch = slotEndEpoch
-            self.startVerse = startVerse
-        }
+
+        public var refDate: Date { Date(timeIntervalSince1970: TimeInterval(refEpoch)) }
+        public var isActive: Bool { phase == "active" }
+        public var isOverdue: Bool { phase == "overdue" }
     }
-    public var slotLabel: String
-    public init(slotLabel: String) { self.slotLabel = slotLabel }
+    public init() {}
 }
 #endif

@@ -195,8 +195,12 @@ export interface DayState {
   pendingEvaluations: number[];
   /** Indices des créneaux déjà clôturés (SessionRecord journalisé). */
   closedSlots: number[];
-  /** Report en attente de décision (mode « toujours demander »). */
-  pendingCarryOver: { fromSlot: number; pages: number[] } | null;
+  /**
+   * Mode « toujours demander » : décision sur les pages en retard du jour.
+   * null = pas encore demandé ; 'accepted' = elles restent dues aujourd'hui ;
+   * 'declined' = reprises au cycle suivant. (Modes auto/jamais : ignoré.)
+   */
+  overdueDecision: 'accepted' | 'declined' | null;
   /** Pages ajoutées aujourd'hui par le renforcement (pour l'explication). */
   reinforcementPages: number[];
   /** Pages de journées manquées, en attente de rattrapage progressif. */

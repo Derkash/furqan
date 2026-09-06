@@ -11,7 +11,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import AppShell from '@/components/AppShell';
 import { refreshRecitationNative } from '@/lib/recitation/appSync';
-import { buildSessions, sessionAt } from '@/lib/recitation/widgetSync';
+import { getScheduleMeta, type ScheduleMeta } from '@/lib/recitation/notifications';
+import { buildSessions, getNativeError, sessionAt } from '@/lib/recitation/widgetSync';
 
 interface BridgeDiagnostics {
   appGroupReachable?: boolean;
@@ -60,6 +61,9 @@ export default function DiagnosticPage() {
   const [sessions, setSessions] = useState(0);
   const [activeLabel, setActiveLabel] = useState('—');
   const [busy, setBusy] = useState(false);
+  const [meta, setMeta] = useState<ScheduleMeta | null>(null);
+  const [nativeErr, setNativeErr] = useState<{ context: string; message: string; at: string } | null>(null);
+  const [testState, setTestState] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -99,8 +103,30 @@ export default function DiagnosticPage() {
       } catch (e) {
         setBridgeError(`pont natif : ${String(e)}`);
       }
+      setMeta(getScheduleMeta());
+      setNativeErr(getNativeError());
     }
     setBusy(false);
+  }, []);
+
+  // Test de bout en bout : pose une notification à +1 min. Si elle n'arrive
+  // pas app fermée, le problème est côté réglages iOS — pas côté programme.
+  const sendTest = useCallback(async () => {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: 739999,
+            title: 'Test Al Muraja3a',
+            body: 'Si vous lisez ceci, les notifications fonctionnent. Qu’Allah vous facilite.',
+            schedule: { at: new Date(Date.now() + 60_000), allowWhileIdle: true },
+          },
+        ],
+      });
+      setTestState('Posée — verrouillez l’écran, elle arrive dans 1 minute.');
+    } catch (e) {
+      setTestState(`Échec : ${String(e)}`);
+    }
   }, []);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -128,6 +154,13 @@ export default function DiagnosticPage() {
           <p className="ds-kicker mb-2">Notifications</p>
           <Row label="Autorisation" value={perm} ok={perm === 'granted'} />
           <Row label="Programmées" value={String(pending.length)} ok={pending.length > 0} />
+          {meta && (
+            <Row
+              label="Dernière planification"
+              value={`${new Date(meta.scheduledAt).toLocaleString('fr-FR')} · ${meta.count} posées`}
+              ok={meta.granted && meta.count > 0}
+            />
+          )}
           {pending.length > 0 && (
             <div className="mt-2 flex flex-col gap-1">
               {pending.slice(0, 12).map((n) => (
@@ -156,9 +189,28 @@ export default function DiagnosticPage() {
           {bridgeError && <p className="text-[12px] text-[#b3542e] mt-2">{bridgeError}</p>}
         </section>
 
-        <button type="button" onClick={load} disabled={busy} className="ds-btn-gold px-6 py-3 text-sm disabled:opacity-50">
-          {busy ? 'Analyse…' : 'Relancer le diagnostic'}
-        </button>
+        {nativeErr && (
+          <section className="rounded-[20px] border border-[#e7c9b2] bg-[#fbf3ec] p-4">
+            <p className="text-[13px] font-extrabold text-[#b3542e]">Dernière erreur native</p>
+            <p className="text-[12px] text-[var(--ds-n700)] mt-1">
+              {nativeErr.context} · {new Date(nativeErr.at).toLocaleString('fr-FR')}
+              <br />
+              {nativeErr.message}
+            </p>
+          </section>
+        )}
+
+        <div className="flex flex-col gap-2.5">
+          <button type="button" onClick={load} disabled={busy} className="ds-btn-gold px-6 py-3 text-sm disabled:opacity-50">
+            {busy ? 'Analyse…' : 'Relancer le diagnostic'}
+          </button>
+          {native && (
+            <button type="button" onClick={sendTest} className="ds-btn-ghost px-6 py-3 text-sm">
+              Tester une notification (1 min)
+            </button>
+          )}
+          {testState && <p className="text-[13px] text-[var(--ds-n600)]">{testState}</p>}
+        </div>
       </div>
     </AppShell>
   );

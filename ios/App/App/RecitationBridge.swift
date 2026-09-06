@@ -37,13 +37,14 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
 
     // ---------- Activité en direct ----------
 
-    /// L'activité en direct reçoit la session EN COURS (et non tout l'état).
-    private func decodeSession(_ call: CAPPluginCall) -> RecitationSession? {
+    /// L'activité en direct reçoit son contenu déjà phasé (LiveContent JS).
+    @available(iOS 16.2, *)
+    private func decodeContent(_ call: CAPPluginCall) -> RecitationActivityAttributes.ContentState? {
         guard
             let raw = call.getString("state"),
             let data = raw.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder().decode(RecitationSession.self, from: data)
+        return try? JSONDecoder().decode(RecitationActivityAttributes.ContentState.self, from: data)
     }
 
     /// Les échecs sont REMONTÉS (et non avalés) : sans cela, une activité qui
@@ -51,29 +52,26 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
     @objc func startLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) {
-            guard let state = decodeSession(call) else {
-                call.reject("payload de session illisible")
+            guard let content = decodeContent(call) else {
+                call.reject("payload d'activité illisible")
                 return
             }
             guard ActivityAuthorizationInfo().areActivitiesEnabled else {
                 call.reject("activités en direct désactivées pour cette app")
                 return
             }
-            // Une seule activité de récitation à la fois.
+            // Une seule activité de récitation à la fois — vivante toute la
+            // journée, mise à jour à chaque phase.
             if Activity<RecitationActivityAttributes>.activities.isEmpty {
-                let attributes = RecitationActivityAttributes(slotLabel: state.slotLabel)
-                let content = ActivityContent(
-                    state: contentState(from: state),
-                    staleDate: state.endDate
-                )
+                let activityContent = ActivityContent(state: content, staleDate: staleDate(for: content))
                 do {
-                    _ = try Activity.request(attributes: attributes, content: content)
+                    _ = try Activity.request(attributes: RecitationActivityAttributes(), content: activityContent)
                 } catch {
                     call.reject("démarrage refusé : \(error.localizedDescription)")
                     return
                 }
             } else {
-                update(with: state)
+                update(with: content)
             }
             call.resolve()
             return
@@ -87,8 +85,8 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
 
     @objc func updateLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.2, *), let state = decodeSession(call) {
-            update(with: state)
+        if #available(iOS 16.2, *), let content = decodeContent(call) {
+            update(with: content)
         }
         #endif
         call.resolve()
@@ -137,23 +135,19 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
     }
 
     #if canImport(ActivityKit)
+    /// L'activité reste pertinente au moins jusqu'à sa référence de décompte,
+    /// avec une marge — l'app la rafraîchit à chaque passage au premier plan.
     @available(iOS 16.2, *)
-    private func contentState(from state: RecitationSession) -> RecitationActivityAttributes.ContentState {
-        RecitationActivityAttributes.ContentState(
-            recitedPages: state.recitedPages,
-            totalPages: state.totalPages,
-            pagesLabel: state.pagesLabel,
-            slotEndEpoch: state.endEpoch,
-            startVerse: state.startVerse
-        )
+    private func staleDate(for content: RecitationActivityAttributes.ContentState) -> Date {
+        max(content.refDate, Date()).addingTimeInterval(2 * 3600)
     }
 
     @available(iOS 16.2, *)
-    private func update(with state: RecitationSession) {
-        let content = ActivityContent(state: contentState(from: state), staleDate: state.endDate)
+    private func update(with content: RecitationActivityAttributes.ContentState) {
+        let activityContent = ActivityContent(state: content, staleDate: staleDate(for: content))
         Task {
             for activity in Activity<RecitationActivityAttributes>.activities {
-                await activity.update(content)
+                await activity.update(activityContent)
             }
         }
     }

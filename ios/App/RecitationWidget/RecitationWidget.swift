@@ -24,11 +24,13 @@ struct RecitationEntry: TimelineEntry {
     let active: RecitationSession?
     /// Prochaine session après `date`.
     let next: RecitationSession?
+    /// Pages en retard à `date` (restes des sessions passées du jour).
+    let overdue: Int
 }
 
 struct RecitationProvider: TimelineProvider {
     func placeholder(in context: Context) -> RecitationEntry {
-        RecitationEntry(date: .now, active: .placeholder, next: nil)
+        RecitationEntry(date: .now, active: .placeholder, next: nil, overdue: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RecitationEntry) -> Void) {
@@ -39,7 +41,8 @@ struct RecitationProvider: TimelineProvider {
         RecitationEntry(
             date: date,
             active: state?.session(at: date),
-            next: state?.nextSession(after: date)
+            next: state?.nextSession(after: date),
+            overdue: state?.overdueCount(at: date) ?? 0
         )
     }
 
@@ -138,9 +141,11 @@ struct RecitationWidgetView: View {
                 case .systemLarge: large(s)
                 default: medium(s)
                 }
+            } else if entry.overdue > 0 {
+                // Des pages des créneaux passés restent dues : le dire AVANT
+                // d'annoncer la suite — rien ne disparaît jamais en silence.
+                overdueView(entry.overdue, next: entry.next)
             } else if let n = entry.next {
-                // Créneau accompli (ou hors créneau) : la progression n'apprend
-                // plus rien — on annonce la prochaine récitation.
                 upcoming(n, done: entry.active?.isComplete ?? false)
             } else {
                 idle
@@ -255,11 +260,18 @@ struct RecitationWidgetView: View {
                 VerseBlock(label: "FIN · \(s.lastPageLabel)", text: s.endVerse, lines: 2, size: 17)
             }
             Spacer(minLength: 0)
-            Text(s.remainingLabel)
+            Text(remainingLine(s))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
         }
+    }
+
+    /// « Encore 2 pages avant 12 h » + le retard éventuel des créneaux passés.
+    private func remainingLine(_ s: RecitationSession) -> String {
+        entry.overdue > 0 && s.kind == "cycle"
+            ? "\(s.remainingLabel) · +\(entry.overdue) en retard"
+            : s.remainingLabel
     }
 
     /// Anneau de temps restant, DESSINÉ : entièrement contenu dans son cadre.
@@ -293,6 +305,32 @@ struct RecitationWidgetView: View {
     }
 
     // ---- Prochaine session (créneau accompli ou hors créneau) ----
+
+    /// Pages en retard, hors créneau : l'information principale de l'écran.
+    private func overdueView(_ count: Int, next: RecitationSession?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(Color(red: 0.85, green: 0.45, blue: 0.25))
+                    .font(.system(size: 14))
+                Text("À rattraper")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            Spacer(minLength: 0)
+            Text("\(count) page\(count > 1 ? "s" : "") en retard")
+                .font(.system(size: family == .systemSmall ? 19 : 24, weight: .heavy))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+            Text(next != nil ? "Prochaine séance \(next!.whenLabel)" : "Toujours à réciter aujourd’hui")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(gold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     private func upcoming(_ n: RecitationSession, done: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
