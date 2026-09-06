@@ -11,10 +11,34 @@ import EvaluationSheet from '@/components/recitation/EvaluationSheet';
 import VersePassage from '@/components/recitation/VersePassage';
 import { useRecitation } from '@/hooks/useRecitation';
 import { duePages } from '@/lib/recitation/dayEngine';
+import { pageFirstVerseHead } from '@/lib/recitation/passageText';
 import { pageRefLabel, pagesLabel, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
 import { MASTERY_LABELS, reinforcementReason } from '@/lib/recitation/mastery';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
 import { evaluationsByPage, loadEvaluations } from '@/lib/recitation/store';
+
+/**
+ * Débuts du premier verset de chaque page (texte othmanien Unicode, source
+ * mushaf-layout — jamais régénéré). Le repère qui évite de se perdre :
+ * on reconnaît sa page à son verset, pas à son numéro.
+ */
+function usePageVerseHeads(pages: number[]): Record<number, string> {
+  const [heads, setHeads] = useState<Record<number, string>>({});
+  const key = pages.join(',');
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(pages.map((p) => pageFirstVerseHead(p, 6).then((t) => [p, t] as const)))
+      .then((entries) => {
+        if (!cancelled) setHeads(Object.fromEntries(entries.filter(([, t]) => t)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return heads;
+}
 
 /** Compte à rebours mm:ss jusqu'à endMin (minutes depuis minuit). */
 function Countdown({ endMin }: { endMin: number }) {
@@ -76,6 +100,7 @@ export default function EnCoursPage() {
   const nextPage = due.all[0] ?? null;
   const reinforcementSet = new Set(dayState?.reinforcementPages ?? []);
   const evalsByPage = useMemo(() => evaluationsByPage(loadEvaluations()), []);
+  const verseHeads = usePageVerseHeads(pages);
 
   if (!ready) return <AppShell><div /></AppShell>;
   if (!ctx || !dayState || !slot) {
@@ -229,6 +254,17 @@ export default function EnCoursPage() {
                           ? 'À réciter maintenant'
                           : 'À suivre'}
                     </p>
+                    {/* Le début du verset de la page : LE repère pour s'y
+                        retrouver — un numéro seul ne dit rien. */}
+                    {verseHeads[p] && (
+                      <p
+                        dir="rtl"
+                        className={`text-[17px] leading-relaxed truncate ${isDone ? 'text-[var(--ds-n400)]' : 'text-[#1f2a26]'}`}
+                        style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}
+                      >
+                        {verseHeads[p]}
+                      </p>
+                    )}
                   </div>
                   <span className="text-xs text-[var(--ds-n500)] flex-none hidden sm:block">
                     {surahsLabelShort(p)}

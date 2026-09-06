@@ -343,6 +343,27 @@ console.log('Plan de notifications : pur, trié, plafonné');
   check('rappels désactivés → aucun', buildNotificationPlan(off, cycle, now, null).length, 0);
 }
 
+console.log('Rappels horaires : tant que des pages sont dues, un ping par heure');
+{
+  const program = mkProgram('auto');
+  const cycle = { number: 1, startDate: '2026-09-06', days: [{ index: 0, pages: [3, 4] }] };
+  // 14 h : le créneau 10-11 h est passé, rien récité → 2 pages dues.
+  const state = mkState([{ startMin: 600, endMin: 660, pages: [3, 4], kind: 'cycle' }]);
+  const now = new Date(2026, 8, 6, 14, 0);
+  const plan = buildNotificationPlan(program, cycle, now, state);
+  const hourly = plan.filter((n) => n.id >= 739000 && n.id < 740000 - 1);
+  check('pings horaires posés (15 h → 23 h)', hourly.length, 9);
+  check('le premier à 15 h', hourly[0].at.getHours(), 15);
+  check('le titre annonce le dû', hourly[0].title.includes('2 pages'), true);
+  // Tout récité → plus aucun ping.
+  const done = { ...state, recitedPages: [3, 4] };
+  const planDone = buildNotificationPlan(program, cycle, now, done);
+  check('tout récité → aucun ping horaire', planDone.filter((n) => n.id >= 739000).length, 0);
+  // Mode « jamais reporter » → pas de dû après le créneau → pas de ping.
+  const planNever = buildNotificationPlan(mkProgram('never'), cycle, now, state);
+  check('mode « jamais » → aucun ping', planNever.filter((n) => n.id >= 739000).length, 0);
+}
+
 // ---------------------------------------------------------------------------
 console.log('');
 if (failures) {

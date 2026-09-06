@@ -60,18 +60,11 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
                 call.reject("activités en direct désactivées pour cette app")
                 return
             }
-            // Une seule activité de récitation à la fois — vivante toute la
-            // journée, mise à jour à chaque phase.
-            if Activity<RecitationActivityAttributes>.activities.isEmpty {
-                let activityContent = ActivityContent(state: content, staleDate: staleDate(for: content))
-                do {
-                    _ = try Activity.request(attributes: RecitationActivityAttributes(), content: activityContent)
-                } catch {
-                    call.reject("démarrage refusé : \(error.localizedDescription)")
-                    return
-                }
-            } else {
-                update(with: content)
+            do {
+                try ensureActivity(with: content)
+            } catch {
+                call.reject("démarrage refusé : \(error.localizedDescription)")
+                return
             }
             call.resolve()
             return
@@ -86,7 +79,10 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
     @objc func updateLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *), let content = decodeContent(call) {
-            update(with: content)
+            // Même chemin que start : si l'activité a été balayée par
+            // l'utilisateur, a expiré, ou a disparu avec une réinstallation,
+            // une mise à jour la fait RENAÎTRE au lieu de tomber dans le vide.
+            try? ensureActivity(with: content)
         }
         #endif
         call.resolve()
@@ -135,6 +131,30 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
     }
 
     #if canImport(ActivityKit)
+    /// GARANTIE de présence : une activité balayée de l'écran verrouillé
+    /// (état .dismissed), expirée (.stale/.ended) ou disparue passe ici par
+    /// une purge puis une re-création. Chaque synchronisation de l'app remet
+    /// donc l'activité sur l'écran verrouillé — c'est ce qui rend son
+    /// affichage systématique tant qu'une récitation est due.
+    @available(iOS 16.2, *)
+    private func ensureActivity(with content: RecitationActivityAttributes.ContentState) throws {
+        let activityContent = ActivityContent(state: content, staleDate: staleDate(for: content))
+        let all = Activity<RecitationActivityAttributes>.activities
+        let alive = all.filter { $0.activityState == .active }
+
+        if alive.isEmpty {
+            // Purger les zombies (balayées / périmées) avant de recréer.
+            for zombie in all {
+                Task { await zombie.end(nil, dismissalPolicy: .immediate) }
+            }
+            _ = try Activity.request(attributes: RecitationActivityAttributes(), content: activityContent)
+        } else {
+            for activity in alive {
+                Task { await activity.update(activityContent) }
+            }
+        }
+    }
+
     /// L'activité reste pertinente au moins jusqu'à sa référence de décompte,
     /// avec une marge — l'app la rafraîchit à chaque passage au premier plan.
     @available(iOS 16.2, *)

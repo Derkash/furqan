@@ -33,6 +33,8 @@ const ID_SPAN = 10000;
 const MAX_PENDING = 60;
 
 type Kind = 0 | 1 | 2; // 0 = début, 1 = avant la fin, 2 = relance après la fin
+/** Identifiants des rappels HORAIRES de dû (un par heure pleine du jour). */
+const HOURLY_ID_BASE = ID_BASE + 9000;
 
 /** Identifiant déterministe : permet d'annuler un rappel précis plus tard. */
 function notifId(dayOffset: number, slotIndex: number, kind: Kind): number {
@@ -131,10 +133,39 @@ export function buildNotificationPlan(
   // Retard actuel du jour : mentionné dans les annonces des créneaux à venir
   // d'aujourd'hui (« + 2 pages en retard ») — on ne laisse jamais croire que
   // les pages manquées ont disparu.
-  const overdueToday =
+  const dueNow =
     dayState && dayState.date === todayKey
-      ? duePages(program, dayState, nowMin, 'cycle').overdue.length
-      : 0;
+      ? duePages(program, dayState, nowMin, 'cycle')
+      : { current: [], overdue: [], all: [] };
+  const dueLearning =
+    dayState && dayState.date === todayKey
+      ? duePages(program, dayState, nowMin, 'learning')
+      : { current: [], overdue: [], all: [] };
+  const overdueToday = dueNow.overdue.length;
+
+  // RAPPEL HORAIRE : tant que des pages sont dues, une notification à chaque
+  // heure pleine jusqu'en fin de soirée. Le plan est reposé à CHAQUE
+  // synchronisation (ouverture, retour au premier plan, page cochée) : dès
+  // que tout est récité, la prochaine planification les efface toutes —
+  // aucun rappel ne part jamais pour un dû déjà réglé.
+  const totalDue = dueNow.all.length + dueLearning.all.length;
+  if (totalDue > 0) {
+    const lastHour = 23;
+    for (let h = Math.floor(nowMin / 60) + 1; h <= lastHour; h++) {
+      const dueLabel =
+        dueNow.all.length && dueLearning.all.length
+          ? `${dueNow.all.length} page${dueNow.all.length > 1 ? 's' : ''} de révision et ${dueLearning.all.length} de votre sourate`
+          : dueNow.all.length
+            ? `${pagesLabel(dueNow.all)}`
+            : `${pagesLabel(dueLearning.all, program.learning?.surah)}`;
+      plan.push({
+        id: HOURLY_ID_BASE + h,
+        title: `${totalDue} page${totalDue > 1 ? 's' : ''} à réciter`,
+        body: `${dueLabel} — toujours en attente. Un moment maintenant ? Qu’Allah vous facilite.`,
+        at: at(todayKey, h * 60),
+      });
+    }
+  }
 
   for (let offset = 0; offset <= HORIZON_DAYS; offset++) {
     const dateKey = addDays(todayKey, offset);
