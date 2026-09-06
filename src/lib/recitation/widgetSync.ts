@@ -1,46 +1,45 @@
 // Pont vers le natif iOS : widget d'écran d'accueil (WidgetKit) et activité en
-// direct sur l'écran verrouillé (ActivityKit). Le plugin Swift `RecitationBridge`
-// écrit l'état dans l'App Group partagé puis recharge les timelines — le compte
-// à rebours, lui, est rendu côté widget : AUCUNE recharge périodique, on ne
-// synchronise que sur événement (page cochée, créneau démarré/terminé).
+// direct (ActivityKit).
+//
+// PRINCIPE : on ne pousse PAS « le créneau courant » mais la LISTE des
+// prochaines sessions (aujourd'hui + les jours suivants du cycle), chacune
+// avec ses bornes horaires en époque. Le widget choisit lui-même la session
+// qui correspond à l'instant de rendu — il change donc de créneau, de pages et
+// de versets tout seul, sans que l'application soit ouverte. C'est ce qui
+// manquait : avant, un nouveau créneau n'apparaissait qu'après ouverture.
+//
 // Sur le web : no-op silencieux.
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { TodayContext } from './dayEngine';
 import { pagesLabel } from './labels';
 import { passageHeads } from './passageText';
-import { currentSlot, formatTime, nextSlot, slotsForWeekday, weekdayOf } from './schedule';
+import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
+import { formatTime, slotsForWeekday, weekdayOf } from './schedule';
 
-/** État partagé avec le widget (JSON écrit dans l'App Group). */
-export interface WidgetState {
-  /**
-   * 'active'   : créneau en cours, pages restantes → progression + décompte
-   * 'done'     : tout est récité → on n'affiche PLUS la progression mais la
-   *              prochaine session (c'est la seule info utile à ce moment)
-   * 'upcoming' : hors créneau → prochaine session
-   * 'idle'     : aucun programme / plus rien de prévu
-   */
-  phase: 'active' | 'done' | 'upcoming' | 'idle';
-  date: string;
-  slotStartMin: number;
-  slotEndMin: number;
-  /** Époque (s) de fin du créneau en cours — décompte du widget. */
-  slotEndEpoch: number;
-  totalPages: number;
-  recitedPages: number;
+/** Nombre de jours du programme envoyés au widget (au-delà : resynchro). */
+const HORIZON_DAYS = 3;
+/** Sessions pour lesquelles on charge le texte des versets. */
+const VERSE_LOOKAHEAD = 6;
+
+/** Une occurrence de créneau, autonome pour l'affichage. */
+export interface WidgetSession {
+  startEpoch: number;
+  endEpoch: number;
+  slotLabel: string;   // « 11 h – 12 h »
+  dayLabel: string;    // '' si aujourd'hui, sinon « mardi 8 septembre »
+  pagesLabel: string;  // « Pages 4 à 5 »
   firstPage: number;
   lastPage: number;
-  pagesLabel: string;
-  slotLabel: string;
-  /** Début du premier verset à réciter (Unicode othmanien, tronqué). */
-  startVerse: string;
-  /** Début du dernier verset à réciter (Unicode othmanien, tronqué). */
-  endVerse: string;
-  // ---- Prochaine session (phases 'done' et 'upcoming') ----
-  nextSlotLabel: string;
-  nextPagesLabel: string;
-  /** « aujourd'hui » ou « mardi 8 septembre » — vide si rien de prévu. */
-  nextDayLabel: string;
+  totalPages: number;
+  recitedPages: number;
+  startVerse: string;  // début du premier verset (othmanien Unicode)
+  endVerse: string;    // début du dernier verset
+}
+
+export interface WidgetState {
+  generatedAt: number;
+  sessions: WidgetSession[];
 }
 
 interface RecitationBridgePlugin {
@@ -52,97 +51,93 @@ interface RecitationBridgePlugin {
 
 const RecitationBridge = registerPlugin<RecitationBridgePlugin>('RecitationBridge');
 
-const IDLE: WidgetState = {
-  phase: 'idle', date: '', slotStartMin: 0, slotEndMin: 0, slotEndEpoch: 0,
-  totalPages: 0, recitedPages: 0, firstPage: 0, lastPage: 0,
-  pagesLabel: '', slotLabel: '', startVerse: '', endVerse: '',
-  nextSlotLabel: '', nextPagesLabel: '', nextDayLabel: '',
-};
+function epochOf(dateKey: string, minutes: number): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return Math.floor(new Date(y, m - 1, d, Math.floor(minutes / 60), minutes % 60, 0, 0).getTime() / 1000);
+}
 
-/** Première session à venir : plus tard aujourd'hui, sinon prochain jour actif. */
-function findNext(ctx: TodayContext, nowMin: number): { label: string; pages: string; day: string } {
-  const { program, cycle, dayState, todayKey, dayDates } = ctx;
+function dayLabelOf(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d, 12).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
 
-  if (dayState) {
-    const upcoming = dayState.slots.find((s) => s.startMin > nowMin && s.pages.length > 0);
-    if (upcoming) {
-      return { label: formatTime(upcoming.startMin), pages: pagesLabel(upcoming.pages), day: 'aujourd’hui' };
-    }
-  }
-
-  // Prochaine journée planifiée du cycle.
-  const nextDate = dayDates.find((d) => d > todayKey);
-  if (!nextDate) return { label: '', pages: '', day: '' };
-  const idx = dayDates.indexOf(nextDate);
-  const pages = cycle.days[idx]?.pages ?? [];
-  const slots = slotsForWeekday(program.schedule, weekdayOf(nextDate));
-  const firstSlot = slots[0];
-  const perSlot = slots.length ? Math.ceil(pages.length / slots.length) : pages.length;
-  const [y, m, d] = nextDate.split('-').map(Number);
-  const dayLabel = new Date(y, m - 1, d, 12).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+function makeSession(
+  dateKey: string,
+  slot: { startMin: number; endMin: number },
+  pages: number[],
+  recited: Set<number>,
+  isToday: boolean
+): WidgetSession {
   return {
-    label: firstSlot ? formatTime(firstSlot.startMin) : '',
-    pages: pagesLabel(pages.slice(0, perSlot)),
-    day: dayLabel,
+    startEpoch: epochOf(dateKey, slot.startMin),
+    endEpoch: epochOf(dateKey, slot.endMin),
+    slotLabel: `${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`,
+    dayLabel: isToday ? '' : dayLabelOf(dateKey),
+    pagesLabel: pagesLabel(pages),
+    firstPage: pages[0] ?? 0,
+    lastPage: pages[pages.length - 1] ?? 0,
+    totalPages: pages.length,
+    recitedPages: pages.filter((p) => recited.has(p)).length,
+    startVerse: '',
+    endVerse: '',
   };
 }
 
-/** Construit l'état widget (hors textes arabes, chargés ensuite). */
-export function buildWidgetState(ctx: TodayContext | null, now: Date): WidgetState {
-  if (!ctx) return IDLE;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const { dayState } = ctx;
-  const next = findNext(ctx, nowMin);
-  const base = { ...IDLE, nextSlotLabel: next.label, nextPagesLabel: next.pages, nextDayLabel: next.day };
-  if (!dayState) return { ...base, phase: next.label ? 'upcoming' : 'idle' };
+/**
+ * Sessions d'aujourd'hui (état réel, reports et renforcement compris) puis
+ * des jours suivants du cycle (projection depuis l'objectif et les horaires).
+ */
+export function buildSessions(ctx: TodayContext | null): WidgetSession[] {
+  if (!ctx) return [];
+  const { program, cycle, dayState, todayKey, dayDates } = ctx;
+  const sessions: WidgetSession[] = [];
 
-  const current = currentSlot(dayState.slots, nowMin);
-  const later = nextSlot(dayState.slots, nowMin);
-  const ref = current ?? later;
-  if (!ref) return { ...base, phase: next.label ? 'upcoming' : 'idle', date: dayState.date };
+  if (dayState) {
+    const recited = new Set(dayState.recitedPages);
+    for (const slot of dayState.slots) {
+      if (slot.pages.length) sessions.push(makeSession(todayKey, slot, slot.pages, recited, true));
+    }
+  }
 
-  const planned = dayState.slots.find((s) => s.startMin === ref.startMin);
-  const pages = planned?.pages ?? [];
-  const recited = new Set(dayState.recitedPages);
-  const doneCount = pages.filter((p) => recited.has(p)).length;
-  const finished = pages.length > 0 && doneCount >= pages.length;
+  const upcomingDates = dayDates.filter((d) => d > todayKey).slice(0, HORIZON_DAYS);
+  for (const date of upcomingDates) {
+    const idx = dayDates.indexOf(date);
+    const pages = cycle.days[idx]?.pages ?? [];
+    if (!pages.length) continue;
+    const slots = slotsForWeekday(program.schedule, weekdayOf(date));
+    if (!slots.length) continue;
+    const planned =
+      program.slotSplit.mode === 'custom'
+        ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
+        : splitPagesAcrossSlots(pages, slots);
+    for (const slot of planned) {
+      if (slot.pages.length) sessions.push(makeSession(date, slot, slot.pages, new Set(), false));
+    }
+  }
 
-  const midnight = new Date(now);
-  midnight.setHours(0, 0, 0, 0);
-
-  return {
-    ...base,
-    // Créneau en cours ET encore des pages → 'active'. Tout récité → 'done' :
-    // le widget bascule sur la prochaine session, la progression n'a plus
-    // d'intérêt une fois l'objectif atteint.
-    phase: current ? (finished ? 'done' : 'active') : 'upcoming',
-    date: dayState.date,
-    slotStartMin: ref.startMin,
-    slotEndMin: ref.endMin,
-    slotEndEpoch: Math.floor(midnight.getTime() / 1000) + ref.endMin * 60,
-    totalPages: pages.length,
-    recitedPages: doneCount,
-    firstPage: pages[0] ?? 0,
-    lastPage: pages[pages.length - 1] ?? 0,
-    pagesLabel: pagesLabel(pages),
-    slotLabel: `${formatTime(ref.startMin)} – ${formatTime(ref.endMin)}`,
-  };
+  return sessions.sort((a, b) => a.startEpoch - b.startEpoch);
 }
 
 let lastPayload = '';
 let liveActivityRunning = false;
 
-function push(state: WidgetState): void {
+function push(state: WidgetState, active: WidgetSession | null): void {
   const payload = JSON.stringify(state);
   if (payload !== lastPayload) {
     lastPayload = payload;
     RecitationBridge.syncState({ state: payload }).catch(() => {});
   }
-  // Activité en direct : uniquement pendant un créneau actif non terminé.
-  if (state.phase === 'active') {
+  // Activité en direct : uniquement pendant un créneau en cours non terminé.
+  const running = active && active.recitedPages < active.totalPages;
+  if (running) {
+    const body = JSON.stringify({ ...active, generatedAt: state.generatedAt });
     const call = liveActivityRunning
-      ? RecitationBridge.updateLiveActivity({ state: payload })
-      : RecitationBridge.startLiveActivity({ state: payload });
+      ? RecitationBridge.updateLiveActivity({ state: body })
+      : RecitationBridge.startLiveActivity({ state: body });
     liveActivityRunning = true;
     call.catch(() => {});
   } else if (liveActivityRunning) {
@@ -151,21 +146,37 @@ function push(state: WidgetState): void {
   }
 }
 
+/** Session en cours à l'instant donné (bornes en époque). */
+export function sessionAt(sessions: WidgetSession[], now: Date): WidgetSession | null {
+  const t = Math.floor(now.getTime() / 1000);
+  return sessions.find((s) => t >= s.startEpoch && t < s.endEpoch) ?? null;
+}
+
 /**
- * Synchronise widget + activité en direct. À appeler après chaque événement
- * (page cochée, tick de créneau, programme modifié). Les textes arabes sont
- * chargés en arrière-plan puis poussés dans une seconde synchro : le widget
- * n'attend jamais après eux.
+ * Synchronise widget + activité en direct. Les textes arabes sont chargés en
+ * arrière-plan puis poussés dans une seconde synchro : le widget n'attend
+ * jamais après eux.
  */
 export function syncNative(ctx: TodayContext | null, now: Date): void {
   if (!Capacitor.isNativePlatform()) return;
-  const state = buildWidgetState(ctx, now);
-  push(state);
-  if (state.firstPage > 0) {
-    passageHeads(state.firstPage, state.lastPage)
-      .then(({ start, end }) => {
-        if (start || end) push({ ...state, startVerse: start, endVerse: end });
-      })
-      .catch(() => {});
-  }
+  const sessions = buildSessions(ctx);
+  const state: WidgetState = { generatedAt: Math.floor(now.getTime() / 1000), sessions };
+  push(state, sessionAt(sessions, now));
+
+  // Versets des prochaines sessions (mise en cache : les pages se répètent).
+  const toLoad = sessions
+    .filter((s) => s.endEpoch >= state.generatedAt)
+    .slice(0, VERSE_LOOKAHEAD)
+    .filter((s) => s.firstPage > 0);
+  if (!toLoad.length) return;
+  Promise.all(toLoad.map((s) => passageHeads(s.firstPage, s.lastPage, 14)))
+    .then((heads) => {
+      const enriched = sessions.map((s) => {
+        const i = toLoad.indexOf(s);
+        return i === -1 ? s : { ...s, startVerse: heads[i].start, endVerse: heads[i].end };
+      });
+      const next: WidgetState = { ...state, sessions: enriched };
+      push(next, sessionAt(enriched, now));
+    })
+    .catch(() => {});
 }

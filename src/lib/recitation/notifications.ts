@@ -1,19 +1,34 @@
-// Notifications locales de récitation (brief §14) : annonce au début de chaque
-// créneau + rappel avant la fin. Programmées à l'avance pour les prochains
-// jours (re-planifiées à chaque ouverture / modification du programme).
-// Sur le web : no-op silencieux. Un appui ouvre la page « Récitation en cours »
-// (géré par l'écouteur d'AppInit via l'extra `route`).
+// Notifications locales de récitation (brief §14) — trois moments par créneau :
+//   1. à l'ouverture du créneau  : « C'est l'heure de votre récitation »
+//   2. avant la fin (réglable)   : rappel du temps et des pages restantes
+//   3. après la fin              : séance non terminée, invitation à reprendre
+//
+// Le 3ᵉ message est programmé d'avance mais ANNULÉ dès que la séance est
+// complétée (`cancelSlotFollowUps`) : on ne dit jamais « séance manquée » à
+// quelqu'un qui a récité. Ton volontairement factuel et non culpabilisant,
+// conformément au brief (§18 : « ne doit pas culpabiliser l'utilisateur »).
+//
+// Sur le web : no-op silencieux.
 
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { pagesLabel } from './labels';
+import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
 import { addDays, cycleDayDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
+import type { Cycle, DayState, Program } from './types';
 
-import type { Cycle, Program } from './types';
-
-/** Jours planifiés à l'avance (au-delà, re-planifié à la prochaine ouverture). */
+/** Jours planifiés à l'avance (re-planifié à chaque ouverture). */
 const HORIZON_DAYS = 3;
-/** Base des identifiants (réservée à la récitation, purgée à chaque re-planif). */
+/** Plage d'identifiants réservée à la récitation. */
 const ID_BASE = 730000;
+const ID_SPAN = 10000;
+
+type Kind = 0 | 1 | 2; // 0 = début, 1 = avant la fin, 2 = relance après la fin
+
+/** Identifiant déterministe : permet d'annuler un rappel précis plus tard. */
+function notifId(dayOffset: number, slotIndex: number, kind: Kind): number {
+  return ID_BASE + dayOffset * 300 + slotIndex * 10 + kind;
+}
 
 function isNative(): boolean {
   return Capacitor.isNativePlatform();
@@ -31,12 +46,11 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   }
 }
 
-/** Annule toutes les notifications de récitation programmées. */
 export async function cancelRecitationNotifications(): Promise<void> {
   if (!isNative()) return;
   try {
     const pending = await LocalNotifications.getPending();
-    const ours = pending.notifications.filter((n) => n.id >= ID_BASE && n.id < ID_BASE + 10000);
+    const ours = pending.notifications.filter((n) => n.id >= ID_BASE && n.id < ID_BASE + ID_SPAN);
     if (ours.length) await LocalNotifications.cancel({ notifications: ours.map((n) => ({ id: n.id })) });
   } catch {
     /* silencieux */
@@ -44,14 +58,48 @@ export async function cancelRecitationNotifications(): Promise<void> {
 }
 
 /**
- * (Re)programme les notifications des prochains jours actifs : début de
- * créneau (« Votre récitation de 18 h à 19 h est prête : pages 3 à 6 ») et
- * rappel avant la fin si configuré.
+ * Annule les rappels d'un créneau du jour dont l'objectif est atteint : le
+ * rappel « il reste N minutes » et la relance « séance non terminée » n'ont
+ * plus lieu d'être.
+ */
+export async function cancelSlotFollowUps(slotIndex: number): Promise<void> {
+  if (!isNative()) return;
+  try {
+    await LocalNotifications.cancel({
+      notifications: [{ id: notifId(0, slotIndex, 1) }, { id: notifId(0, slotIndex, 2) }],
+    });
+  } catch {
+    /* silencieux */
+  }
+}
+
+/** Créneaux planifiés d'une date (aujourd'hui : l'état réel du jour). */
+function plannedSlotsFor(
+  program: Program,
+  cycle: Cycle,
+  dayDates: string[],
+  dateKey: string,
+  dayState: DayState | null
+): { startMin: number; endMin: number; pages: number[] }[] {
+  if (dayState && dayState.date === dateKey) return dayState.slots;
+  const idx = dayDates.indexOf(dateKey);
+  const pages = cycle.days[idx]?.pages ?? [];
+  const slots = slotsForWeekday(program.schedule, weekdayOf(dateKey));
+  if (!pages.length || !slots.length) return [];
+  return program.slotSplit.mode === 'custom'
+    ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
+    : splitPagesAcrossSlots(pages, slots);
+}
+
+/**
+ * (Re)programme toutes les notifications des prochains jours actifs.
+ * Idempotent : on purge d'abord la plage d'identifiants réservée.
  */
 export async function scheduleRecitationNotifications(
   program: Program,
   cycle: Cycle,
-  now: Date
+  now: Date,
+  dayState: DayState | null = null
 ): Promise<void> {
   if (!isNative()) return;
   await cancelRecitationNotifications();
@@ -61,46 +109,61 @@ export async function scheduleRecitationNotifications(
   const dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
   const todayKey = toDateKey(now);
   const notifications: Parameters<typeof LocalNotifications.schedule>[0]['notifications'] = [];
-  let id = ID_BASE;
+  const at = (dateKey: string, minutes: number) => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return new Date(y, m - 1, d, Math.floor(minutes / 60), minutes % 60, 0, 0);
+  };
 
   for (let offset = 0; offset <= HORIZON_DAYS; offset++) {
     const dateKey = addDays(todayKey, offset);
-    const dayIdx = dayDates.indexOf(dateKey);
-    if (dayIdx === -1) continue;
-    const pages = cycle.days[dayIdx]?.pages ?? [];
-    const slots = slotsForWeekday(program.schedule, weekdayOf(dateKey));
-    if (!slots.length || !pages.length) continue;
-    // Répartition indicative (le renforcement du jour même peut décaler d'une
-    // page ou deux — acceptable pour un texte de notification).
-    const per = Math.ceil(pages.length / slots.length);
-    const [y, m, d] = dateKey.split('-').map(Number);
+    if (!dayDates.includes(dateKey)) continue;
+    const slots = plannedSlotsFor(program, cycle, dayDates, dateKey, dayState);
 
     slots.forEach((slot, i) => {
-      const slotPages = pages.slice(i * per, (i + 1) * per);
-      if (!slotPages.length) return;
-      const label =
-        slotPages.length === 1
-          ? `page ${slotPages[0]}`
-          : `pages ${slotPages[0]} à ${slotPages[slotPages.length - 1]}`;
-      const startAt = new Date(y, m - 1, d, Math.floor(slot.startMin / 60), slot.startMin % 60);
-      if (startAt > now) {
+      if (!slot.pages.length) return;
+      const recited = new Set(offset === 0 ? (dayState?.recitedPages ?? []) : []);
+      const remaining = slot.pages.filter((p) => !recited.has(p));
+      if (!remaining.length) return; // créneau déjà accompli : aucun rappel
+      const label = pagesLabel(slot.pages).toLowerCase();
+      const count = remaining.length;
+
+      // 1. Ouverture du créneau.
+      const start = at(dateKey, slot.startMin);
+      if (start > now) {
         notifications.push({
-          id: id++,
-          title: 'Al Muraja3a',
-          body: `Votre récitation de ${formatTime(slot.startMin)} à ${formatTime(slot.endMin)} est prête : ${label}.`,
-          schedule: { at: startAt },
+          id: notifId(offset, i, 0),
+          title: 'C’est l’heure de votre récitation',
+          body: `${pagesLabel(slot.pages)} — jusqu’à ${formatTime(slot.endMin)}. Qu’Allah vous facilite.`,
+          schedule: { at: start },
           extra: { route: '/recitation/en-cours' },
         });
       }
+
+      // 2. Rappel avant la fin.
       if (program.endReminderMin != null) {
         const remindMin = slot.endMin - program.endReminderMin;
-        const remindAt = new Date(y, m - 1, d, Math.floor(remindMin / 60), remindMin % 60);
+        const remindAt = at(dateKey, remindMin);
         if (remindAt > now && remindMin > slot.startMin) {
           notifications.push({
-            id: id++,
-            title: 'Al Muraja3a',
-            body: `Il vous reste ${program.endReminderMin} minutes sur le créneau de ${formatTime(slot.startMin)}.`,
+            id: notifId(offset, i, 1),
+            title: `Il reste ${program.endReminderMin} minutes`,
+            body: `${count} page${count > 1 ? 's' : ''} à réciter avant ${formatTime(slot.endMin)} (${label}).`,
             schedule: { at: remindAt },
+            extra: { route: '/recitation/en-cours' },
+          });
+        }
+      }
+
+      // 3. Relance après la fin — annulée si la séance est accomplie.
+      const followUpMin = slot.endMin + (program.endReminderMin ?? 15);
+      if (followUpMin < 24 * 60) {
+        const followUpAt = at(dateKey, followUpMin);
+        if (followUpAt > now) {
+          notifications.push({
+            id: notifId(offset, i, 2),
+            title: 'Séance non terminée',
+            body: `${pagesLabel(slot.pages)} vous attendent encore. Vous pouvez les reprendre maintenant.`,
+            schedule: { at: followUpAt },
             extra: { route: '/recitation/en-cours' },
           });
         }

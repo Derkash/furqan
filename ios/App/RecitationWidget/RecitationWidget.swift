@@ -1,10 +1,14 @@
 //
 //  RecitationWidget.swift
-//  Widget d'écran d'accueil (brief §12, maquette 2) : créneau, pages prévues,
-//  progression, temps restant. Le compte à rebours est rendu par
-//  Text(timerInterval:) / ProgressView(timerInterval:) — il défile TOUT SEUL,
-//  sans recharge de timeline. La timeline ne contient que deux entrées : l'état
-//  courant et la bascule à la fin du créneau.
+//  Widget d'écran d'accueil (brief §12) : créneau, pages prévues, repères du
+//  passage, progression et temps restant.
+//
+//  Deux principes tiennent tout l'affichage :
+//   • Le widget reçoit TOUTES les sessions à venir et choisit lui-même celle
+//     qui correspond à l'instant de rendu — il change donc de créneau sans
+//     que l'app soit ouverte. La timeline pose une entrée à chaque bascule.
+//   • Le temps restant est un anneau DESSINÉ (Circle().trim) recalculé à
+//     chaque entrée + un Text(timerInterval:) vivant : rien à rafraîchir.
 //
 
 import WidgetKit
@@ -13,77 +17,94 @@ import SwiftUI
 // Palette de l'app (fond clair, vert profond, touches dorées).
 private let greenDeep = Color(red: 0.10, green: 0.26, blue: 0.20)
 private let gold = Color(red: 0.77, green: 0.63, blue: 0.35)
-private let goldLight = Color(red: 0.97, green: 0.94, blue: 0.88)
 
 struct RecitationEntry: TimelineEntry {
     let date: Date
-    let state: SharedRecitationState?
+    /// Session en cours à `date` (nil hors créneau).
+    let active: RecitationSession?
+    /// Prochaine session après `date`.
+    let next: RecitationSession?
 }
 
 struct RecitationProvider: TimelineProvider {
     func placeholder(in context: Context) -> RecitationEntry {
-        RecitationEntry(date: .now, state: .placeholder)
+        RecitationEntry(date: .now, active: .placeholder, next: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RecitationEntry) -> Void) {
-        completion(RecitationEntry(date: .now, state: SharedRecitationState.load() ?? .placeholder))
+        completion(entry(at: .now, from: SharedRecitationState.load()))
+    }
+
+    private func entry(at date: Date, from state: SharedRecitationState?) -> RecitationEntry {
+        RecitationEntry(
+            date: date,
+            active: state?.session(at: date),
+            next: state?.nextSession(after: date)
+        )
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<RecitationEntry>) -> Void) {
         let state = SharedRecitationState.load()
-        var entries = [RecitationEntry(date: .now, state: state)]
+        let now = Date.now
+        var dates: Set<Date> = [now]
 
-        // Créneau actif : une entrée par minute jusqu'à la fin. Les entrées
-        // d'UNE MÊME timeline sont rendues par le système sans nouvelle
-        // requête — elles ne consomment pas le budget de rechargement. C'est
-        // ce qui permet à l'anneau de temps d'être exact sans scaleEffect ni
-        // ProgressView non maîtrisable.
-        if let state, state.isActive, state.slotEndDate > .now {
-            let step: TimeInterval = 60
-            var t = Date.now.addingTimeInterval(step)
-            var guardCount = 0
-            while t < state.slotEndDate, guardCount < 180 {
-                entries.append(RecitationEntry(date: t, state: state))
-                t = t.addingTimeInterval(step)
-                guardCount += 1
-            }
-            // Fin du créneau : état neutre jusqu'à la prochaine synchro de l'app.
-            entries.append(RecitationEntry(date: state.slotEndDate, state: nil))
+        // Minute par minute pendant les 2 prochaines heures : l'anneau de temps
+        // reste exact. Les entrées d'UNE MÊME timeline sont rendues par le
+        // système sans nouvelle requête — elles ne coûtent aucun rechargement.
+        var t = now
+        for _ in 0..<120 {
+            t = t.addingTimeInterval(60)
+            dates.insert(t)
         }
-        completion(Timeline(entries: entries, policy: .never))
+        // Puis chaque bascule de session (début / fin), pour les jours suivants.
+        if let state {
+            for boundary in state.boundaries where boundary > now {
+                dates.insert(boundary)
+                dates.insert(boundary.addingTimeInterval(1))
+            }
+        }
+
+        let entries = dates.sorted().prefix(400).map { entry(at: $0, from: state) }
+        // Rechargement de sûreté dans 2 h : ramène les pages récitées et
+        // prolonge l'horizon si l'app n'a pas été ouverte entre-temps.
+        completion(Timeline(entries: Array(entries), policy: .after(now.addingTimeInterval(2 * 3600))))
     }
 }
 
-extension SharedRecitationState {
-    static let placeholder = SharedRecitationState(
-        phase: "active", date: "", slotStartMin: 1080, slotEndMin: 1140,
-        slotEndEpoch: Int(Date.now.addingTimeInterval(37 * 60).timeIntervalSince1970),
-        totalPages: 4, recitedPages: 2, firstPage: 3, lastPage: 6,
-        pagesLabel: "Pages 3 à 6", slotLabel: "18 h – 19 h",
-        startVerse: "إِنَّ ٱلَّذِينَ كَفَرُوا۟ …", endVerse: "وَهُوَ بِكُلِّ شَىْءٍ …",
-        nextSlotLabel: "20 h", nextPagesLabel: "Pages 7 à 10", nextDayLabel: "aujourd’hui"
+extension RecitationSession {
+    static let placeholder = RecitationSession(
+        startEpoch: Int(Date.now.addingTimeInterval(-23 * 60).timeIntervalSince1970),
+        endEpoch: Int(Date.now.addingTimeInterval(37 * 60).timeIntervalSince1970),
+        slotLabel: "18 h – 19 h", dayLabel: "", pagesLabel: "Pages 3 à 6",
+        firstPage: 3, lastPage: 6, totalPages: 4, recitedPages: 2,
+        startVerse: "إِنَّ ٱلَّذِينَ كَفَرُوا۟ سَوَآءٌ عَلَيْهِمْ ءَأَنذَرْتَهُمْ أَمْ لَمْ تُنذِرْهُمْ …",
+        endVerse: "هُوَ ٱلَّذِى خَلَقَ لَكُم مَّا فِى ٱلْأَرْضِ جَمِيعًا …"
     )
 }
 
-/// Une ligne de verset arabe : repère de DÉBUT ou de FIN du passage.
-/// Texte Unicode othmanien (les polices QCF de la WebView, par page et en
-/// woff2, ne sont pas utilisables ici) — une seule ligne, tronquée côté JS.
-struct VerseLine: View {
+/// Un repère du passage : étiquette + verset arabe.
+/// Texte Unicode othmanien (les polices QCF de la WebView, une par page et en
+/// woff2, ne sont pas utilisables dans une extension) — tronqué par lineLimit.
+struct VerseBlock: View {
     let label: String
     let text: String
+    let lines: Int
+    let size: CGFloat
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 9, weight: .heavy))
                 .foregroundStyle(gold)
-                .fixedSize()
             Text(text)
-                .font(.system(size: 15))
+                .font(.system(size: size))
                 .foregroundStyle(.white.opacity(0.92))
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
+                .lineLimit(lines)
+                .multilineTextAlignment(.trailing)
+                .minimumScaleFactor(0.7)
                 .environment(\.layoutDirection, .rightToLeft)
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -109,16 +130,16 @@ struct RecitationWidgetView: View {
 
     var body: some View {
         Group {
-            if let state = entry.state, state.isActive {
-                if family == .systemSmall { small(state) }
-                else if family == .systemLarge { large(state) }
-                else { medium(state) }
-            } else if let state = entry.state, state.isDone, state.hasNext {
-                // Objectif atteint : la progression n'apprend plus rien, on
-                // affiche uniquement la prochaine récitation.
-                finished(state)
-            } else if let state = entry.state, state.hasNext {
-                upcoming(state)
+            if let s = entry.active, !s.isComplete {
+                switch family {
+                case .systemSmall: small(s)
+                case .systemLarge: large(s)
+                default: medium(s)
+                }
+            } else if let n = entry.next {
+                // Créneau accompli (ou hors créneau) : la progression n'apprend
+                // plus rien — on annonce la prochaine récitation.
+                upcoming(n, done: entry.active?.isComplete ?? false)
             } else {
                 idle
             }
@@ -127,140 +148,73 @@ struct RecitationWidgetView: View {
         .widgetURL(URL(string: "almuraja3a://recitation/en-cours"))
     }
 
-    // ---- Créneau actif (maquette 2) ----
+    // ---- Créneau en cours ----
 
-    private func medium(_ state: SharedRecitationState) -> some View {
+    private func header(_ s: RecitationSession, size: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: size - 1))
+            Text("Récitation en cours")
+                .font(.system(size: size, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 4)
+            Text(s.slotLabel)
+                .font(.system(size: size - 2, weight: .semibold))
+                .foregroundStyle(gold)
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    private func medium(_ s: RecitationSession) -> some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                // Une seule ligne pour le titre + le créneau, chacun autorisé à
-                // se réduire : l'anneau a désormais une largeur fixe, plus rien
-                // ne déborde par-dessus.
-                HStack(spacing: 6) {
-                    Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 13))
-                    Text("Récitation en cours")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 4)
-                    Text(state.slotLabel)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(gold)
-                        .lineLimit(1)
-                        .fixedSize()
-                }
+                header(s, size: 14)
                 Spacer(minLength: 0)
-                Text("\(state.recitedPages) / \(state.totalPages) pages")
+                Text("\(s.recitedPages) / \(s.totalPages) pages")
                     .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                PageSegments(total: state.totalPages, done: state.recitedPages)
+                Text(s.pagesLabel)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+                PageSegments(total: s.totalPages, done: s.recitedPages)
                     .padding(.top, 2)
-                if !state.startVerse.isEmpty {
-                    VerseLine(label: "DÉBUT", text: state.startVerse)
-                        .padding(.top, 1)
+                if !s.startVerse.isEmpty {
+                    VerseBlock(label: "DÉBUT", text: s.startVerse, lines: 1, size: 14)
                 }
-                Text(state.remainingLabel)
+                Text(s.remainingLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            gauge(state)
+            gauge(s)
         }
         .padding(2)
     }
 
-    /// Grand format : la carte complète — progression, anneau, et les DEUX
-    /// repères du passage (début et fin), un par ligne.
-    private func large(_ state: SharedRecitationState) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 7) {
-                Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 15))
-                Text("Récitation en cours")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                Spacer(minLength: 4)
-                Text(state.slotLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(gold)
-                    .fixedSize()
-            }
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(state.recitedPages) / \(state.totalPages) pages")
-                        .font(.system(size: 32, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(state.pagesLabel)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                gauge(state)
-            }
-            PageSegments(total: state.totalPages, done: state.recitedPages)
-            VStack(alignment: .leading, spacing: 7) {
-                if !state.startVerse.isEmpty { VerseLine(label: "DÉBUT", text: state.startVerse) }
-                if !state.endVerse.isEmpty { VerseLine(label: "FIN", text: state.endVerse) }
-            }
-            .padding(.top, 2)
-            Spacer(minLength: 0)
-            Text(state.remainingLabel)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .lineLimit(1)
-        }
-    }
-
-    /// Objectif du créneau atteint : uniquement la prochaine récitation.
-    private func finished(_ state: SharedRecitationState) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 7) {
-                Image(systemName: "checkmark.seal.fill").foregroundStyle(gold).font(.system(size: 15))
-                Text("Récitation terminée")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            Spacer(minLength: 0)
-            Text("Prochaine \(state.nextLabel)")
-                .font(.system(size: family == .systemSmall ? 19 : 24, weight: .heavy))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
-            if !state.nextPagesLabel.isEmpty {
-                Text(state.nextPagesLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(gold)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func small(_ state: SharedRecitationState) -> some View {
+    private func small(_ s: RecitationSession) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 13))
-                Text(state.slotLabel)
+                Text(s.slotLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(gold)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            Text("\(state.recitedPages) / \(state.totalPages)")
+            Text("\(s.recitedPages) / \(s.totalPages)")
                 .font(.system(size: 28, weight: .heavy))
                 .foregroundStyle(.white)
             Text("pages récitées")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
-            PageSegments(total: state.totalPages, done: state.recitedPages)
-            Text(timerInterval: entry.date...state.slotEndDate, countsDown: true)
+            PageSegments(total: s.totalPages, done: s.recitedPages)
+            Text(timerInterval: entry.date...s.endDate, countsDown: true)
                 .font(.system(size: 13, weight: .bold).monospacedDigit())
                 .foregroundStyle(gold)
                 .lineLimit(1)
@@ -268,24 +222,58 @@ struct RecitationWidgetView: View {
         }
     }
 
-    /// Anneau de temps restant, DESSINÉ (Circle().trim) : entièrement contenu
-    /// dans son cadre, contrairement à un ProgressView circulaire agrandi.
-    /// La fraction est calculée pour l'instant de l'entrée de timeline —
-    /// exacte à la minute — et le décompte central reste vivant à la seconde.
-    private func gauge(_ state: SharedRecitationState) -> some View {
-        let total = max(1, TimeInterval(state.slotEndMin - state.slotStartMin) * 60)
-        let left = max(0, state.slotEndDate.timeIntervalSince(entry.date))
+    /// Grand format : l'espace disponible va aux DEUX repères du passage,
+    /// deux lignes chacun (le reste est tronqué par le système).
+    private func large(_ s: RecitationSession) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            header(s, size: 16)
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(s.recitedPages) / \(s.totalPages) pages")
+                        .font(.system(size: 32, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(s.pagesLabel)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                gauge(s)
+            }
+            PageSegments(total: s.totalPages, done: s.recitedPages)
+            if !s.startVerse.isEmpty {
+                VerseBlock(label: "DÉBUT · PAGE \(s.firstPage)", text: s.startVerse, lines: 2, size: 17)
+            }
+            if !s.endVerse.isEmpty {
+                Divider().overlay(Color.white.opacity(0.15))
+                VerseBlock(label: "FIN · PAGE \(s.lastPage)", text: s.endVerse, lines: 2, size: 17)
+            }
+            Spacer(minLength: 0)
+            Text(s.remainingLabel)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+    }
+
+    /// Anneau de temps restant, DESSINÉ : entièrement contenu dans son cadre.
+    /// La fraction est calculée pour l'instant de l'entrée — exacte à la
+    /// minute — et le décompte central reste vivant à la seconde.
+    private func gauge(_ s: RecitationSession) -> some View {
+        let total = max(1, TimeInterval(s.endEpoch - s.startEpoch))
+        let left = max(0, s.endDate.timeIntervalSince(entry.date))
         let fraction = min(1, max(0, left / total))
 
         return ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.18), lineWidth: 8)
+            Circle().stroke(Color.white.opacity(0.18), lineWidth: 8)
             Circle()
                 .trim(from: 0, to: fraction)
                 .stroke(gold, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
-                Text(timerInterval: entry.date...state.slotEndDate, countsDown: true)
+                Text(timerInterval: entry.date...s.endDate, countsDown: true)
                     .font(.system(size: 16, weight: .heavy).monospacedDigit())
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
@@ -298,32 +286,42 @@ struct RecitationWidgetView: View {
             .padding(.horizontal, 6)
         }
         .frame(width: 84, height: 84)
-        .padding(.leading, 2)
     }
 
-    // ---- Prochaine session / repos ----
+    // ---- Prochaine session (créneau accompli ou hors créneau) ----
 
-    private func upcoming(_ state: SharedRecitationState) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+    private func upcoming(_ n: RecitationSession, done: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 7) {
-                Image(systemName: "book.fill").foregroundStyle(gold).font(.system(size: 14))
-                Text("Prochaine récitation")
+                Image(systemName: done ? "checkmark.seal.fill" : "book.fill")
+                    .foregroundStyle(gold)
+                    .font(.system(size: 14))
+                Text(done ? "Récitation terminée" : "Prochaine récitation")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
-            Text(state.nextLabel)
-                .font(.system(size: family == .systemSmall ? 19 : 24, weight: .heavy))
-                .foregroundStyle(gold)
+            Text("Prochaine \(n.whenLabel)")
+                .font(.system(size: family == .systemSmall ? 18 : 23, weight: .heavy))
+                .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.6)
-            if !state.nextPagesLabel.isEmpty {
-                Text(state.nextPagesLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
+            Text(n.pagesLabel)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(gold)
+                .lineLimit(1)
+            if family == .systemLarge {
+                if !n.startVerse.isEmpty {
+                    VerseBlock(label: "DÉBUT · PAGE \(n.firstPage)", text: n.startVerse, lines: 2, size: 17)
+                        .padding(.top, 4)
+                }
+                if !n.endVerse.isEmpty {
+                    Divider().overlay(Color.white.opacity(0.15))
+                    VerseBlock(label: "FIN · PAGE \(n.lastPage)", text: n.endVerse, lines: 2, size: 17)
+                }
+                Spacer(minLength: 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -335,7 +333,7 @@ struct RecitationWidgetView: View {
             Text("Al Muraja3a")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.white)
-            Text("Aucune session en cours")
+            Text("Aucune session prévue")
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.7))
         }
@@ -351,7 +349,7 @@ struct RecitationWidget: Widget {
             RecitationWidgetView(entry: entry)
         }
         .configurationDisplayName("Récitation")
-        .description("Suivez votre créneau de récitation : pages récitées et temps restant.")
+        .description("Suivez votre créneau de récitation : pages, passage et temps restant.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

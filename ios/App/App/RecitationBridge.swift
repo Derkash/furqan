@@ -36,19 +36,20 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
 
     // ---------- Activité en direct ----------
 
-    private func decodeState(_ call: CAPPluginCall) -> SharedRecitationState? {
+    /// L'activité en direct reçoit la session EN COURS (et non tout l'état).
+    private func decodeSession(_ call: CAPPluginCall) -> RecitationSession? {
         guard
             let raw = call.getString("state"),
             let data = raw.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder().decode(SharedRecitationState.self, from: data)
+        return try? JSONDecoder().decode(RecitationSession.self, from: data)
     }
 
     @objc func startLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) {
             guard ActivityAuthorizationInfo().areActivitiesEnabled,
-                  let state = decodeState(call) else {
+                  let state = decodeSession(call) else {
                 call.resolve()
                 return
             }
@@ -57,7 +58,7 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
                 let attributes = RecitationActivityAttributes(slotLabel: state.slotLabel)
                 let content = ActivityContent(
                     state: contentState(from: state),
-                    staleDate: state.slotEndDate
+                    staleDate: state.endDate
                 )
                 _ = try? Activity.request(attributes: attributes, content: content)
             } else {
@@ -70,7 +71,7 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
 
     @objc func updateLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.2, *), let state = decodeState(call) {
+        if #available(iOS 16.2, *), let state = decodeSession(call) {
             update(with: state)
         }
         #endif
@@ -92,19 +93,19 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
 
     #if canImport(ActivityKit)
     @available(iOS 16.2, *)
-    private func contentState(from state: SharedRecitationState) -> RecitationActivityAttributes.ContentState {
+    private func contentState(from state: RecitationSession) -> RecitationActivityAttributes.ContentState {
         RecitationActivityAttributes.ContentState(
             recitedPages: state.recitedPages,
             totalPages: state.totalPages,
             pagesLabel: state.pagesLabel,
-            slotEndEpoch: state.slotEndEpoch,
+            slotEndEpoch: state.endEpoch,
             startVerse: state.startVerse
         )
     }
 
     @available(iOS 16.2, *)
-    private func update(with state: SharedRecitationState) {
-        let content = ActivityContent(state: contentState(from: state), staleDate: state.slotEndDate)
+    private func update(with state: RecitationSession) {
+        let content = ActivityContent(state: contentState(from: state), staleDate: state.endDate)
         Task {
             for activity in Activity<RecitationActivityAttributes>.activities {
                 await activity.update(content)

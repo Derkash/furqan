@@ -16,7 +16,7 @@ import {
   type TodayContext,
 } from '@/lib/recitation/dayEngine';
 import { appendEvaluation } from '@/lib/recitation/store';
-import { scheduleRecitationNotifications } from '@/lib/recitation/notifications';
+import { cancelSlotFollowUps, scheduleRecitationNotifications } from '@/lib/recitation/notifications';
 import { syncNative } from '@/lib/recitation/widgetSync';
 import type { DayState, MasteryLevel } from '@/lib/recitation/types';
 
@@ -54,7 +54,7 @@ export function useRecitation(): RecitationApi {
     // (Re)planifie les notifications une fois par montage.
     if (next && !notifiedRef.current) {
       notifiedRef.current = true;
-      scheduleRecitationNotifications(next.program, next.cycle, current).catch(() => {});
+      scheduleRecitationNotifications(next.program, next.cycle, current, next.dayState).catch(() => {});
     }
   }, []);
 
@@ -80,6 +80,14 @@ export function useRecitation(): RecitationApi {
         const nextState = fn(prev.dayState);
         const next = { ...prev, dayState: nextState };
         syncNative(next, new Date());
+        // Séance accomplie → on retire ses relances : ne jamais annoncer une
+        // « séance non terminée » à quelqu'un qui vient de tout réciter.
+        const recited = new Set(nextState.recitedPages);
+        nextState.slots.forEach((slot, i) => {
+          if (slot.pages.length && slot.pages.every((p) => recited.has(p))) {
+            cancelSlotFollowUps(i).catch(() => {});
+          }
+        });
         return next;
       });
     },

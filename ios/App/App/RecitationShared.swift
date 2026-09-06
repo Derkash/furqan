@@ -2,10 +2,11 @@
 //  RecitationShared.swift
 //  Partagé entre l'app et l'extension RecitationWidget (double appartenance).
 //
-//  État écrit par la WebView (plugin RecitationBridge) dans l'App Group, lu
-//  par le widget et l'activité en direct. Le compte à rebours n'est PAS stocké
-//  en minutes restantes : on stocke l'époque de fin (slotEndEpoch) et les vues
-//  utilisent Text(timerInterval:) — aucun rafraîchissement périodique.
+//  L'app écrit dans l'App Group la LISTE des prochaines sessions (aujourd'hui
+//  + les jours suivants du cycle), chacune bornée par des époques. Le widget
+//  choisit ensuite lui-même la session correspondant à l'instant de rendu :
+//  il change donc de créneau, de pages et de versets SANS que l'application
+//  soit ouverte. Le décompte, lui, est rendu par Text(timerInterval:).
 //
 
 import Foundation
@@ -18,29 +19,43 @@ public let recitationAppGroupId = "group.com.almuraja3a.app"
 /// Clé UserDefaults (suite App Group) contenant le JSON d'état.
 public let recitationStateKey = "recitationWidgetState"
 
-/// Miroir Swift de l'état construit côté TypeScript (widgetSync.ts).
-public struct SharedRecitationState: Codable {
-    /// "active" (créneau en cours, pages restantes) | "done" (objectif atteint
-    /// → on montre la prochaine session) | "upcoming" | "idle"
-    public var phase: String
-    public var date: String
-    public var slotStartMin: Int
-    public var slotEndMin: Int
-    public var slotEndEpoch: Int    // secondes epoch — fin du créneau
-    public var totalPages: Int
-    public var recitedPages: Int
+/// Une occurrence de créneau, autonome pour l'affichage.
+public struct RecitationSession: Codable, Hashable {
+    public var startEpoch: Int
+    public var endEpoch: Int
+    public var slotLabel: String    // « 11 h – 12 h »
+    public var dayLabel: String     // vide si aujourd'hui
+    public var pagesLabel: String   // « Pages 4 à 5 »
     public var firstPage: Int
     public var lastPage: Int
-    public var pagesLabel: String   // « Pages 3 à 6 »
-    public var slotLabel: String    // « 18 h – 19 h »
-    /// Début du premier / dernier verset à réciter (Unicode othmanien,
-    /// tronqué côté JS). Vide tant que le texte n'est pas chargé.
-    public var startVerse: String
-    public var endVerse: String
-    // Prochaine session (phases "done" et "upcoming")
-    public var nextSlotLabel: String
-    public var nextPagesLabel: String
-    public var nextDayLabel: String
+    public var totalPages: Int
+    public var recitedPages: Int
+    public var startVerse: String   // début du premier verset (othmanien)
+    public var endVerse: String     // début du dernier verset
+
+    public var startDate: Date { Date(timeIntervalSince1970: TimeInterval(startEpoch)) }
+    public var endDate: Date { Date(timeIntervalSince1970: TimeInterval(endEpoch)) }
+    public var remainingPages: Int { max(0, totalPages - recitedPages) }
+    public var isComplete: Bool { totalPages > 0 && recitedPages >= totalPages }
+
+    /// « à 11 h » / « mardi 8 septembre, à 8 h » — début de la session.
+    public var whenLabel: String {
+        let hour = slotLabel.components(separatedBy: " – ").first ?? slotLabel
+        return dayLabel.isEmpty ? "à \(hour)" : "\(dayLabel), à \(hour)"
+    }
+
+    /// « Encore 2 pages avant 12 h ».
+    public var remainingLabel: String {
+        let end = slotLabel.components(separatedBy: " – ").last ?? ""
+        if remainingPages == 0 { return "Objectif atteint — qu’Allah accepte" }
+        return "Encore \(remainingPages) page\(remainingPages > 1 ? "s" : "") avant \(end)"
+    }
+}
+
+/// État partagé complet : toutes les sessions à venir.
+public struct SharedRecitationState: Codable {
+    public var generatedAt: Int
+    public var sessions: [RecitationSession]
 
     public static func load() -> SharedRecitationState? {
         guard
@@ -51,24 +66,21 @@ public struct SharedRecitationState: Codable {
         return try? JSONDecoder().decode(SharedRecitationState.self, from: data)
     }
 
-    public var isActive: Bool { phase == "active" && totalPages > 0 }
-    public var isDone: Bool { phase == "done" }
-    public var hasNext: Bool { !nextSlotLabel.isEmpty }
-    /// « à 11 h » ou « mardi 8 septembre, à 8 h »
-    public var nextLabel: String {
-        if nextSlotLabel.isEmpty { return "" }
-        if nextDayLabel.isEmpty || nextDayLabel == "aujourd’hui" { return "à \(nextSlotLabel)" }
-        return "\(nextDayLabel), à \(nextSlotLabel)"
+    /// Session en cours à cet instant.
+    public func session(at date: Date) -> RecitationSession? {
+        let t = Int(date.timeIntervalSince1970)
+        return sessions.first { t >= $0.startEpoch && t < $0.endEpoch }
     }
-    public var remainingPages: Int { max(0, totalPages - recitedPages) }
-    public var slotEndDate: Date { Date(timeIntervalSince1970: TimeInterval(slotEndEpoch)) }
-    /// « Encore 2 pages avant 19 h » (fin du créneau en heure locale).
-    public var remainingLabel: String {
-        let h = slotEndMin / 60
-        let m = slotEndMin % 60
-        let hour = m == 0 ? "\(h) h" : String(format: "%d h %02d", h, m)
-        if remainingPages == 0 { return "Objectif atteint — qu’Allah accepte" }
-        return "Encore \(remainingPages) page\(remainingPages > 1 ? "s" : "") avant \(hour)"
+
+    /// Première session à venir strictement après cet instant.
+    public func nextSession(after date: Date) -> RecitationSession? {
+        let t = Int(date.timeIntervalSince1970)
+        return sessions.first { $0.startEpoch > t }
+    }
+
+    /// Instants où l'affichage doit basculer (débuts et fins de session).
+    public var boundaries: [Date] {
+        sessions.flatMap { [$0.startDate, $0.endDate] }.sorted()
     }
 }
 
@@ -81,7 +93,7 @@ public struct RecitationActivityAttributes: ActivityAttributes {
         public var totalPages: Int
         public var pagesLabel: String
         public var slotEndEpoch: Int
-        /// Début du prochain verset à réciter (Unicode othmanien, tronqué).
+        /// Début du premier verset à réciter (Unicode othmanien, tronqué).
         public var startVerse: String
         public init(recitedPages: Int, totalPages: Int, pagesLabel: String, slotEndEpoch: Int, startVerse: String) {
             self.recitedPages = recitedPages
