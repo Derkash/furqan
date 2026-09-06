@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initAudioStore, isNativeApp } from '@/utils/audioStore';
+import { refreshRecitationNative } from '@/lib/recitation/appSync';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
 import { applyOrientationPref } from '@/utils/orientation';
@@ -18,6 +19,7 @@ export default function AppInit() {
   const router = useRouter();
 
   useEffect(() => {
+    const cleanups: (() => void)[] = [];
     if (isNativeApp()) {
       document.documentElement.classList.add('capacitor');
       // Orientation choisie par l'utilisateur (Auto par défaut) : rien n'est
@@ -42,6 +44,16 @@ export default function AppInit() {
         const route = (event.notification.extra as { route?: string } | undefined)?.route;
         if (route) router.push(route);
       });
+
+      // Récitation : alimenter le widget, l'activité en direct et les
+      // notifications DÈS le lancement — quel que soit l'écran affiché — puis
+      // à chaque retour au premier plan et toutes les 5 minutes.
+      refreshRecitationNative();
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) refreshRecitationNative();
+      });
+      const recitationTimer = window.setInterval(() => refreshRecitationNative(), 5 * 60 * 1000);
+      cleanups.push(() => window.clearInterval(recitationTimer));
     }
     // Nettoyage : le lexique s'était importé sans compte (« guest ») avant que
     // le vocabulaire ne soit réservé aux comptes connectés. On purge cette
@@ -59,6 +71,10 @@ export default function AppInit() {
     // devoir se reconnecter. No-op si Supabase absent.
     const user = getCurrentUser();
     if (user) hydrateVocab(user).catch(() => {});
+
+    return () => {
+      cleanups.forEach((fn) => fn());
+    };
   }, [router]);
 
   return null;

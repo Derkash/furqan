@@ -21,6 +21,7 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "diagnostics", returnType: CAPPluginReturnPromise),
     ]
 
     // ---------- Widget (App Group + reload) ----------
@@ -45,12 +46,17 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
         return try? JSONDecoder().decode(RecitationSession.self, from: data)
     }
 
+    /// Les échecs sont REMONTÉS (et non avalés) : sans cela, une activité qui
+    /// ne démarre pas est indiscernable d'une activité désactivée.
     @objc func startLiveActivity(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) {
-            guard ActivityAuthorizationInfo().areActivitiesEnabled,
-                  let state = decodeSession(call) else {
-                call.resolve()
+            guard let state = decodeSession(call) else {
+                call.reject("payload de session illisible")
+                return
+            }
+            guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+                call.reject("activités en direct désactivées pour cette app")
                 return
             }
             // Une seule activité de récitation à la fois.
@@ -60,13 +66,23 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
                     state: contentState(from: state),
                     staleDate: state.endDate
                 )
-                _ = try? Activity.request(attributes: attributes, content: content)
+                do {
+                    _ = try Activity.request(attributes: attributes, content: content)
+                } catch {
+                    call.reject("démarrage refusé : \(error.localizedDescription)")
+                    return
+                }
             } else {
                 update(with: state)
             }
+            call.resolve()
+            return
         }
+        call.reject("iOS 16.2 requis pour les activités en direct")
+        return
+        #else
+        call.reject("ActivityKit indisponible")
         #endif
-        call.resolve()
     }
 
     @objc func updateLiveActivity(_ call: CAPPluginCall) {
@@ -76,6 +92,35 @@ public class RecitationBridge: CAPPlugin, CAPBridgedPlugin {
         }
         #endif
         call.resolve()
+    }
+
+    /// État réel du pont : ce que le widget peut lire, ce qu'iOS autorise.
+    @objc func diagnostics(_ call: CAPPluginCall) {
+        var info: [String: Any] = [:]
+        let defaults = UserDefaults(suiteName: recitationAppGroupId)
+        info["appGroupReachable"] = defaults != nil
+        let raw = defaults?.string(forKey: recitationStateKey)
+        info["stateBytes"] = raw?.count ?? 0
+        if let raw, let data = raw.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(SharedRecitationState.self, from: data) {
+            info["sessionCount"] = decoded.sessions.count
+            info["generatedAt"] = decoded.generatedAt
+            if let s = decoded.session(at: Date()) {
+                info["activeSlot"] = s.slotLabel
+                info["activePages"] = s.pagesLabel
+            }
+            if let n = decoded.nextSession(after: Date()) {
+                info["nextSlot"] = n.slotLabel
+                info["nextDay"] = n.dayLabel
+            }
+        }
+        #if canImport(ActivityKit)
+        if #available(iOS 16.2, *) {
+            info["activitiesEnabled"] = ActivityAuthorizationInfo().areActivitiesEnabled
+            info["runningActivities"] = Activity<RecitationActivityAttributes>.activities.count
+        }
+        #endif
+        call.resolve(info)
     }
 
     @objc func endLiveActivity(_ call: CAPPluginCall) {

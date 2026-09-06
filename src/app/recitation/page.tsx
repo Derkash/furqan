@@ -184,6 +184,7 @@ export default function RecitationPage() {
             { href: '/recitation/maitrise', label: 'Maîtrise', hint: 'Niveau page par page, sourate, juz’' },
             { href: '/recitation/bilan', label: 'Bilan du cycle', hint: 'Avancement et proposition de rythme' },
             { href: '/recitation/historique', label: 'Historique', hint: 'Sessions et statistiques' },
+            { href: '/recitation/diagnostic', label: 'Diagnostic', hint: 'Widget, activité en direct, notifications' },
           ].map((l) => (
             <Link key={l.href} href={l.href} className="flex items-center justify-between rounded-2xl border border-[var(--ds-divider)] px-4 py-3 hover:border-[var(--ds-gold)] transition-colors">
               <span>
