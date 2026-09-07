@@ -261,7 +261,7 @@ console.log('Placement de la séance hors des créneaux de révision');
   const config: LearningConfig = { surah: 5, currentPage: 108, placement: 'end', dailyCap: null };
   const slotEnd = learningSlot(config, config2Schedule, 3)!;
   check('fin de journée : commence à 20 h', slotEnd.startMin, 1200);
-  check('durée = 3 pages × 5 min', slotEnd.endMin - slotEnd.startMin, 15);
+  check('… et court jusqu’à minuit (la sourate se doit jusqu’à 00 h)', slotEnd.endMin, 1439);
   const slotStart = learningSlot({ ...config, placement: 'start' }, config2Schedule, 4)!;
   check('début de journée : finit à 8 h', slotStart.endMin, 480);
   check('commence 20 min avant', slotStart.startMin, 460);

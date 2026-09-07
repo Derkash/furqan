@@ -57,12 +57,16 @@ export function learningDayIndex(programCreatedAt: string, todayKey: string): nu
   return Math.max(0, daysBetween(programCreatedAt.slice(0, 10), todayKey));
 }
 
+/** Minuit (23 h 59) : borne de fin de la séance de sourate. */
+const MIDNIGHT = 24 * 60 - 1;
+
 /**
  * Créneau de la séance, placé hors des créneaux de révision.
- * - 'end'   : juste après la fin de la plage de récitation (défaut) ;
- * - 'start' : juste avant son début ;
- * - 'custom': à l'heure choisie.
- * La durée est estimée d'après le nombre de pages, avec un plancher.
+ * - 'end'   : de la FIN de la plage de révision jusqu'à MINUIT (défaut) —
+ *             la sourate du jour se doit jusqu'à 00 h, ni plus ni moins :
+ *             demain, c'est la séance de demain qui la redemandera ;
+ * - 'custom': de l'heure choisie jusqu'à minuit, même logique ;
+ * - 'start' : avant la plage de révision (durée estimée par le volume).
  */
 export function learningSlot(
   config: LearningConfig,
@@ -70,20 +74,19 @@ export function learningSlot(
   pageCount: number
 ): Slot | null {
   if (pageCount <= 0) return null;
-  const duration = Math.max(MIN_DURATION, pageCount * LEARNING_MIN_PER_PAGE);
   const { startMin, endMin } = schedule.hours;
 
   if (config.placement === 'custom' && config.customStartMin != null) {
-    const start = Math.max(0, Math.min(config.customStartMin, 24 * 60 - MIN_DURATION));
-    return { startMin: start, endMin: Math.min(24 * 60 - 1, start + duration) };
+    const start = Math.max(0, Math.min(config.customStartMin, MIDNIGHT - MIN_DURATION));
+    return { startMin: start, endMin: MIDNIGHT };
   }
   if (config.placement === 'start') {
+    const duration = Math.max(MIN_DURATION, pageCount * LEARNING_MIN_PER_PAGE);
     const end = Math.max(MIN_DURATION, startMin);
     return { startMin: Math.max(0, end - duration), endMin: end };
   }
-  // 'end' — la séance commence quand la plage de révision se termine.
-  const start = Math.min(endMin, 24 * 60 - MIN_DURATION - 1);
-  return { startMin: start, endMin: Math.min(24 * 60 - 1, start + duration) };
+  // 'end' — de la fin de la révision jusqu'à minuit.
+  return { startMin: Math.min(endMin, MIDNIGHT - MIN_DURATION), endMin: MIDNIGHT };
 }
 
 /** Séance complète du jour (créneau + pages), ou null si rien à réciter. */

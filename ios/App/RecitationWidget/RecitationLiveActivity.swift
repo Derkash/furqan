@@ -54,7 +54,9 @@ struct RecitationLiveActivity: Widget {
                 Text(timerInterval: Date.now...s.refDate, countsDown: true)
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
                     .foregroundStyle(s.isOverdue ? rust : gold)
-                    .frame(maxWidth: 52)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(maxWidth: 56)
                     .multilineTextAlignment(.trailing)
                     .privacySensitive(false)
             } minimal: {
@@ -121,11 +123,14 @@ private struct Countdown: View {
     let state: RecitationActivityAttributes.ContentState
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
+            // UNE seule ligne, quoi qu'il arrive : « 1:44:37 » se réduit
+            // plutôt que de casser (les heures faisaient déborder le cadre).
             Text(timerInterval: Date.now...state.refDate, countsDown: true)
-                .font(.system(size: 26, weight: .heavy).monospacedDigit())
+                .font(.system(size: 24, weight: .heavy).monospacedDigit())
                 .foregroundStyle(state.isOverdue ? rust : gold)
-                .frame(maxWidth: 86)
-                .multilineTextAlignment(.trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .frame(maxWidth: 112, alignment: .trailing)
             Text(state.isActive ? "restantes" : state.isOverdue ? "avant la suite" : "avant le début")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))

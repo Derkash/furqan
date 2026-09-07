@@ -267,10 +267,12 @@ struct RecitationWidgetView: View {
         }
     }
 
-    /// « Encore 2 pages avant 12 h » + le retard éventuel des créneaux passés.
+    /// « Encore 2 pages avant 12 h » + le retard éventuel des créneaux passés
+    /// — affiché quelle que soit la séance : la révision en retard reste due
+    /// même pendant la sourate en cours.
     private func remainingLine(_ s: RecitationSession) -> String {
-        entry.overdue > 0 && s.kind == "cycle"
-            ? "\(s.remainingLabel) · +\(entry.overdue) en retard"
+        entry.overdue > 0
+            ? "\(s.remainingLabel) · +\(entry.overdue) révision en retard"
             : s.remainingLabel
     }
 

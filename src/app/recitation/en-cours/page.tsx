@@ -69,12 +69,40 @@ export default function EnCoursPage() {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const active = dayState ? currentSlot(dayState.slots, nowMin) : null;
   const upcoming = dayState ? nextSlot(dayState.slots, nowMin) : null;
-  const slot = useMemo(() => {
+
+  // PRIORITÉ AU PROGRAMME DU JOUR : tant qu'il reste du dû de révision, la
+  // séance de sourate ne prend PAS l'écran — même si son créneau (20 h →
+  // minuit) est commencé. Sinon, à 20 h, on ne pouvait plus rattraper le
+  // retard du cycle. Bascule manuelle possible (viewKind).
+  const [viewKind, setViewKind] = useState<'cycle' | 'learning' | null>(null);
+  const cycleDueAll =
+    ctx && dayState ? duePages(ctx.program, dayState, nowMin, 'cycle').all : [];
+  const temporalSlot = useMemo(() => {
     if (!dayState) return null;
     const ref = active ?? upcoming;
     if (!ref) return dayState.slots[dayState.slots.length - 1] ?? null;
     return dayState.slots.find((s) => s.startMin === ref.startMin) ?? null;
   }, [dayState, active, upcoming]);
+  const wantKind: 'cycle' | 'learning' =
+    viewKind ?? (cycleDueAll.length > 0 ? 'cycle' : (temporalSlot?.kind === 'learning' ? 'learning' : 'cycle'));
+  const slot = useMemo(() => {
+    if (!dayState) return null;
+    if (temporalSlot && (temporalSlot.kind ?? 'cycle') === wantKind) return temporalSlot;
+    const same = dayState.slots.filter((s) => (s.kind ?? 'cycle') === wantKind);
+    // Créneau ouvert de cette nature, sinon le dernier (repères horaires).
+    return same.find((s) => nowMin < s.endMin) ?? same[same.length - 1] ?? temporalSlot;
+  }, [dayState, temporalSlot, wantKind, nowMin]);
+  // La séance de sourate attend-elle derrière le programme du jour ?
+  const learningWaiting =
+    wantKind === 'cycle' &&
+    cycleDueAll.length > 0 &&
+    (dayState?.slots.some(
+      (s) =>
+        s.kind === 'learning' &&
+        s.startMin <= nowMin &&
+        s.pages.some((p) => !(dayState.learningRecited ?? []).includes(p))
+    ) ??
+      false);
 
   // La séance de la sourate en cours a son PROPRE suivi : réciter une page en
   // révision ne la valide pas ici, et inversement.
@@ -138,16 +166,46 @@ export default function EnCoursPage() {
           </h1>
           <p className="text-[var(--ds-n600)] mt-0.5">
             {isLearning && 'Consolidation quotidienne · '}
-            {active
+            {nowMin >= slot.startMin && nowMin < slot.endMin
               ? `${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`
-              : upcoming
-                ? `Prochaine séance : ${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`
-                : `Dernière séance de la journée (${formatTime(slot.startMin)} – ${formatTime(slot.endMin)})`}
+              : nowMin >= slot.endMin
+                ? 'Rattrapage — toujours à réciter aujourd’hui'
+                : `Prochaine séance : ${formatTime(slot.startMin)} – ${formatTime(slot.endMin)}`}
           </p>
         </div>
       </header>
 
       <div className="max-w-[720px]">
+        {/* La sourate patiente tant que le programme du jour n'est pas plié */}
+        {learningWaiting && (
+          <div className="rounded-[18px] bg-[var(--ds-gold-100)] border border-[var(--ds-gold)] px-4 py-3 mb-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] font-bold text-[var(--ds-gold-700)]">
+              La sourate en cours attend la fin de votre programme du jour.
+            </p>
+            <button
+              type="button"
+              onClick={() => setViewKind('learning')}
+              className="ds-btn-ghost px-3.5 py-1.5 text-[12px] flex-none"
+            >
+              Y passer
+            </button>
+          </div>
+        )}
+        {viewKind === 'learning' && cycleDueAll.length > 0 && (
+          <div className="rounded-[18px] bg-[#fbf3ec] border border-[#e7c9b2] px-4 py-3 mb-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] font-bold text-[#b3542e]">
+              {cycleDueAll.length} page{cycleDueAll.length > 1 ? 's' : ''} du programme du jour vous attendent.
+            </p>
+            <button
+              type="button"
+              onClick={() => setViewKind(null)}
+              className="ds-btn-ghost px-3.5 py-1.5 text-[12px] flex-none"
+            >
+              Y revenir
+            </button>
+          </div>
+        )}
+
         {/* Carte verte de synthèse (maquette 1) */}
         <section
           className="rounded-[24px] p-6 text-white mb-4"
@@ -158,7 +216,7 @@ export default function EnCoursPage() {
               {dueCount} PAGE{dueCount > 1 ? 'S' : ''} À RÉCITER
               {due.overdue.length > 0 && ` · DONT ${due.overdue.length} EN RETARD`}
             </p>
-            {active && (
+            {slot && nowMin >= slot.startMin && nowMin < slot.endMin && (
               <p className="text-sm text-white/90 flex items-center gap-1.5">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <circle cx="12" cy="12" r="9" />

@@ -189,15 +189,22 @@ export function buildLiveContent(state: WidgetState, now: Date): LiveContent | n
     : 0;
 
   if (active && active.recitedPages < active.totalPages) {
+    const remaining = active.totalPages - active.recitedPages;
+    // Séance de sourate active AVEC du retard de révision : les deux dus
+    // s'affichent — le programme du jour reste prioritaire et visible.
+    const label =
+      active.kind === 'learning' && overdue > 0
+        ? `${overdue} de révision + ${remaining} de sourate`
+        : active.pagesLabel;
     return {
       phase: 'active',
-      dueCount: active.totalPages - active.recitedPages + (active.kind === 'cycle' ? overdue : 0),
+      dueCount: remaining + overdue,
       recitedPages: active.recitedPages,
       totalPages: active.totalPages,
-      pagesLabel: active.pagesLabel,
+      pagesLabel: label,
       refEpoch: active.endEpoch,
       slotLabel: active.slotLabel,
-      startVerse: active.startVerse,
+      startVerse: active.kind === 'learning' && overdue > 0 ? '' : active.startVerse,
     };
   }
   if (overdue > 0) {
