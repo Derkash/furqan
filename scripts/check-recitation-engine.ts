@@ -16,6 +16,7 @@ import {
   nextSlot,
   parseTime,
   slotsForWeekday,
+  startDateForIndex,
 } from '../src/lib/recitation/schedule';
 import {
   currentLevel,
@@ -401,6 +402,21 @@ console.log('Ré-étalement en cours de journée : les créneaux passés sont d�
   check('le créneau passé ne garde que sa page récitée (journal)', rebalanced.slots[0].pages, [3]);
   check('la séance de sourate est intouchée', rebalanced.slots[3].pages, [106]);
   check('plus aucun retard fantôme à 13 h', duePages(mkProgram('auto'), rebalanced, 13 * 60, 'cycle').overdue, []);
+}
+
+// ---------------------------------------------------------------------------
+console.log('Modifier sans repartir à zéro : recalage de la date de départ');
+{
+  // Actifs lun-ven. Aujourd'hui = mercredi 9 sept 2026, jour 3 (index 2).
+  const dates0 = startDateForIndex(config, '2026-09-09', 2);
+  check('jour 3 un mercredi → départ recalé au lundi', dates0, '2026-09-07');
+  // Vérification croisée : les dates recalculées redonnent bien mercredi en 3e.
+  check('cohérence : dayDates[2] retombe sur aujourd’hui',
+    cycleDayDates(config, dates0, 3)[2], '2026-09-09');
+  // Index 0 (jour 1) : rien à reculer.
+  check('jour 1 → départ = aujourd’hui', startDateForIndex(config, '2026-09-09', 0), '2026-09-09');
+  // Week-end inactif au milieu : jour 3 un lundi → recul jusqu'au jeudi.
+  check('recul par-dessus le week-end', startDateForIndex(config, '2026-09-07', 2), '2026-09-03');
 }
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { SetupFrame } from '@/components/recitation/SetupSteps';
-import { finalizeProgram, loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
+import {
+  cyclePosition,
+  finalizeProgram,
+  loadDraft,
+  saveDraft,
+  type FinalizeMode,
+  type ProgramDraft,
+} from '@/lib/recitation/draft';
 import { pagesLabel } from '@/lib/recitation/labels';
 import { perimeterPages } from '@/lib/recitation/perimeter';
 import {
@@ -26,6 +33,9 @@ export default function RepartitionPage() {
   const router = useRouter();
   const [draft, setDraft] = useState<ProgramDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  // Cycle déjà en cours : proposer de POURSUIVRE plutôt que repartir au jour 1.
+  const [position] = useState(() => cyclePosition(new Date()));
+  const [finalizeMode, setFinalizeMode] = useState<FinalizeMode>('continue');
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => setDraft(loadDraft()), []);
@@ -79,7 +89,7 @@ export default function RepartitionPage() {
 
   const save = () => {
     setSaving(true);
-    const result = finalizeProgram(draft, new Date());
+    const result = finalizeProgram(draft, new Date(), position ? finalizeMode : 'restart');
     if (result) {
       scheduleRecitationNotifications(result.program, result.cycle, new Date()).catch(() => {});
       router.push('/recitation');
@@ -92,6 +102,7 @@ export default function RepartitionPage() {
     <AppShell>
       <SetupFrame
         step={3}
+        freeNav={draft.selections.length > 0 && !!draft.objective}
         title="Répartition de la journée"
         subtitle={`Objectif du premier jour : ${firstDay.length} pages (${pagesLabel(firstDay)}).`}
         canContinue={slots.length > 0 && !customShort && !saving}
@@ -183,6 +194,51 @@ export default function RepartitionPage() {
                 .
               </li>
             </ul>
+          </section>
+        )}
+
+        {/* Cycle en cours : poursuivre ou repartir du début */}
+        {position && position.totalDays > 1 && (
+          <section className="ds-card p-4 md:p-5 mt-4">
+            <p className="text-sm font-extrabold mb-2">
+              Vous êtes au jour {position.dayNumber} sur {position.totalDays}
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="flex items-start gap-2.5 cursor-pointer py-0.5">
+                <input
+                  type="radio"
+                  name="finalize-mode"
+                  checked={finalizeMode === 'continue'}
+                  onChange={() => setFinalizeMode('continue')}
+                  className="accent-[var(--ds-gold)] mt-1"
+                />
+                <span>
+                  <span className="text-sm font-semibold block">
+                    Poursuivre là où j’en suis
+                  </span>
+                  <span className="text-[12px] text-[var(--ds-n600)]">
+                    Mêmes pages et même objectif : votre position est conservée telle quelle.
+                    Périmètre ou rythme modifiés : le cycle continue dès aujourd’hui sur les
+                    pages restantes — jamais sur ce qui est déjà récité.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer py-0.5">
+                <input
+                  type="radio"
+                  name="finalize-mode"
+                  checked={finalizeMode === 'restart'}
+                  onChange={() => setFinalizeMode('restart')}
+                  className="accent-[var(--ds-gold)] mt-1"
+                />
+                <span>
+                  <span className="text-sm font-semibold block">Recommencer un cycle complet</span>
+                  <span className="text-[12px] text-[var(--ds-n600)]">
+                    Nouveau départ au jour 1, tout le périmètre.
+                  </span>
+                </span>
+              </label>
+            </div>
           </section>
         )}
 

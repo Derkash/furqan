@@ -101,6 +101,7 @@ export default function PerimetrePage() {
     <AppShell>
       <SetupFrame
         step={0}
+        freeNav={draft.selections.length > 0 && !!draft.objective}
         title="Ce que je connais"
         subtitle="Déclarez ce que vous avez mémorisé — combinez librement sourates, juz’ et pages."
         canContinue={pages.length > 0}

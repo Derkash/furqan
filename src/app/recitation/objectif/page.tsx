@@ -99,6 +99,7 @@ export default function ObjectifPage() {
     <AppShell>
       <SetupFrame
         step={1}
+        freeNav={draft.selections.length > 0 && !!draft.objective}
         title="Mon objectif"
         subtitle={`${pages.length} pages mémorisées — choisissez votre rythme de récitation.`}
         canContinue={!!objective && cycleDays.length > 0}

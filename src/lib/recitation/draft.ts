@@ -7,8 +7,16 @@
 import { archiveToday } from './dayEngine';
 import { buildCycleDays } from './planner';
 import { perimeterPages } from './perimeter';
-import { toDateKey } from './schedule';
-import { clearDayState, loadCycle, loadProgram, saveCycle, saveProgram } from './store';
+import { cycleDayDates, startDateForIndex, toDateKey } from './schedule';
+import {
+  clearDayState,
+  loadCycle,
+  loadDayState,
+  loadProgram,
+  loadSessions,
+  saveCycle,
+  saveProgram,
+} from './store';
 import type { Cycle, MemorizedSelection, Objective, Program, ScheduleConfig } from './types';
 
 export interface ProgramDraft {
@@ -85,16 +93,44 @@ export function clearDraft(): void {
   } catch {}
 }
 
+/** Position courante dans le cycle (pour l'UI de modification). */
+export function cyclePosition(now: Date): { dayNumber: number; totalDays: number } | null {
+  const program = loadProgram();
+  const cycle = loadCycle();
+  if (!program || !cycle || !cycle.days.length) return null;
+  const dates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  const todayKey = toDateKey(now);
+  let idx = dates.indexOf(todayKey);
+  if (idx === -1) idx = Math.min(dates.filter((d) => d < todayKey).length, cycle.days.length - 1);
+  return { dayNumber: idx + 1, totalDays: cycle.days.length };
+}
+
+/** Mode d'enregistrement quand un cycle est déjà en cours. */
+export type FinalizeMode = 'restart' | 'continue';
+
 /**
  * Valide le brouillon → Program + Cycle enregistrés. Le périmètre peut évoluer
  * sans perdre l'historique : seuls program/cycle/dayState sont remplacés.
- * Renvoie null si le brouillon est incomplet.
+ *
+ * mode 'continue' (modification en cours de cycle) :
+ *  - périmètre et objectif INCHANGÉS → le cycle est conservé tel quel, seule
+ *    sa date de départ est recalée pour que « jour 3 sur 6 » reste vrai avec
+ *    les nouveaux horaires ;
+ *  - sinon → le cycle repart d'AUJOURD'HUI sur les pages non encore récitées
+ *    de ce cycle : on poursuit là où on en est, jamais depuis le début.
+ * mode 'restart' : nouveau cycle complet dès aujourd'hui (comportement
+ * historique).
  */
-export function finalizeProgram(draft: ProgramDraft, now: Date): { program: Program; cycle: Cycle } | null {
+export function finalizeProgram(
+  draft: ProgramDraft,
+  now: Date,
+  mode: FinalizeMode = 'restart'
+): { program: Program; cycle: Cycle } | null {
   if (!draft.selections.length || !draft.objective) return null;
   const pages = perimeterPages(draft.selections);
   if (!pages.length) return null;
   const nowIso = now.toISOString();
+  const todayKey = toDateKey(now);
   const existing = loadProgram();
   const program: Program = {
     selections: draft.selections,
@@ -110,11 +146,46 @@ export function finalizeProgram(draft: ProgramDraft, now: Date): { program: Prog
     updatedAt: nowIso,
   };
   const previous = loadCycle();
-  const cycle: Cycle = {
-    number: previous ? previous.number + (previous.startDate === toDateKey(now) ? 0 : 1) : 1,
-    startDate: toDateKey(now),
-    days: buildCycleDays(pages, draft.objective),
-  };
+  let cycle: Cycle;
+
+  if (mode === 'continue' && previous && existing && previous.days.length) {
+    const samePlan =
+      JSON.stringify(existing.perimeterPages) === JSON.stringify(pages) &&
+      JSON.stringify(existing.objective) === JSON.stringify(draft.objective);
+    const oldDates = cycleDayDates(existing.schedule, previous.startDate, previous.days.length);
+    let idx = oldDates.indexOf(todayKey);
+    if (idx === -1) idx = Math.min(oldDates.filter((d) => d < todayKey).length, previous.days.length - 1);
+
+    if (samePlan) {
+      // Même plan : on garde les journées du cycle, on recale seulement la
+      // date de départ pour que le jour courant reste le jour courant.
+      cycle = {
+        number: previous.number,
+        startDate: startDateForIndex(draft.schedule, todayKey, idx),
+        days: previous.days,
+      };
+    } else {
+      // Plan modifié : poursuivre sur les pages du cycle NON encore récitées.
+      const recited = new Set<number>();
+      for (const rec of loadSessions()) {
+        if (rec.kind === 'learning' || rec.date < previous.startDate) continue;
+        for (const p of rec.recitedPages) recited.add(p);
+      }
+      const ds = loadDayState();
+      if (ds?.date === todayKey) for (const p of ds.recitedPages) recited.add(p);
+      const remaining = pages.filter((p) => !recited.has(p));
+      cycle = remaining.length
+        ? { number: previous.number, startDate: todayKey, days: buildCycleDays(remaining, draft.objective) }
+        : { number: previous.number + 1, startDate: todayKey, days: buildCycleDays(pages, draft.objective) };
+    }
+  } else {
+    cycle = {
+      number: previous ? previous.number + (previous.startDate === todayKey ? 0 : 1) : 1,
+      startDate: todayKey,
+      days: buildCycleDays(pages, draft.objective),
+    };
+  }
+
   saveProgram(program);
   saveCycle(cycle);
   // Sauver l'acquis du jour dans le journal AVANT la remise à zéro : la

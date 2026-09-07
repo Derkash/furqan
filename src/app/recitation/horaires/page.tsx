@@ -79,6 +79,7 @@ export default function HorairesPage() {
     <AppShell>
       <SetupFrame
         step={2}
+        freeNav={draft.selections.length > 0 && !!draft.objective}
         title="Jours et horaires"
         subtitle="Quand récitez-vous ? L’objectif du jour sera réparti entre ces créneaux."
         canContinue={schedule.activeWeekdays.length > 0 && slots.length > 0}

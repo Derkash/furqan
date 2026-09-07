@@ -98,6 +98,29 @@ export function weekdayOf(dateKey: string): number {
 }
 
 /**
+ * Date de départ D telle que, en comptant `index` jours actifs après le
+ * premier jour actif ≥ D, on retombe (au plus tôt) sur `todayKey`. Sert à
+ * MODIFIER un programme en conservant la position dans le cycle : « je suis
+ * au jour 3 » reste vrai après un changement d'horaires.
+ */
+export function startDateForIndex(
+  config: ScheduleConfig,
+  todayKey: string,
+  index: number
+): string {
+  if (!config.activeWeekdays.length || index <= 0) return todayKey;
+  let cursor = todayKey;
+  let remaining = index;
+  let guard = 0;
+  while (remaining > 0 && guard < 400) {
+    cursor = addDays(cursor, -1);
+    if (isActiveWeekday(config, weekdayOf(cursor))) remaining--;
+    guard++;
+  }
+  return cursor;
+}
+
+/**
  * Dates des journées du cycle : chaque jour du cycle occupe le prochain jour
  * ACTIF du calendrier (les jours inactifs sont sautés). Renvoie une clé de
  * date par jour du cycle, à partir de startDate.
