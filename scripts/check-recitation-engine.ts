@@ -32,6 +32,7 @@ import {
 } from '../src/lib/recitation/learning';
 import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
 import { solarEvents } from '../src/lib/recitation/solar';
+import { buildLiveContent, type WidgetState } from '../src/lib/recitation/widgetSync';
 import { duePages, pendingOverdue, rebalanceToday } from '../src/lib/recitation/dayEngine';
 import { buildNotificationPlan } from '../src/lib/recitation/notifications';
 import type {
@@ -445,6 +446,35 @@ console.log('Choisir le juz de départ : le cycle tourne, rien n’est sauté');
 }
 
 // ---------------------------------------------------------------------------
+console.log('Écran verrouillé : décompte du jour, rouge après 22 h, fin quand tout est fait');
+{
+  const epoch = (h: number, min = 0) => Math.floor(new Date(2026, 8, 8, h, min).getTime() / 1000);
+  const mkWidgetState = (recited: number): WidgetState => ({
+    generatedAt: epoch(9),
+    carryOverDue: true,
+    sessions: [
+      {
+        startEpoch: epoch(9), endEpoch: epoch(10), slotLabel: '9 h – 10 h', dayLabel: '',
+        pagesLabel: '03/pages 5 à 6', kind: 'cycle', title: 'Récitation en cours',
+        firstPageLabel: '03/page 5', lastPageLabel: '03/page 6',
+        firstPage: 54, lastPage: 55, totalPages: 2, recitedPages: recited,
+        startVerse: 'يَوۡمَ تَجِدُ …', endVerse: '',
+      },
+    ],
+  });
+  const at = (h: number, min = 0) => new Date(2026, 8, 8, h, min);
+
+  const midday = buildLiveContent(mkWidgetState(0), at(14, 30))!;
+  check('phase normale avant 22 h', midday.phase, 'day');
+  check('décompte vers minuit', midday.refEpoch, epoch(23, 59));
+  check('2 pages restantes', midday.dueCount, 2);
+
+  const night = buildLiveContent(mkWidgetState(0), at(22, 30))!;
+  check('après 22 h → phase lastCall (rouge, gros)', night.phase, 'lastCall');
+
+  check('tout récité → activité terminée', buildLiveContent(mkWidgetState(2), at(14, 30)), null);
+}
+
 console.log('Rappels d’adhkar dans le plan de notifications');
 {
   const program = { ...mkProgram('auto'), adhkarEnabled: true };

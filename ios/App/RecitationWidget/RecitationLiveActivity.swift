@@ -13,6 +13,8 @@ import SwiftUI
 
 private let gold = Color(red: 0.77, green: 0.63, blue: 0.35)
 private let greenDeep = Color(red: 0.10, green: 0.26, blue: 0.20)
+/// Rouge de dernière ligne droite (phase « lastCall », après 22 h).
+private let urgent = Color(red: 0.92, green: 0.34, blue: 0.25)
 
 @available(iOS 16.2, *)
 struct RecitationLiveActivity: Widget {
@@ -52,7 +54,7 @@ struct RecitationLiveActivity: Widget {
             } compactTrailing: {
                 Text(timerInterval: Date.now...s.refDate, countsDown: true)
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(gold)
+                    .foregroundStyle(s.isLastCall ? urgent : gold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: 56)
@@ -131,8 +133,8 @@ private struct Countdown: View {
             // UNE seule ligne, quoi qu'il arrive : « 1:44:37 » se réduit
             // plutôt que de casser (les heures faisaient déborder le cadre).
             Text(timerInterval: Date.now...state.refDate, countsDown: true)
-                .font(.system(size: 24, weight: .heavy).monospacedDigit())
-                .foregroundStyle(gold)
+                .font(.system(size: state.isLastCall ? 30 : 24, weight: .heavy).monospacedDigit())
+                .foregroundStyle(state.isLastCall ? urgent : gold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .frame(maxWidth: 112, alignment: .trailing)
@@ -158,8 +160,8 @@ private struct LockScreenView: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .lineLimit(1)
                 Text(headline(state))
-                    .font(.system(size: 17, weight: .heavy))
-                    .foregroundStyle(.white)
+                    .font(.system(size: state.isLastCall ? 21 : 17, weight: .heavy))
+                    .foregroundStyle(state.isLastCall ? urgent : .white)
                 Segments(total: state.totalPages, done: state.recitedPages)
                     .frame(maxWidth: 160)
                 Text(state.pagesLabel)

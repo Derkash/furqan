@@ -127,6 +127,8 @@ public struct RecitationActivityAttributes: ActivityAttributes {
         public var refDate: Date { Date(timeIntervalSince1970: TimeInterval(refEpoch)) }
         public var isActive: Bool { phase == "active" }
         public var isOverdue: Bool { phase == "overdue" }
+        /// Après 22 h : dernière ligne droite avant minuit.
+        public var isLastCall: Bool { phase == "lastCall" }
     }
     public init() {}
 }

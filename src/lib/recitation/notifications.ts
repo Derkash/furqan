@@ -161,10 +161,17 @@ export function buildNotificationPlan(
           : dueNow.all.length
             ? `${pagesLabel(dueNow.all)}`
             : `${pagesLabel(dueLearning.all, program.learning?.surah)}`;
+      // 22 h et 23 h : dernière ligne droite — le ton change, et OUVRIR
+      // l'app depuis ce rappel fait passer l'écran verrouillé en rouge.
+      const lastCall = h >= 22;
       plan.push({
         id: HOURLY_ID_BASE + h,
-        title: `${totalDue} page${totalDue > 1 ? 's' : ''} à réciter`,
-        body: `${dueLabel} — toujours en attente. Un moment maintenant ? Qu’Allah vous facilite.`,
+        title: lastCall
+          ? `Dernière ligne droite — ${totalDue} page${totalDue > 1 ? 's' : ''} avant minuit`
+          : `${totalDue} page${totalDue > 1 ? 's' : ''} à réciter`,
+        body: lastCall
+          ? `${dueLabel} — la journée se termine bientôt. Qu’Allah vous facilite.`
+          : `${dueLabel} — toujours en attente. Un moment maintenant ? Qu’Allah vous facilite.`,
         at: at(todayKey, h * 60),
       });
     }

@@ -200,17 +200,13 @@ export function buildLiveContent(state: WidgetState, now: Date): LiveContent | n
 
   const doneToday = today.reduce((sum, s) => sum + s.recitedPages, 0);
   const totalToday = today.reduce((sum, s) => sum + s.totalPages, 0);
-  const lastEnd = Math.max(...today.map((s) => s.endEpoch));
 
-  // Phase au moment de la synchro (indicatif — la valeur porteuse est le
-  // restant du jour) : retard → rouge ; séance en cours → or ; sinon attente.
-  const active = today.find((s) => t >= s.startEpoch && t < s.endEpoch) ?? null;
-  const overdueNow = state.carryOverDue
-    ? today
-        .filter((s) => s.endEpoch <= t && s.kind !== 'learning')
-        .reduce((sum, s) => sum + Math.max(0, s.totalPages - s.recitedPages), 0)
-    : 0;
-  const phase = overdueNow > 0 ? 'overdue' : active ? 'active' : 'upcoming';
+  // Phase au moment de la synchro. « lastCall » à partir de 22 h : la
+  // dernière ligne droite avant minuit — l'écran verrouillé passe en rouge
+  // et en gros. (La bascule exige une synchro après 22 h : une Live Activity
+  // ne change pas seule ; le ping horaire de 22 h invite précisément à
+  // rouvrir l'app, ce qui déclenche la bascule.)
+  const phase = now.getHours() >= 22 ? 'lastCall' : 'day';
 
   const label =
     cycleLeft > 0 && learningLeft > 0
@@ -223,17 +219,17 @@ export function buildLiveContent(state: WidgetState, now: Date): LiveContent | n
     .filter((s) => s.recitedPages < s.totalPages)
     .sort((a, b) => a.startEpoch - b.startEpoch)[0];
 
-  const endDate = new Date(lastEnd * 1000);
-  const endLabel = `avant ${endDate.getHours() === 23 && endDate.getMinutes() >= 59 ? 'minuit' : formatTime(endDate.getHours() * 60 + endDate.getMinutes())}`;
-
+  // Le décompte vise TOUJOURS minuit : le dû du jour vit jusqu'à minuit
+  // (duePages), même après la dernière séance — un décompte vers une fin de
+  // séance déjà passée resterait figé à 0:00.
   return {
     phase,
     dueCount: remainingToday,
     recitedPages: doneToday,
     totalPages: totalToday,
     pagesLabel: label,
-    refEpoch: lastEnd,
-    slotLabel: endLabel,
+    refEpoch: endOfToday(now),
+    slotLabel: 'avant minuit',
     startVerse: nextSession?.startVerse ?? '',
   };
 }
