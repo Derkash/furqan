@@ -337,7 +337,9 @@ console.log('Plan de notifications : pur, trié, plafonné');
   check('un plan non vide', plan.length > 0, true);
   check('trié par date', plan.every((n, i) => i === 0 || plan[i - 1].at <= n.at), true);
   check('jamais plus de 60 (limite iOS 64)', plan.length <= 60, true);
-  const kinds = new Set(plan.map((n) => n.id % 10));
+  // Seuls les identifiants de CRÉNEAUX portent les kinds 0/1/2 — les rappels
+  // adhkar (738xxx) et horaires (739xxx) ont leurs propres plages.
+  const kinds = new Set(plan.filter((n) => n.id < 738000).map((n) => n.id % 10));
   check('les trois moments présents (début, rappel, relance)', [...kinds].sort(), [0, 1, 2]);
   const first = plan[0];
   check('la première est à venir', first.at > now, true);
