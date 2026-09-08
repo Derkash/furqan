@@ -22,6 +22,7 @@ import { buildLearningSlot } from './learning';
 import { pagesLabel } from './labels';
 import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
 import { addDays, cycleDayDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
+import { solarEvents } from './solar';
 import type { Cycle, DayState, PlannedSlot, Program } from './types';
 
 /** Jours planifiés à l'avance (re-planifié à chaque ouverture). */
@@ -35,6 +36,8 @@ const MAX_PENDING = 60;
 type Kind = 0 | 1 | 2; // 0 = début, 1 = avant la fin, 2 = relance après la fin
 /** Identifiants des rappels HORAIRES de dû (un par heure pleine du jour). */
 const HOURLY_ID_BASE = ID_BASE + 9000;
+/** Identifiants des rappels d'ADHKAR (4 par jour, calés sur le soleil). */
+const ADHKAR_ID_BASE = ID_BASE + 8000;
 
 /** Identifiant déterministe : permet d'annuler un rappel précis plus tard. */
 function notifId(dayOffset: number, slotIndex: number, kind: Kind): number {
@@ -233,6 +236,48 @@ export function buildNotificationPlan(
     });
   }
 
+  // ADHKAR — calés sur le soleil (position : Aulnay-sous-Bois par défaut).
+  // Matin : fenêtre du lever au zénith ; soir : fenêtre avant le coucher.
+  //   1. au lever          → « c'est le moment » ;
+  //   2. zénith − 1 h      → « les avez-vous faits ? dernière heure » ;
+  //   3. coucher − 2 h     → « c'est le moment » ;
+  //   4. coucher − 1 h     → « les avez-vous faits ? dernière heure ».
+  if (program.adhkarEnabled !== false) {
+    for (let offset = 0; offset <= HORIZON_DAYS; offset++) {
+      const dateKey = addDays(todayKey, offset);
+      const sun = solarEvents(dateKey);
+      if (!sun) continue;
+      const H = 60 * 60 * 1000;
+      const moments: { at: Date; title: string; body: string }[] = [
+        {
+          at: sun.sunrise,
+          title: 'Adhkar du matin',
+          body: 'Le soleil est levé — c’est le moment de vos adhkar. Qu’Allah illumine votre journée.',
+        },
+        {
+          at: new Date(sun.solarNoon.getTime() - H),
+          title: 'Adhkar du matin — dernière heure',
+          body: 'Les avez-vous récités ? Le zénith est dans une heure environ.',
+        },
+        {
+          at: new Date(sun.sunset.getTime() - 2 * H),
+          title: 'Adhkar du soir',
+          body: 'Le soleil décline — c’est le moment de vos adhkar du soir.',
+        },
+        {
+          at: new Date(sun.sunset.getTime() - H),
+          title: 'Adhkar du soir — dernière heure',
+          body: 'Les avez-vous récités ? Le soleil se couche dans une heure environ.',
+        },
+      ];
+      moments.forEach((mnt, k) => {
+        if (mnt.at > now) {
+          plan.push({ id: ADHKAR_ID_BASE + offset * 10 + k, title: mnt.title, body: mnt.body, at: mnt.at });
+        }
+      });
+    }
+  }
+
   return plan.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, MAX_PENDING);
 }
 
@@ -286,7 +331,8 @@ export async function scheduleRecitationNotifications(
           title: n.title,
           body: n.body,
           schedule: { at: n.at, allowWhileIdle: true },
-          extra: { route: '/recitation/en-cours' },
+          // Un rappel d'adhkar ouvre la page Adhkar ; le reste, la session.
+          extra: { route: n.id >= ID_BASE + 8000 && n.id < ID_BASE + 9000 ? '/adhkar' : '/recitation/en-cours' },
         })),
       });
     } catch {

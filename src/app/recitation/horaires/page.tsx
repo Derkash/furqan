@@ -231,6 +231,23 @@ export default function HorairesPage() {
             />
           </label>
           {schedule.remindersEnabled && (
+            <label className="flex items-center justify-between cursor-pointer mt-3 pt-3 border-t border-[var(--ds-divider)]">
+              <span className="text-sm font-extrabold">
+                Adhkar du matin et du soir
+                <span className="block text-[12px] font-normal text-[var(--ds-n600)]">
+                  Rappels calés sur le soleil : lever, une heure avant le zénith,
+                  deux heures puis une heure avant le coucher.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={draft.adhkarEnabled}
+                onChange={(e) => update({ ...draft, adhkarEnabled: e.target.checked })}
+                className="w-5 h-5 accent-[var(--ds-gold)] flex-none ml-3"
+              />
+            </label>
+          )}
+          {schedule.remindersEnabled && (
             <label className="flex items-center gap-2 mt-3 text-sm">
               <span className="text-[var(--ds-n600)]">Rappel avant la fin du créneau :</span>
               <select

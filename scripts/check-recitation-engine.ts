@@ -31,6 +31,7 @@ import {
   learningSpan,
 } from '../src/lib/recitation/learning';
 import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
+import { solarEvents } from '../src/lib/recitation/solar';
 import { duePages, pendingOverdue, rebalanceToday } from '../src/lib/recitation/dayEngine';
 import { buildNotificationPlan } from '../src/lib/recitation/notifications';
 import type {
@@ -439,6 +440,36 @@ console.log('Choisir le juz de départ : le cycle tourne, rien n’est sauté');
   check('page au MILIEU du juz 3 → même rotation', rotateCycleDays(base, 50).map((d) => d.pages[0]), [42, 62, 1, 22]);
   check('sans point de départ → ordre inchangé', rotateCycleDays(base, null).map((d) => d.pages[0]), [1, 22, 42, 62]);
   check('départ au juz 1 → ordre inchangé', rotateCycleDays(base, 1).map((d) => d.pages[0]), [1, 22, 42, 62]);
+}
+
+// ---------------------------------------------------------------------------
+console.log('Rappels d’adhkar dans le plan de notifications');
+{
+  const program = { ...mkProgram('auto'), adhkarEnabled: true };
+  const cycle = { number: 1, startDate: '2026-09-08', days: [{ index: 0, pages: [3, 4] }] };
+  const now = new Date(2026, 8, 8, 5, 0); // 5 h : tous les moments sont à venir
+  const plan = buildNotificationPlan(program, cycle, now, null);
+  const adhkar = plan.filter((n) => n.id >= 738000 && n.id < 739000);
+  check('4 rappels adhkar posés pour aujourd’hui', adhkar.filter((n) => n.at.getDate() === 8).length, 4);
+  check('titres matin puis soir', adhkar.slice(0, 4).map((n) => n.title.includes('matin')), [true, true, false, false]);
+  const off = { ...program, adhkarEnabled: false };
+  check('désactivés → aucun', buildNotificationPlan(off, cycle, now, null).filter((n) => n.id >= 738000 && n.id < 739000).length, 0);
+}
+
+console.log('Éphémérides solaires (Aulnay-sous-Bois, 8 sept. 2026)');
+{
+  const ev = solarEvents('2026-09-08')!;
+  const localH = (d: Date) => d.getHours() + d.getMinutes() / 60;
+  // Fourchettes larges (heure locale Europe/Paris, CEST) : lever ~7 h 20,
+  // midi solaire ~13 h 50, coucher ~20 h 10.
+  check('lever entre 7 h et 7 h 45', localH(ev.sunrise) > 7 && localH(ev.sunrise) < 7.75, true);
+  check('midi solaire entre 13 h 30 et 14 h 05', localH(ev.solarNoon) > 13.5 && localH(ev.solarNoon) < 14.09, true);
+  check('coucher entre 19 h 50 et 20 h 30', localH(ev.sunset) > 19.83 && localH(ev.sunset) < 20.5, true);
+  check('ordre lever < zénith < coucher',
+    ev.sunrise < ev.solarNoon && ev.solarNoon < ev.sunset, true);
+  const noonMs = (ev.sunrise.getTime() + ev.sunset.getTime()) / 2;
+  check('zénith au milieu du jour (±3 min)', Math.abs(noonMs - ev.solarNoon.getTime()) < 3 * 60000, true);
+  check('nuit polaire → null', solarEvents('2026-12-21', 80, 0), null);
 }
 
 // ---------------------------------------------------------------------------

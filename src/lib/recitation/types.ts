@@ -149,6 +149,8 @@ export interface Program {
    * null = ordre du mushaf depuis le début du périmètre.
    */
   startPage?: number | null;
+  /** Rappels d'adhkar calés sur le soleil (lever, zénith, coucher). */
+  adhkarEnabled?: boolean;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }

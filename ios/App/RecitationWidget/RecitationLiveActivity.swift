@@ -13,7 +13,6 @@ import SwiftUI
 
 private let gold = Color(red: 0.77, green: 0.63, blue: 0.35)
 private let greenDeep = Color(red: 0.10, green: 0.26, blue: 0.20)
-private let rust = Color(red: 0.85, green: 0.45, blue: 0.25)
 
 @available(iOS 16.2, *)
 struct RecitationLiveActivity: Widget {
@@ -28,7 +27,7 @@ struct RecitationLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
-                        BookBadge(overdue: s.isOverdue)
+                        BookBadge()
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Al Muraja3a")
                                 .font(.system(size: 12, weight: .semibold))
@@ -47,21 +46,21 @@ struct RecitationLiveActivity: Widget {
                     bottomLine(s).privacySensitive(false)
                 }
             } compactLeading: {
-                Image(systemName: s.isOverdue ? "exclamationmark.circle.fill" : "book.fill")
-                    .foregroundStyle(s.isOverdue ? rust : gold)
+                Image(systemName: "book.fill")
+                    .foregroundStyle(gold)
                     .privacySensitive(false)
             } compactTrailing: {
                 Text(timerInterval: Date.now...s.refDate, countsDown: true)
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(s.isOverdue ? rust : gold)
+                    .foregroundStyle(gold)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: 56)
                     .multilineTextAlignment(.trailing)
                     .privacySensitive(false)
             } minimal: {
-                Image(systemName: s.isOverdue ? "exclamationmark.circle.fill" : "book.fill")
-                    .foregroundStyle(s.isOverdue ? rust : gold)
+                Image(systemName: "book.fill")
+                    .foregroundStyle(gold)
                     .privacySensitive(false)
             }
             .widgetURL(URL(string: "almuraja3a://recitation/en-cours"))
@@ -73,9 +72,9 @@ struct RecitationLiveActivity: Widget {
 private func headline(_ s: RecitationActivityAttributes.ContentState) -> String {
     // Le RESTANT DU JOUR : la seule valeur qui reste vraie sans mise à jour
     // (elle ne change qu'en récitant — et réciter rafraîchit l'activité).
-    s.isOverdue
-        ? "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") en retard"
-        : "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") restante\(s.dueCount > 1 ? "s" : "")"
+    // Toujours « restantes », jamais « en retard » : c'est un décompte de
+    // journée, pas un reproche — demande explicite de l'utilisateur.
+    "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") restante\(s.dueCount > 1 ? "s" : "")"
 }
 
 @available(iOS 16.2, *)
@@ -85,12 +84,11 @@ private func bottomLine(_ s: RecitationActivityAttributes.ContentState) -> some 
 }
 
 private struct BookBadge: View {
-    var overdue = false
     var body: some View {
         ZStack {
             Circle().fill(greenDeep)
-            Image(systemName: overdue ? "exclamationmark.circle.fill" : "book.fill")
-                .foregroundStyle(overdue ? rust : gold)
+            Image(systemName: "book.fill")
+                .foregroundStyle(gold)
                 .font(.system(size: 15))
         }
         .frame(width: 34, height: 34)
@@ -134,7 +132,7 @@ private struct Countdown: View {
             // plutôt que de casser (les heures faisaient déborder le cadre).
             Text(timerInterval: Date.now...state.refDate, countsDown: true)
                 .font(.system(size: 24, weight: .heavy).monospacedDigit())
-                .foregroundStyle(state.isOverdue ? rust : gold)
+                .foregroundStyle(gold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .frame(maxWidth: 112, alignment: .trailing)
@@ -153,7 +151,7 @@ private struct LockScreenView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            BookBadge(overdue: state.isOverdue)
+            BookBadge()
             VStack(alignment: .leading, spacing: 3) {
                 Text("Al Muraja3a · aujourd’hui")
                     .font(.system(size: 12, weight: .semibold))
@@ -161,7 +159,7 @@ private struct LockScreenView: View {
                     .lineLimit(1)
                 Text(headline(state))
                     .font(.system(size: 17, weight: .heavy))
-                    .foregroundStyle(state.isOverdue ? rust : .white)
+                    .foregroundStyle(.white)
                 Segments(total: state.totalPages, done: state.recitedPages)
                     .frame(maxWidth: 160)
                 Text(state.pagesLabel)

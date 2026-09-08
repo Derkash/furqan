@@ -31,6 +31,8 @@ export interface ProgramDraft {
   learning: Program['learning'];
   /** Première page du cycle (le cycle tourne autour) — null = début du périmètre. */
   startPage: number | null;
+  /** Rappels d'adhkar (lever / zénith / coucher du soleil). */
+  adhkarEnabled: boolean;
 }
 
 const DRAFT_KEY = 'almuraja3a:recitation:draft';
@@ -52,6 +54,7 @@ export function emptyDraft(): ProgramDraft {
     endReminderMin: 15,
     learning: null,
     startPage: null,
+    adhkarEnabled: true,
   };
 }
 
@@ -76,6 +79,7 @@ export function loadDraft(): ProgramDraft {
       endReminderMin: existing.endReminderMin,
       learning: existing.learning ?? null,
       startPage: existing.startPage ?? null,
+      adhkarEnabled: existing.adhkarEnabled ?? true,
     };
   }
   return emptyDraft();
@@ -147,6 +151,7 @@ export function finalizeProgram(
     endReminderMin: draft.endReminderMin,
     learning: draft.learning,
     startPage: draft.startPage,
+    adhkarEnabled: draft.adhkarEnabled,
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
   };
