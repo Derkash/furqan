@@ -185,7 +185,6 @@ function endOfToday(now: Date): number {
  * sur le WIDGET, qui a une timeline et reste exact app fermée.
  */
 export function buildLiveContent(state: WidgetState, now: Date): LiveContent | null {
-  const t = Math.floor(now.getTime() / 1000);
   const today = state.sessions.filter((s) => s.startEpoch < endOfToday(now));
   if (!today.length) return null;
 
