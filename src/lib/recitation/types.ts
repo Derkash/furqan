@@ -143,6 +143,12 @@ export interface Program {
   endReminderMin: number | null;
   /** Sourate en cours d'apprentissage — null si aucune. */
   learning: LearningConfig | null;
+  /**
+   * Première page du cycle (choisie par l'utilisateur) : le cycle démarre au
+   * jour qui la contient puis TOURNE — juz' 3, 4, …, fin, puis 1 et 2.
+   * null = ordre du mushaf depuis le début du périmètre.
+   */
+  startPage?: number | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }

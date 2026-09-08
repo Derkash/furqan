@@ -7,6 +7,7 @@ import {
   buildCycleDays,
   carryOverPages,
   checkFeasibility,
+  rotateCycleDays,
   splitPagesAcrossSlots,
 } from '../src/lib/recitation/planner';
 import {
@@ -417,6 +418,27 @@ console.log('Modifier sans repartir à zéro : recalage de la date de départ');
   check('jour 1 → départ = aujourd’hui', startDateForIndex(config, '2026-09-09', 0), '2026-09-09');
   // Week-end inactif au milieu : jour 3 un lundi → recul jusqu'au jeudi.
   check('recul par-dessus le week-end', startDateForIndex(config, '2026-09-07', 2), '2026-09-03');
+}
+
+// ---------------------------------------------------------------------------
+console.log('Choisir le juz de départ : le cycle tourne, rien n’est sauté');
+{
+  const pages = perimeterPages([
+    { kind: 'juz', juz: 1 },
+    { kind: 'juz', juz: 2 },
+    { kind: 'juz', juz: 3 },
+    { kind: 'juz', juz: 4 },
+  ]);
+  const base = buildCycleDays(pages, { kind: 'juzPerDay', amount: 1 });
+  // Départ au juz 3 (page 42) → ordre 3, 4, 1, 2.
+  const rotated = rotateCycleDays(base, 42);
+  check('jour 1 = juz 3 (pages 42-61)', [rotated[0].pages[0], rotated[0].pages.at(-1)], [42, 61]);
+  check('ordre 3 → 4 → 1 → 2', rotated.map((d) => d.pages[0]), [42, 62, 1, 22]);
+  check('index réindexés 0..3', rotated.map((d) => d.index), [0, 1, 2, 3]);
+  check('aucune page perdue', rotated.flatMap((d) => d.pages).length, pages.length);
+  check('page au MILIEU du juz 3 → même rotation', rotateCycleDays(base, 50).map((d) => d.pages[0]), [42, 62, 1, 22]);
+  check('sans point de départ → ordre inchangé', rotateCycleDays(base, null).map((d) => d.pages[0]), [1, 22, 42, 62]);
+  check('départ au juz 1 → ordre inchangé', rotateCycleDays(base, 1).map((d) => d.pages[0]), [1, 22, 42, 62]);
 }
 
 // ---------------------------------------------------------------------------

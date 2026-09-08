@@ -12,6 +12,7 @@ import {
   DEFAULT_MIN_PER_PAGE,
   buildCycleDays,
   carryOverPages,
+  rotateCycleDays,
   splitPagesAcrossSlots,
   splitPagesCustom,
 } from './planner';
@@ -224,7 +225,12 @@ export function ensureToday(now: Date): TodayContext | null {
   // 3. Cycle terminé ? (toutes les dates passées) → nouveau cycle dès aujourd'hui.
   if (dayDates.length && dayDates[dayDates.length - 1] < todayKey) {
     const nextNumber = cycle.number + 1;
-    const days = buildCycleDays(program.perimeterPages, program.objective);
+    // Le point de départ choisi (« je commence par le juz 3 ») vaut pour
+    // chaque cycle : l'ordre tourné est l'ordre du programme.
+    const days = rotateCycleDays(
+      buildCycleDays(program.perimeterPages, program.objective),
+      program.startPage
+    );
     cycle = { number: nextNumber, startDate: todayKey, days };
     saveCycle(cycle);
     dayDates = cycleDayDates(program.schedule, todayKey, days.length);

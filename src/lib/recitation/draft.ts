@@ -5,7 +5,7 @@
 // l'historique (sessions, évaluations) n'est JAMAIS touché (brief §19).
 
 import { archiveToday } from './dayEngine';
-import { buildCycleDays } from './planner';
+import { buildCycleDays, rotateCycleDays } from './planner';
 import { perimeterPages } from './perimeter';
 import { cycleDayDates, startDateForIndex, toDateKey } from './schedule';
 import {
@@ -29,6 +29,8 @@ export interface ProgramDraft {
   endReminderMin: number | null;
   /** Sourate en cours d'apprentissage (séance quotidienne dédiée). */
   learning: Program['learning'];
+  /** Première page du cycle (le cycle tourne autour) — null = début du périmètre. */
+  startPage: number | null;
 }
 
 const DRAFT_KEY = 'almuraja3a:recitation:draft';
@@ -49,6 +51,7 @@ export function emptyDraft(): ProgramDraft {
     reinforcementEnabled: true,
     endReminderMin: 15,
     learning: null,
+    startPage: null,
   };
 }
 
@@ -72,6 +75,7 @@ export function loadDraft(): ProgramDraft {
       reinforcementEnabled: existing.reinforcementEnabled,
       endReminderMin: existing.endReminderMin,
       learning: existing.learning ?? null,
+      startPage: existing.startPage ?? null,
     };
   }
   return emptyDraft();
@@ -142,6 +146,7 @@ export function finalizeProgram(
     reinforcementEnabled: draft.reinforcementEnabled,
     endReminderMin: draft.endReminderMin,
     learning: draft.learning,
+    startPage: draft.startPage,
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
   };
@@ -151,7 +156,8 @@ export function finalizeProgram(
   if (mode === 'continue' && previous && existing && previous.days.length) {
     const samePlan =
       JSON.stringify(existing.perimeterPages) === JSON.stringify(pages) &&
-      JSON.stringify(existing.objective) === JSON.stringify(draft.objective);
+      JSON.stringify(existing.objective) === JSON.stringify(draft.objective) &&
+      (existing.startPage ?? null) === (draft.startPage ?? null);
     const oldDates = cycleDayDates(existing.schedule, previous.startDate, previous.days.length);
     let idx = oldDates.indexOf(todayKey);
     if (idx === -1) idx = Math.min(oldDates.filter((d) => d < todayKey).length, previous.days.length - 1);
@@ -175,14 +181,22 @@ export function finalizeProgram(
       if (ds?.date === todayKey) for (const p of ds.recitedPages) recited.add(p);
       const remaining = pages.filter((p) => !recited.has(p));
       cycle = remaining.length
-        ? { number: previous.number, startDate: todayKey, days: buildCycleDays(remaining, draft.objective) }
-        : { number: previous.number + 1, startDate: todayKey, days: buildCycleDays(pages, draft.objective) };
+        ? {
+            number: previous.number,
+            startDate: todayKey,
+            days: rotateCycleDays(buildCycleDays(remaining, draft.objective), draft.startPage),
+          }
+        : {
+            number: previous.number + 1,
+            startDate: todayKey,
+            days: rotateCycleDays(buildCycleDays(pages, draft.objective), draft.startPage),
+          };
     }
   } else {
     cycle = {
       number: previous ? previous.number + (previous.startDate === todayKey ? 0 : 1) : 1,
       startDate: todayKey,
-      days: buildCycleDays(pages, draft.objective),
+      days: rotateCycleDays(buildCycleDays(pages, draft.objective), draft.startPage),
     };
   }
 

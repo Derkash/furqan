@@ -75,6 +75,20 @@ export function buildCycleDays(pages: number[], objective: Objective): CycleDay[
   return days;
 }
 
+/**
+ * Fait DÉMARRER le cycle au jour contenant `startPage` : l'ordre du mushaf
+ * est préservé à l'intérieur des jours, seuls les jours tournent —
+ * [juz 1, 2, 3, 4] avec départ au juz 3 devient [3, 4, 1, 2]. C'est la wird
+ * cyclique classique : on part d'où l'on est, on boucle par le début.
+ */
+export function rotateCycleDays(days: CycleDay[], startPage: number | null | undefined): CycleDay[] {
+  if (!startPage || days.length < 2) return days;
+  let k = days.findIndex((d) => d.pages.includes(startPage));
+  if (k === -1) k = days.findIndex((d) => (d.pages[0] ?? 0) >= startPage);
+  if (k <= 0) return days;
+  return [...days.slice(k), ...days.slice(0, k)].map((d, i) => ({ ...d, index: i }));
+}
+
 // ---------------------------------------------------------------------------
 // Répartition d'une journée entre les créneaux
 // ---------------------------------------------------------------------------

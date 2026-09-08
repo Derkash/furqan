@@ -11,7 +11,7 @@ import { SetupFrame } from '@/components/recitation/SetupSteps';
 import { loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
 import { formatDateKey, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
 import { perimeterPages } from '@/lib/recitation/perimeter';
-import { buildCycleDays } from '@/lib/recitation/planner';
+import { buildCycleDays, rotateCycleDays } from '@/lib/recitation/planner';
 import { addDays, cycleDayDates, toDateKey } from '@/lib/recitation/schedule';
 import { learningPagesForDay, learningProgress } from '@/lib/recitation/learning';
 import { loadProgram } from '@/lib/recitation/store';
@@ -74,9 +74,15 @@ export default function ObjectifPage() {
     return { config: cfg, pages: learningPagesForDay(cfg, 0), progress: learningProgress(cfg) };
   }, [draft]);
   const objective = preset ? toObjective(preset, pagesPerDay, days) : null;
-  const cycleDays = useMemo(
+  // Jours dans l'ordre du mushaf (pour le sélecteur de départ)…
+  const baseDays = useMemo(
     () => (objective ? buildCycleDays(pages, objective) : []),
     [pages, objective]
+  );
+  // …puis pivotés sur le point de départ choisi : c'est l'ordre réel du cycle.
+  const cycleDays = useMemo(
+    () => rotateCycleDays(baseDays, draft?.startPage ?? null),
+    [baseDays, draft]
   );
   const dates = useMemo(() => {
     if (!draft || !cycleDays.length) return [];
@@ -156,6 +162,37 @@ export default function ObjectifPage() {
             </button>
           ))}
         </div>
+
+        {/* Point de départ du cycle : « je commence par le juz 3 » — les
+            jours tournent, rien n'est sauté ni re-récité. */}
+        {baseDays.length > 1 && (
+          <section className="ds-card p-4 mt-4">
+            <p className="text-sm font-extrabold mb-1.5">Commencer le cycle par…</p>
+            <select
+              value={draft.startPage ?? ''}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : null;
+                const next = { ...draft, startPage: v };
+                setDraft(next);
+                saveDraft(next);
+              }}
+              className="w-full rounded-xl border border-[var(--ds-divider)] px-3 py-2.5 text-sm bg-white"
+            >
+              <option value="">Le début du périmètre (ordre du mushaf)</option>
+              {baseDays.map((day, i) => (
+                <option key={day.pages[0]} value={day.pages[0]}>
+                  Jour {i + 1} · {pagesLabel(day.pages)} · {surahSpanLabel(day.pages)}
+                </option>
+              ))}
+            </select>
+            {draft.startPage != null && (
+              <p className="text-[12px] text-[var(--ds-n600)] mt-2">
+                Le cycle démarre là, va jusqu’à la fin du périmètre, puis boucle par le début —
+                rien n’est sauté.
+              </p>
+            )}
+          </section>
+        )}
 
         {/* La sourate en cours s'ajoute à cet objectif */}
         {learning?.progress && learning.pages.length > 0 && (
