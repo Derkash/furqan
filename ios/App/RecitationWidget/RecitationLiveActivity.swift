@@ -71,24 +71,17 @@ struct RecitationLiveActivity: Widget {
 
 @available(iOS 16.2, *)
 private func headline(_ s: RecitationActivityAttributes.ContentState) -> String {
-    switch s.phase {
-    case "active": return "\(s.recitedPages) / \(s.totalPages) pages"
-    case "overdue": return "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") en retard"
-    default: return "Prochaine récitation"
-    }
+    // Le RESTANT DU JOUR : la seule valeur qui reste vraie sans mise à jour
+    // (elle ne change qu'en récitant — et réciter rafraîchit l'activité).
+    s.isOverdue
+        ? "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") en retard"
+        : "\(s.dueCount) page\(s.dueCount > 1 ? "s" : "") restante\(s.dueCount > 1 ? "s" : "")"
 }
 
 @available(iOS 16.2, *)
 @ViewBuilder
 private func bottomLine(_ s: RecitationActivityAttributes.ContentState) -> some View {
-    if s.isActive {
-        Segments(total: s.totalPages, done: s.recitedPages).padding(.top, 4)
-    } else {
-        Text(s.pagesLabel)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.8))
-            .lineLimit(1)
-    }
+    Segments(total: s.totalPages, done: s.recitedPages).padding(.top, 4)
 }
 
 private struct BookBadge: View {
@@ -108,11 +101,25 @@ private struct Segments: View {
     let total: Int
     let done: Int
     var body: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<max(total, 1), id: \.self) { i in
-                Capsule()
-                    .fill(i < done ? gold : Color.white.opacity(0.25))
-                    .frame(height: 5)
+        if total > 14 {
+            // Journée chargée : jauge continue, les barrettes deviendraient
+            // des miettes illisibles.
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.25))
+                    Capsule()
+                        .fill(gold)
+                        .frame(width: geo.size.width * CGFloat(done) / CGFloat(max(total, 1)))
+                }
+            }
+            .frame(height: 5)
+        } else {
+            HStack(spacing: 5) {
+                ForEach(0..<max(total, 1), id: \.self) { i in
+                    Capsule()
+                        .fill(i < done ? gold : Color.white.opacity(0.25))
+                        .frame(height: 5)
+                }
             }
         }
     }
@@ -131,7 +138,9 @@ private struct Countdown: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .frame(maxWidth: 112, alignment: .trailing)
-            Text(state.isActive ? "restantes" : state.isOverdue ? "avant la suite" : "avant le début")
+            // « avant 22 h » / « avant minuit » : l'échéance du JOUR — une
+            // seule référence, elle ne se périme jamais en cours de journée.
+            Text(state.slotLabel.isEmpty ? "aujourd’hui" : state.slotLabel)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
         }
@@ -146,17 +155,19 @@ private struct LockScreenView: View {
         HStack(spacing: 12) {
             BookBadge(overdue: state.isOverdue)
             VStack(alignment: .leading, spacing: 3) {
-                Text(state.isActive ? "Al Muraja3a · \(state.slotLabel)" : "Al Muraja3a")
+                Text("Al Muraja3a · aujourd’hui")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
                     .lineLimit(1)
                 Text(headline(state))
                     .font(.system(size: 17, weight: .heavy))
-                    .foregroundStyle(.white)
-                if state.isActive {
-                    Segments(total: state.totalPages, done: state.recitedPages)
-                        .frame(maxWidth: 160)
-                }
+                    .foregroundStyle(state.isOverdue ? rust : .white)
+                Segments(total: state.totalPages, done: state.recitedPages)
+                    .frame(maxWidth: 160)
+                Text(state.pagesLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
                 if !state.startVerse.isEmpty {
                     Text(state.startVerse)
                         .font(.system(size: 13))
@@ -165,11 +176,6 @@ private struct LockScreenView: View {
                         .minimumScaleFactor(0.6)
                         .environment(\.layoutDirection, .rightToLeft)
                         .frame(maxWidth: 170, alignment: .trailing)
-                } else if !state.isActive {
-                    Text(state.pagesLabel)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineLimit(1)
                 }
             }
             Spacer(minLength: 8)

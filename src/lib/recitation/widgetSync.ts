@@ -170,68 +170,72 @@ function endOfToday(now: Date): number {
 }
 
 /**
- * L'activité en direct doit être là DÈS qu'une récitation est due ou à venir
- * aujourd'hui — pas seulement pendant un créneau. iOS n'autorise le démarrage
- * qu'app ouverte : on la démarre donc à la première occasion (lancement,
- * retour au premier plan) et on ne la termine qu'une fois la journée pliée.
+ * CONTRAINTE STRUCTURELLE : une Live Activity n'a PAS de timeline — son
+ * contenu est figé jusqu'à la prochaine ouverture de l'app. Un affichage
+ * « créneau en cours + décompte de fin » se périme donc à chaque frontière
+ * de créneau (décompte bloqué à 0:00, compteur faux) dès que l'app dort.
+ *
+ * L'écran verrouillé affiche donc l'ÉTAT DU JOUR, qui vieillit bien :
+ *  - « X pages restantes aujourd'hui » — ne change QUE quand on récite,
+ *    et réciter = app ouverte = mise à jour automatique ;
+ *  - décompte vers la FIN de la dernière séance du jour (minuit avec la
+ *    sourate) — une seule échéance, stable ;
+ *  - le début du prochain verset à réciter — stable tant qu'on ne récite pas.
+ * Le suivi fin par créneau (retard en rouge, bascules à l'heure juste) vit
+ * sur le WIDGET, qui a une timeline et reste exact app fermée.
  */
 export function buildLiveContent(state: WidgetState, now: Date): LiveContent | null {
   const t = Math.floor(now.getTime() / 1000);
   const today = state.sessions.filter((s) => s.startEpoch < endOfToday(now));
+  if (!today.length) return null;
+
+  const cycleLeft = today
+    .filter((s) => s.kind !== 'learning')
+    .reduce((sum, s) => sum + Math.max(0, s.totalPages - s.recitedPages), 0);
+  const learningLeft = today
+    .filter((s) => s.kind === 'learning')
+    .reduce((sum, s) => sum + Math.max(0, s.totalPages - s.recitedPages), 0);
+  const remainingToday = cycleLeft + learningLeft;
+  if (remainingToday <= 0) return null; // journée pliée
+
+  const doneToday = today.reduce((sum, s) => sum + s.recitedPages, 0);
+  const totalToday = today.reduce((sum, s) => sum + s.totalPages, 0);
+  const lastEnd = Math.max(...today.map((s) => s.endEpoch));
+
+  // Phase au moment de la synchro (indicatif — la valeur porteuse est le
+  // restant du jour) : retard → rouge ; séance en cours → or ; sinon attente.
   const active = today.find((s) => t >= s.startEpoch && t < s.endEpoch) ?? null;
-  const next = today.find((s) => s.startEpoch > t) ?? null;
-  // Retard cumulé : pages restantes des sessions passées (si la préférence
-  // les garde dues). Les sessions portent leur avancement.
-  const overdue = state.carryOverDue
+  const overdueNow = state.carryOverDue
     ? today
-        .filter((s) => s.endEpoch <= t)
+        .filter((s) => s.endEpoch <= t && s.kind !== 'learning')
         .reduce((sum, s) => sum + Math.max(0, s.totalPages - s.recitedPages), 0)
     : 0;
+  const phase = overdueNow > 0 ? 'overdue' : active ? 'active' : 'upcoming';
 
-  if (active && active.recitedPages < active.totalPages) {
-    const remaining = active.totalPages - active.recitedPages;
-    // Séance de sourate active AVEC du retard de révision : les deux dus
-    // s'affichent — le programme du jour reste prioritaire et visible.
-    const label =
-      active.kind === 'learning' && overdue > 0
-        ? `${overdue} de révision + ${remaining} de sourate`
-        : active.pagesLabel;
-    return {
-      phase: 'active',
-      dueCount: remaining + overdue,
-      recitedPages: active.recitedPages,
-      totalPages: active.totalPages,
-      pagesLabel: label,
-      refEpoch: active.endEpoch,
-      slotLabel: active.slotLabel,
-      startVerse: active.kind === 'learning' && overdue > 0 ? '' : active.startVerse,
-    };
-  }
-  if (overdue > 0) {
-    return {
-      phase: 'overdue',
-      dueCount: overdue,
-      recitedPages: 0,
-      totalPages: overdue,
-      pagesLabel: next ? `Prochaine séance ${next.slotLabel}` : 'À rattraper avant ce soir',
-      refEpoch: next?.startEpoch ?? endOfToday(now),
-      slotLabel: next?.slotLabel ?? '',
-      startVerse: '',
-    };
-  }
-  if (next) {
-    return {
-      phase: 'upcoming',
-      dueCount: next.totalPages,
-      recitedPages: 0,
-      totalPages: next.totalPages,
-      pagesLabel: next.pagesLabel,
-      refEpoch: next.startEpoch,
-      slotLabel: next.slotLabel,
-      startVerse: next.startVerse,
-    };
-  }
-  return null; // journée pliée : plus rien de dû ni de prévu aujourd'hui
+  const label =
+    cycleLeft > 0 && learningLeft > 0
+      ? `${cycleLeft} de révision + ${learningLeft} de sourate`
+      : cycleLeft > 0
+        ? 'Révision du jour'
+        : 'Sourate en cours';
+  // Prochain verset à réciter : celui de la première séance incomplète.
+  const nextSession = today
+    .filter((s) => s.recitedPages < s.totalPages)
+    .sort((a, b) => a.startEpoch - b.startEpoch)[0];
+
+  const endDate = new Date(lastEnd * 1000);
+  const endLabel = `avant ${endDate.getHours() === 23 && endDate.getMinutes() >= 59 ? 'minuit' : formatTime(endDate.getHours() * 60 + endDate.getMinutes())}`;
+
+  return {
+    phase,
+    dueCount: remainingToday,
+    recitedPages: doneToday,
+    totalPages: totalToday,
+    pagesLabel: label,
+    refEpoch: lastEnd,
+    slotLabel: endLabel,
+    startVerse: nextSession?.startVerse ?? '',
+  };
 }
 
 let lastPayload = '';
