@@ -11,7 +11,9 @@ import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { useRecitation } from '@/hooks/useRecitation';
 import { rebalanceToday, setPagesRecited } from '@/lib/recitation/dayEngine';
-import { pageRefLabel, pagesLabel } from '@/lib/recitation/labels';
+import { pagesLabel } from '@/lib/recitation/labels';
+import PageMultiList from '@/components/recitation/PageMultiList';
+import { usePageVerseHeads } from '@/components/recitation/usePageVerseHeads';
 import { refreshRecitationNative } from '@/lib/recitation/appSync';
 import { formatTime } from '@/lib/recitation/schedule';
 import type { SlotKind } from '@/lib/recitation/types';
@@ -50,6 +52,9 @@ export default function ImprovisationPage() {
     return { cyclePages, learningPages };
   }, [dayState]);
 
+  // Aperçus des versets : le même repère que dans le parcours du jour.
+  const heads = usePageVerseHeads([...cyclePages, ...learningPages]);
+
   if (!ready) return <AppShell><div /></AppShell>;
   if (!ctx || !dayState) {
     return (
@@ -60,18 +65,6 @@ export default function ImprovisationPage() {
       </AppShell>
     );
   }
-
-  const toggle = (set: Set<number>, page: number, apply: (s: Set<number>) => void) => {
-    const next = new Set(set);
-    if (next.has(page)) next.delete(page);
-    else next.add(page);
-    apply(next);
-  };
-
-  /** Coche d'un geste toutes les pages jusqu'à celle-ci (récitation continue). */
-  const selectThrough = (pages: number[], page: number, apply: (s: Set<number>) => void) => {
-    apply(new Set(pages.filter((p) => p <= page)));
-  };
 
   const total = selected.size + selectedLearning.size;
 
@@ -115,71 +108,26 @@ export default function ImprovisationPage() {
 
         {cyclePages.length > 0 && (
           <section className="ds-card p-4">
-            <p className="text-sm font-extrabold mb-2.5">Révision du jour</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-              {cyclePages.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => toggle(selected, p, setSelected)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    selectThrough(cyclePages, p, setSelected);
-                  }}
-                  className={`rounded-xl px-2 py-2.5 text-[13px] font-bold transition-colors ${
-                    selected.has(p)
-                      ? 'bg-[var(--ds-gold)] text-white'
-                      : 'border border-[var(--ds-divider)] text-[var(--ds-n700)]'
-                  }`}
-                >
-                  {pageRefLabel(p)}
-                </button>
-              ))}
-            </div>
-            {cyclePages.length > 1 && (
-              <div className="flex gap-2 mt-2.5">
-                <button
-                  type="button"
-                  onClick={() => setSelected(new Set(cyclePages))}
-                  className="ds-btn-ghost px-3.5 py-1.5 text-[12px]"
-                >
-                  Tout
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelected(new Set())}
-                  className="ds-btn-ghost px-3.5 py-1.5 text-[12px]"
-                >
-                  Rien
-                </button>
-              </div>
-            )}
+            <p className="text-sm font-extrabold mb-1">Révision du jour</p>
+            <PageMultiList
+              pages={cyclePages}
+              selected={selected}
+              onChange={setSelected}
+              heads={heads}
+            />
           </section>
         )}
 
         {learningPages.length > 0 && (
           <section className="ds-card p-4">
-            <p className="text-sm font-extrabold mb-2.5">Sourate en cours</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-              {learningPages.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => toggle(selectedLearning, p, setSelectedLearning)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    selectThrough(learningPages, p, setSelectedLearning);
-                  }}
-                  className={`rounded-xl px-2 py-2.5 text-[13px] font-bold transition-colors ${
-                    selectedLearning.has(p)
-                      ? 'bg-[var(--ds-gold)] text-white'
-                      : 'border border-[var(--ds-divider)] text-[var(--ds-n700)]'
-                  }`}
-                >
-                  {pageRefLabel(p, learningSurah)}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm font-extrabold mb-1">Sourate en cours</p>
+            <PageMultiList
+              pages={learningPages}
+              selected={selectedLearning}
+              onChange={setSelectedLearning}
+              surah={learningSurah}
+              heads={heads}
+            />
           </section>
         )}
 

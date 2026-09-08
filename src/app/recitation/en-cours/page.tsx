@@ -7,38 +7,16 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from '@/components/AppShell';
-import EvaluationSheet from '@/components/recitation/EvaluationSheet';
 import VersePassage from '@/components/recitation/VersePassage';
 import { useRecitation } from '@/hooks/useRecitation';
 import { duePages } from '@/lib/recitation/dayEngine';
-import { pageFirstVerseHead } from '@/lib/recitation/passageText';
+import { usePageVerseHeads } from '@/components/recitation/usePageVerseHeads';
 import { pageRefLabel, pagesLabel, surahPageRef, surahSpanLabel, surahsOfPage } from '@/lib/recitation/labels';
 import { MASTERY_LABELS, reinforcementReason } from '@/lib/recitation/mastery';
+import { pressProps } from '@/components/recitation/PageMultiList';
 import { currentSlot, formatTime, nextSlot } from '@/lib/recitation/schedule';
 import { evaluationsByPage, loadEvaluations } from '@/lib/recitation/store';
 
-/**
- * Débuts du premier verset de chaque page (texte othmanien Unicode, source
- * mushaf-layout — jamais régénéré). Le repère qui évite de se perdre :
- * on reconnaît sa page à son verset, pas à son numéro.
- */
-function usePageVerseHeads(pages: number[]): Record<number, string> {
-  const [heads, setHeads] = useState<Record<number, string>>({});
-  const key = pages.join(',');
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(pages.map((p) => pageFirstVerseHead(p, 6).then((t) => [p, t] as const)))
-      .then((entries) => {
-        if (!cancelled) setHeads(Object.fromEntries(entries.filter(([, t]) => t)));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return heads;
-}
 
 /** Compte à rebours mm:ss jusqu'à endMin (minutes depuis minuit). */
 function Countdown({ endMin }: { endMin: number }) {
@@ -61,8 +39,7 @@ function Countdown({ endMin }: { endMin: number }) {
 }
 
 export default function EnCoursPage() {
-  const { ctx, ready, now, markRecited, evaluate, skipEvaluation } = useRecitation();
-  const [toEvaluate, setToEvaluate] = useState<number | null>(null);
+  const { ctx, ready, now, markRecited } = useRecitation();
   const parcoursRef = useRef<HTMLDivElement>(null);
 
   const dayState = ctx?.dayState ?? null;
@@ -149,9 +126,16 @@ export default function EnCoursPage() {
     );
   }
 
+  // L'évaluation de maîtrise après chaque page est SUSPENDUE à la demande de
+  // l'utilisateur (2026-09-08) — cocher suffit. La feuille EvaluationSheet et
+  // tout le moteur de maîtrise restent en place pour une réactivation.
   const markAndEvaluate = (page: number) => {
     markRecited(page, true, slot.kind);
-    setToEvaluate(page);
+  };
+
+  /** Appui long : cocher d'un geste toutes les pages dues jusqu'à celle-ci. */
+  const markThrough = (page: number) => {
+    for (const p of due.all) if (p <= page) markRecited(p, true, slot.kind);
   };
 
   return (
@@ -261,7 +245,10 @@ export default function EnCoursPage() {
 
         {/* Parcours page par page */}
         <section className="ds-card p-5 md:p-6 mb-4" ref={parcoursRef}>
-          <h2 className="text-lg font-extrabold mb-4">Votre parcours</h2>
+          <h2 className="text-lg font-extrabold mb-1">Votre parcours</h2>
+          <p className="text-[12px] text-[var(--ds-n500)] mb-3">
+            Un appui long sur une pastille coche toutes les pages jusqu’à celle-ci.
+          </p>
           <div className="flex flex-col divide-y divide-[var(--ds-divider)]">
             {pages.map((p) => {
               const isDone = recitedSet.has(p);
@@ -271,7 +258,10 @@ export default function EnCoursPage() {
                 <div key={p} className="py-3 flex items-center gap-3.5">
                   <button
                     type="button"
-                    onClick={() => (isDone ? markRecited(p, false, slot.kind) : markAndEvaluate(p))}
+                    {...pressProps(
+                      () => (isDone ? markRecited(p, false, slot.kind) : markAndEvaluate(p)),
+                      () => markThrough(p)
+                    )}
                     aria-label={isDone ? `Décocher la page ${p}` : `Marquer la page ${p} comme récitée`}
                     className={`flex-none w-9 h-9 rounded-full flex items-center justify-center text-sm font-extrabold border-2 transition-colors ${
                       isDone
@@ -372,19 +362,6 @@ export default function EnCoursPage() {
         </div>
       </div>
 
-      {toEvaluate != null && (
-        <EvaluationSheet
-          page={toEvaluate}
-          onEvaluate={(level, note) => {
-            evaluate(toEvaluate, level, note);
-            setToEvaluate(null);
-          }}
-          onSkip={() => {
-            skipEvaluation(toEvaluate);
-            setToEvaluate(null);
-          }}
-        />
-      )}
     </AppShell>
   );
 }
