@@ -22,6 +22,7 @@ import { buildLearningSlot } from './learning';
 import { pagesLabel } from './labels';
 import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
 import { addDays, cycleDayDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
+import { DEFAULT_QUIZ_SETTINGS } from './quiz';
 import { solarEvents } from './solar';
 import type { Cycle, DayState, PlannedSlot, Program } from './types';
 
@@ -38,6 +39,8 @@ type Kind = 0 | 1 | 2; // 0 = début, 1 = avant la fin, 2 = relance après la fi
 const HOURLY_ID_BASE = ID_BASE + 9000;
 /** Identifiants des rappels d'ADHKAR (4 par jour, calés sur le soleil). */
 const ADHKAR_ID_BASE = ID_BASE + 8000;
+/** Identifiants du rappel de QUIZ audio quotidien (1 par jour). */
+const QUIZ_ID_BASE = ID_BASE + 7000;
 
 /** Identifiant déterministe : permet d'annuler un rappel précis plus tard. */
 function notifId(dayOffset: number, slotIndex: number, kind: Kind): number {
@@ -243,6 +246,27 @@ export function buildNotificationPlan(
     });
   }
 
+  // QUIZ AUDIO quotidien — à l'heure choisie (15 h par défaut), tant que le
+  // périmètre existe et que le quiz est activé. Jamais configuré = défauts
+  // actifs : le rappel de 15 h part dès le premier jour, et son premier tap
+  // amène au choix du nombre de questions.
+  const quizCfg = program.quiz ?? (program.perimeterPages.length ? DEFAULT_QUIZ_SETTINGS : null);
+  if (quizCfg?.enabled && program.perimeterPages.length) {
+    const n = quizCfg.questionCount;
+    for (let offset = 0; offset <= HORIZON_DAYS; offset++) {
+      const dateKey = addDays(todayKey, offset);
+      const quizAt = at(dateKey, quizCfg.hourMin);
+      if (quizAt > now) {
+        plan.push({
+          id: QUIZ_ID_BASE + offset,
+          title: 'Quiz audio du jour',
+          body: `${n} versets tirés de tout ce que vous connaissez — saurez-vous les situer ? Qu’Allah affermisse votre mémorisation.`,
+          at: quizAt,
+        });
+      }
+    }
+  }
+
   // ADHKAR — calés sur le soleil (position : Aulnay-sous-Bois par défaut).
   // Matin : fenêtre du lever au zénith ; soir : fenêtre avant le coucher.
   //   1. au lever          → « c'est le moment » ;
@@ -338,8 +362,16 @@ export async function scheduleRecitationNotifications(
           title: n.title,
           body: n.body,
           schedule: { at: n.at, allowWhileIdle: true },
-          // Un rappel d'adhkar ouvre la page Adhkar ; le reste, la session.
-          extra: { route: n.id >= ID_BASE + 8000 && n.id < ID_BASE + 9000 ? '/adhkar' : '/recitation/en-cours' },
+          // Chaque famille de rappel ouvre son écran : adhkar → /adhkar,
+          // quiz → /recitation/quiz, le reste → la session en cours.
+          extra: {
+            route:
+              n.id >= ID_BASE + 8000 && n.id < ID_BASE + 9000
+                ? '/adhkar'
+                : n.id >= ID_BASE + 7000 && n.id < ID_BASE + 8000
+                  ? '/recitation/quiz'
+                  : '/recitation/en-cours',
+          },
         })),
       });
     } catch {

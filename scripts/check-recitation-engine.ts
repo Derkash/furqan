@@ -32,6 +32,7 @@ import {
 } from '../src/lib/recitation/learning';
 import { pageRefLabel, pagesLabel } from '../src/lib/recitation/labels';
 import { solarEvents } from '../src/lib/recitation/solar';
+import { recentFailPages, selectQuizPages, type QuizResult } from '../src/lib/recitation/quiz';
 import { buildLiveContent, type WidgetState } from '../src/lib/recitation/widgetSync';
 import { duePages, pendingOverdue, rebalanceToday } from '../src/lib/recitation/dayEngine';
 import { buildNotificationPlan } from '../src/lib/recitation/notifications';
@@ -338,9 +339,9 @@ console.log('Plan de notifications : pur, trié, plafonné');
   check('un plan non vide', plan.length > 0, true);
   check('trié par date', plan.every((n, i) => i === 0 || plan[i - 1].at <= n.at), true);
   check('jamais plus de 60 (limite iOS 64)', plan.length <= 60, true);
-  // Seuls les identifiants de CRÉNEAUX portent les kinds 0/1/2 — les rappels
-  // adhkar (738xxx) et horaires (739xxx) ont leurs propres plages.
-  const kinds = new Set(plan.filter((n) => n.id < 738000).map((n) => n.id % 10));
+  // Seuls les identifiants de CRÉNEAUX portent les kinds 0/1/2 — quiz
+  // (737xxx), adhkar (738xxx) et horaires (739xxx) ont leurs propres plages.
+  const kinds = new Set(plan.filter((n) => n.id < 737000).map((n) => n.id % 10));
   check('les trois moments présents (début, rappel, relance)', [...kinds].sort(), [0, 1, 2]);
   const first = plan[0];
   check('la première est à venir', first.at > now, true);
@@ -473,6 +474,68 @@ console.log('Écran verrouillé : décompte du jour, rouge après 22 h, fin quan
   check('après 22 h → phase lastCall (rouge, gros)', night.phase, 'lastCall');
 
   check('tout récité → activité terminée', buildLiveContent(mkWidgetState(2), at(14, 30)), null);
+}
+
+console.log('Quiz audio : couverture maximale + réserve de fautes');
+{
+  const rng = () => 0.5; // déterministe pour le test
+  const perimeter = Array.from({ length: 30 }, (_, i) => i + 1); // 30 pages
+  const today = '2026-09-14';
+
+  // Vierge : autant de pages que demandé, toutes différentes.
+  const first = selectQuizPages(perimeter, 10, {}, [], today, rng);
+  check('10 questions, pages toutes différentes', new Set(first).size, 10);
+
+  // Pages vues aujourd'hui/hier exclues tant qu'il y a le choix.
+  const coverage: Record<number, string> = {};
+  for (const p of first) coverage[p] = today;
+  const second = selectQuizPages(perimeter, 10, coverage, [], today, rng);
+  check('le lendemain-même : aucune page répétée', second.filter((p) => first.includes(p)).length, 0);
+
+  // Sur 3 quiz consécutifs, tout le périmètre de 30 pages est couvert.
+  for (const p of second) coverage[p] = today;
+  const third = selectQuizPages(perimeter, 10, coverage, [], today, rng);
+  const all = new Set([...first, ...second, ...third]);
+  check('3 quiz de 10 couvrent les 30 pages', all.size, 30);
+
+  // Réserve de fautes : un échec récent revient en tête, même vu hier.
+  const fails: QuizResult[] = [
+    { page: 7, verseKey: '2:10', found: false, at: '2026-09-12T15:00:00Z' },
+    { page: 19, verseKey: '2:40', found: false, at: '2026-09-13T15:00:00Z' },
+    { page: 3, verseKey: '2:5', found: true, at: '2026-09-13T15:00:00Z' },
+  ];
+  check('fautes récentes, plus récente d’abord', recentFailPages(fails, today), [19, 7]);
+  const withFails = selectQuizPages(perimeter, 10, coverage, fails, today, rng);
+  check('les 2 fautes ouvrent le quiz', withFails.slice(0, 2), [19, 7]);
+  check('toujours 10 questions uniques', new Set(withFails).size, 10);
+
+  // Une faute rattrapée (trouvé plus récent) ne revient plus.
+  const redeemed: QuizResult[] = [
+    ...fails,
+    { page: 19, verseKey: '2:40', found: true, at: '2026-09-14T09:00:00Z' },
+  ];
+  check('faute rattrapée → sortie de la réserve', recentFailPages(redeemed, today), [7]);
+
+  // Périmètre plus petit que la demande : tout le périmètre, sans doublon.
+  const small = selectQuizPages([1, 2, 3], 10, {}, [], today, rng);
+  check('périmètre de 3 pages → 3 questions', small.length, 3);
+}
+
+console.log('Notification du quiz quotidien');
+{
+  const program = { ...mkProgram('auto'), quiz: { enabled: true, hourMin: 15 * 60, questionCount: 10 as const } };
+  const cycle = { number: 1, startDate: '2026-09-14', days: [{ index: 0, pages: [3, 4] }] };
+  const now = new Date(2026, 8, 14, 9, 0);
+  const plan = buildNotificationPlan(program, cycle, now, null);
+  const quiz = plan.filter((n) => n.id >= 737000 && n.id < 738000);
+  check('rappel quiz posé à 15 h', quiz[0]?.at.getHours(), 15);
+  check('un par jour sur l’horizon', quiz.length >= 2, true);
+  const off = { ...program, quiz: { ...program.quiz, enabled: false } };
+  check('désactivé → aucun', buildNotificationPlan(off, cycle, now, null).filter((n) => n.id >= 737000 && n.id < 738000).length, 0);
+  // Jamais configuré → les défauts vivent : le rappel part dès le 1er jour.
+  const virgin = { ...mkProgram('auto') };
+  const virginQuiz = buildNotificationPlan(virgin, cycle, now, null).filter((n) => n.id >= 737000 && n.id < 738000);
+  check('jamais configuré → rappel à 15 h quand même', virginQuiz[0]?.at.getHours(), 15);
 }
 
 console.log('Rappels d’adhkar dans le plan de notifications');

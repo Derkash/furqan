@@ -214,6 +214,7 @@ export default function RecitationPage() {
         {/* Raccourcis */}
         <div className="ds-card p-6 flex flex-col justify-center gap-2.5">
           {[
+            { href: '/recitation/quiz', label: 'Quiz audio', hint: 'Chaque jour, sur tout ce que vous connaissez' },
             { href: '/recitation/apprentissage', label: 'Sourate en cours', hint: 'Consolidation quotidienne du lâhiq' },
             { href: '/recitation/maitrise', label: 'Maîtrise', hint: 'Niveau page par page, sourate, juz’' },
             { href: '/recitation/bilan', label: 'Bilan du cycle', hint: 'Avancement et proposition de rythme' },

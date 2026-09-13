@@ -151,6 +151,8 @@ export interface Program {
   startPage?: number | null;
   /** Rappels d'adhkar calés sur le soleil (lever, zénith, coucher). */
   adhkarEnabled?: boolean;
+  /** Quiz audio quotidien sur le périmètre mémorisé — null = jamais configuré. */
+  quiz?: { enabled: boolean; hourMin: number; questionCount: 5 | 10 | 15 | 20 } | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
