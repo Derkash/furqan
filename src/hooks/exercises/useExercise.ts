@@ -15,6 +15,8 @@ import { STEP_GENERATORS } from '@/lib/exercises/stepGenerators';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import { useVerseMap } from '@/hooks/useVerseMap';
 import { getCurrentUser, getPriorityPages } from '@/utils/exercises/userStats';
+import { loadCoverage, recordCoverage } from '@/lib/recitation/quiz';
+import { addDays, toDateKey } from '@/lib/recitation/schedule';
 
 interface UseExerciseReturn {
   // State
@@ -140,25 +142,53 @@ export function useExercise(): UseExerciseReturn {
   // tant que toute la plage n'a pas été couverte (couverture maximale).
   const sessionUsedRef = useRef<Set<number>>(new Set());
 
-  /** Tire une page NON encore vue cette session (repart pour un cycle quand tout
-   *  a été couvert), avec un léger biais vers les pages à retravailler. */
-  const drawSpreadPage = useCallback((startPage: number, endPage: number): number => {
-    if (endPage <= startPage) return startPage;
-    const used = sessionUsedRef.current;
-    const rangeSize = endPage - startPage + 1;
-    if (used.size >= rangeSize) used.clear(); // toute la plage vue → nouveau cycle
+  /**
+   * Tire une page NON encore vue cette session (repart pour un cycle quand
+   * tout a été couvert), avec un léger biais vers les pages à retravailler.
+   *
+   * `dailyCoverage` (quiz audio quotidien) ajoute deux règles :
+   *  - RÉSERVE DE FAUTES : les deux premières questions de la session
+   *    reviennent d'office sur les pages à retravailler (pas un simple biais) ;
+   *  - COUVERTURE INTER-JOURS : parmi les pages restantes, celles JAMAIS
+   *    interrogées passent d'abord, puis celles vues avant hier — une page vue
+   *    aujourd'hui ou hier ne revient qu'en pénurie. La couverture est
+   *    enregistrée à chaque tirage (localStorage quizCoverage).
+   */
+  const drawSpreadPage = useCallback(
+    (startPage: number, endPage: number, dailyCoverage = false): number => {
+      if (endPage <= startPage) return startPage;
+      const used = sessionUsedRef.current;
+      const rangeSize = endPage - startPage + 1;
+      if (used.size >= rangeSize) used.clear(); // toute la plage vue → nouveau cycle
 
-    const unused: number[] = [];
-    for (let p = startPage; p <= endPage; p++) if (!used.has(p)) unused.push(p);
+      const unused: number[] = [];
+      for (let p = startPage; p <= endPage; p++) if (!used.has(p)) unused.push(p);
 
-    // Biais fautes (30 %) mais uniquement parmi les pages encore non vues.
-    const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
-    const prioUnused = unused.filter((p) => priority.has(p));
-    const pool = prioUnused.length > 0 && Math.random() < 0.3 ? prioUnused : unused;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    used.add(pick);
-    return pick;
-  }, []);
+      const priority = getPriorityPages(getCurrentUser(), startPage, endPage);
+      const prioUnused = unused.filter((p) => priority.has(p));
+      // Réserve déterministe en tête de quiz quotidien, sinon biais 30 %.
+      const reserveSlot = dailyCoverage && used.size < 2;
+      let pool: number[];
+      if (prioUnused.length > 0 && (reserveSlot || Math.random() < 0.3)) {
+        pool = prioUnused;
+      } else if (dailyCoverage) {
+        const cov = loadCoverage();
+        const today = toDateKey(new Date());
+        const yesterday = addDays(today, -1);
+        const fresh = unused.filter((p) => !prioUnused.includes(p));
+        const never = fresh.filter((p) => !cov[p]);
+        const old = fresh.filter((p) => cov[p] && cov[p] < yesterday);
+        pool = never.length ? never : old.length ? old : unused;
+      } else {
+        pool = unused;
+      }
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      used.add(pick);
+      if (dailyCoverage) recordCoverage(pick);
+      return pick;
+    },
+    []
+  );
 
   // File de re-questionnement (fautes de la session en cours) : quand une réponse
   // est fausse, on ré-interroge la même page peu de tours plus tard, sans attendre
@@ -288,7 +318,7 @@ export function useExercise(): UseExerciseReturn {
     const rangeSize = config.endPage - config.startPage + 1;
     let startPage: number;
     if (DOUBLE_PAGE_RANDOM_EXERCISES.includes(config.exerciseId)) {
-      startPage = drawSpreadPage(config.startPage, config.endPage);
+      startPage = drawSpreadPage(config.startPage, config.endPage, config.exerciseId === 'audio-quiz');
     } else if (config.exerciseId === 'sequential') {
       // Séquentiel : départ aléatoire dans la plage (puis progression avec bouclage).
       startPage = config.startPage + Math.floor(Math.random() * rangeSize);
@@ -367,7 +397,7 @@ export function useExercise(): UseExerciseReturn {
           requeueRef.current.splice(dueIdx, 1);
         } else {
           // Sac mélangé : couvre toute la plage avant de reboucler.
-          nextPage = drawSpreadPage(startPage, endPage);
+          nextPage = drawSpreadPage(startPage, endPage, state.exerciseId === 'audio-quiz');
         }
       } else {
         // Progression page par page, sens selon la config (Séquentiel), avec

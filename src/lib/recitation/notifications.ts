@@ -369,7 +369,7 @@ export async function scheduleRecitationNotifications(
               n.id >= ID_BASE + 8000 && n.id < ID_BASE + 9000
                 ? '/adhkar'
                 : n.id >= ID_BASE + 7000 && n.id < ID_BASE + 8000
-                  ? '/recitation/quiz'
+                  ? '/exercises/audio-quiz/setup'
                   : '/recitation/en-cours',
           },
         })),

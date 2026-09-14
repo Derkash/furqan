@@ -10,8 +10,12 @@ import { loadHizbQuarters, unitToGlobalBounds, type HizbQuarter } from '@/utils/
 import { PracticeShell } from '@/components/AppShell';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadSetup, saveSetup } from '@/utils/exercises/exerciseMemory';
-import { getSelfAssess, setSelfAssess } from '@/utils/exercises/prefs';
+import { getSelfAssess, hasSelfAssessPref, setSelfAssess } from '@/utils/exercises/prefs';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
+import { DEFAULT_QUIZ_SETTINGS, recitationQuizRange } from '@/lib/recitation/quiz';
+import { refreshRecitationNative } from '@/lib/recitation/appSync';
+import { formatTime, parseTime } from '@/lib/recitation/schedule';
+import { loadProgram, saveProgram } from '@/lib/recitation/store';
 import type { VersePositionType } from '@/types/exercises';
 import Link from 'next/link';
 
@@ -199,6 +203,9 @@ function SetupPageInner() {
 
   // Aucune valeur pré-saisie au premier rendu (évite aussi un décalage d'hydratation SSR).
   const [range, setRange] = useState<RangePickerValue>({ mode: 'page', start: null, end: null });
+  // Rappel quotidien du quiz audio (notification à heure fixe, Program.quiz).
+  const [dailyQuizEnabled, setDailyQuizEnabled] = useState(true);
+  const [dailyQuizHour, setDailyQuizHour] = useState(15 * 60);
   // Lecture : destination unique (aller à telle page / sourate / hizb / juz),
   // sans blocage de plage — on peut ensuite feuilleter tout le Mushaf.
   const [gotoMode, setGotoMode] = useState<RangeMode>('page');
@@ -236,7 +243,14 @@ function SetupPageInner() {
     // appliquée partout). Sinon, on retombe sur les derniers réglages de l'exo.
     const shared = loadSharedRange();
     const saved = loadSetup(exerciseId);
-    if (shared && (shared.start != null || shared.end != null)) {
+    // QUIZ AUDIO : la plage est TOUJOURS pré-remplie depuis la récitation
+    // quotidienne — de la première page du périmètre à la page atteinte dans
+    // la sourate en cours. Modifiable avant de lancer, mais jamais périmée :
+    // avancer d'une page dans Al-Ma'idah élargit le prochain quiz d'office.
+    const recitRange = exerciseId === 'audio-quiz' ? recitationQuizRange() : null;
+    if (recitRange) {
+      setRange({ mode: 'page', start: recitRange.startPage, end: recitRange.endPage });
+    } else if (shared && (shared.start != null || shared.end != null)) {
       setRange({ mode: shared.mode, start: shared.start, end: shared.end });
     } else if (saved && (saved.mode != null || saved.start != null || saved.end != null)) {
       setRange({
@@ -248,7 +262,18 @@ function SetupPageInner() {
       // Rétro-compat : ancien Hifz enregistré en page unique → proposer la même page en plage.
       setRange({ mode: 'page', start: saved.singlePage, end: saved.singlePage });
     }
-    setSelfAssessOn(getSelfAssess());
+    // Quiz audio : l'auto-évaluation Trouvé/Raté est activée d'office tant que
+    // l'utilisateur n'a pas exprimé de préférence — elle alimente la réserve
+    // de fautes du quiz quotidien.
+    setSelfAssessOn(
+      exerciseId === 'audio-quiz' && !hasSelfAssessPref() ? true : getSelfAssess()
+    );
+    if (exerciseId === 'audio-quiz') {
+      const program = loadProgram();
+      const q = program?.quiz ?? DEFAULT_QUIZ_SETTINGS;
+      setDailyQuizEnabled(q.enabled);
+      setDailyQuizHour(q.hourMin);
+    }
     // Lecture : dernière destination choisie (mode + valeur).
     if (saved?.mode) setGotoMode(saved.mode as RangeMode);
     if (saved?.start != null) setGotoValue(saved.start);
@@ -382,6 +407,21 @@ function SetupPageInner() {
         answerMode,
         revealTimeout,
       });
+      // Synchronise le rappel quotidien : nombre de questions du jour, heure,
+      // activation — la notification de demain reflète ce lancement.
+      const program = loadProgram();
+      if (program) {
+        const allowed = [5, 10, 15, 20] as const;
+        const count = allowed.reduce((best, c) =>
+          Math.abs(c - questionCount) < Math.abs(best - questionCount) ? c : best
+        , allowed[0]);
+        saveProgram({
+          ...program,
+          quiz: { enabled: dailyQuizEnabled, hourMin: dailyQuizHour, questionCount: count },
+          updatedAt: new Date().toISOString(),
+        });
+        refreshRecitationNative(new Date());
+      }
     } else if (isSequential) {
       query.set('show', showPositions.join(','));
       query.set('dir', direction);
@@ -708,6 +748,42 @@ function SetupPageInner() {
                   className="w-5 h-5 accent-[var(--ds-green)] flex-none"
                 />
               </label>
+            )}
+
+            {/* Rappel quotidien du quiz audio : notification à heure fixe,
+                plage toujours pré-remplie depuis la récitation quotidienne. */}
+            {isAudioQuiz && (
+              <div className="px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 bg-[var(--ds-bg)]">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm font-semibold text-[var(--ds-green)]">
+                    Quiz quotidien à {formatTime(dailyQuizHour)}
+                    <span className="block text-[11px] font-normal text-gray-400">
+                      Notification chaque jour — la plage suit votre récitation
+                      (périmètre + sourate en cours).
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={dailyQuizEnabled}
+                    onChange={(e) => setDailyQuizEnabled(e.target.checked)}
+                    className="w-5 h-5 accent-[var(--ds-green)] flex-none"
+                  />
+                </label>
+                {dailyQuizEnabled && (
+                  <label className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-[var(--ds-gold)]/20 text-sm">
+                    <span className="text-gray-500 font-semibold">Heure du rappel :</span>
+                    <input
+                      type="time"
+                      value={`${String(Math.floor(dailyQuizHour / 60)).padStart(2, '0')}:${String(dailyQuizHour % 60).padStart(2, '0')}`}
+                      onChange={(e) => {
+                        const v = parseTime(e.target.value);
+                        if (v != null) setDailyQuizHour(v);
+                      }}
+                      className="rounded-lg border-2 border-[var(--ds-gold)]/30 px-3 py-1.5 bg-white"
+                    />
+                  </label>
+                )}
+              </div>
             )}
 
             {/* Nombre de questions (tous les exercices sauf Hifz) */}

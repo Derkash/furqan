@@ -11,7 +11,8 @@
 //     échecs récents non encore rattrapés — la faute d'avant-hier revient
 //     jusqu'à ce qu'elle soit trouvée.
 
-import { addDays } from './schedule';
+import { addDays, toDateKey } from './schedule';
+import { loadProgram } from './store';
 import type { Program } from './types';
 
 export interface QuizSettings {
@@ -161,6 +162,33 @@ export function recordQuizAnswer(page: number, verseKey: string, found: boolean,
   } catch {
     /* quota — silencieux */
   }
+}
+
+/** Note qu'une page vient d'être interrogée (couverture inter-jours). */
+export function recordCoverage(page: number, now: Date = new Date()): void {
+  if (!isBrowser()) return;
+  try {
+    const coverage = loadCoverage();
+    coverage[page] = toDateKey(now);
+    window.localStorage.setItem(COVERAGE_KEY, JSON.stringify(coverage));
+  } catch {
+    /* quota — silencieux */
+  }
+}
+
+/**
+ * Plage à pré-remplir dans le setup du quiz audio : TOUT ce que la récitation
+ * quotidienne connaît — de la première page du périmètre jusqu'à la page
+ * atteinte dans la sourate en cours (« je suis à Al-Ma'idah page 5 » → la
+ * plage va de la page 2 à cette page-là). null sans programme.
+ */
+export function recitationQuizRange(): { startPage: number; endPage: number } | null {
+  const program = loadProgram();
+  if (!program?.perimeterPages.length) return null;
+  const first = program.perimeterPages[0];
+  const last = program.perimeterPages[program.perimeterPages.length - 1];
+  const learningPage = program.learning?.currentPage ?? null;
+  return { startPage: first, endPage: Math.max(last, learningPage ?? 0) || last };
 }
 
 /** Réglages effectifs du quiz (Program.quiz, sinon défauts). */

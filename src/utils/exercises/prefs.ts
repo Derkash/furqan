@@ -15,6 +15,16 @@ export function getSelfAssess(): boolean {
   }
 }
 
+/** La préférence a-t-elle déjà été définie par l'utilisateur ? */
+export function hasSelfAssessPref(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(SELF_ASSESS_KEY) != null;
+  } catch {
+    return false;
+  }
+}
+
 export function setSelfAssess(value: boolean): void {
   if (typeof window === 'undefined') return;
   try {
