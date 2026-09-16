@@ -15,7 +15,8 @@ import {
   tick,
   type TodayContext,
 } from '@/lib/recitation/dayEngine';
-import { appendEvaluation } from '@/lib/recitation/store';
+import { appendEvaluation, hydrateRecitationFromRemote } from '@/lib/recitation/store';
+import { getCurrentUser } from '@/utils/exercises/userStats';
 import { cancelSlotFollowUps, scheduleRecitationNotifications } from '@/lib/recitation/notifications';
 import { syncNative } from '@/lib/recitation/widgetSync';
 import type { DayState, MasteryLevel, SlotKind } from '@/lib/recitation/types';
@@ -57,6 +58,21 @@ export function useRecitation(): RecitationApi {
       scheduleRecitationNotifications(next.program, next.cycle, current, next.dayState).catch(() => {});
     }
   }, []);
+
+  // Filet de sécurité : compte connecté mais AUCUN programme en local
+  // (stockage vidé — réinstallation de l'app, nouvel appareil…) → on retente
+  // UNE fois la restauration depuis Supabase, puis on recharge le contexte.
+  // Ne touche jamais à un programme local existant (pas d'écrasement).
+  const recoveredRef = useRef(false);
+  useEffect(() => {
+    if (!ready || ctx || recoveredRef.current) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    recoveredRef.current = true;
+    hydrateRecitationFromRemote(user)
+      .then(() => refresh())
+      .catch(() => {});
+  }, [ready, ctx, refresh]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {

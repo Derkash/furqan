@@ -126,12 +126,18 @@ function validateCredentials(
   };
 }
 
-/** Hydrate le cache local (stats + réglages + vocabulaire) depuis Supabase après connexion. */
+/** Hydrate le cache local (stats + réglages + vocabulaire + programme de
+ *  récitation) depuis Supabase après connexion. L'import du store récitation
+ *  est dynamique : il importe lui-même ce module (getCurrentUser) — on évite
+ *  le cycle à l'initialisation. */
 async function hydrateFromRemote(username: string): Promise<void> {
   const [stats, setups] = await Promise.all([
     fetchStats(username),
     fetchSetups(username),
     hydrateVocab(username), // vocabulaire par compte (fusion distant/local)
+    import('@/lib/recitation/store')
+      .then((m) => m.hydrateRecitationFromRemote(username))
+      .catch(() => {}),
   ]);
   if (stats) saveStats(username, stats);
   if (setups) hydrateSetupsLocal(setups);
