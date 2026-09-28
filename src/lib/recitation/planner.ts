@@ -13,7 +13,7 @@ import type { CycleDay, Objective, PlannedSlot, Slot } from './types';
  * Découpe le périmètre en journées selon l'objectif, dans l'ordre du mushaf.
  *
  * - juzPerDay : coupe aux frontières RÉELLES du mushaf (hizb pour ½ juz',
- *   juz' pour 1, un juz' sur deux pour 2) — « 3 juz' connus, 1 juz'/jour »
+ *   sinon tous les n juz' — 1, 2, 3, 4 ou 5) — « 3 juz' connus, 1 juz'/jour »
  *   donne bien un juz' entier par jour même si les juz' font 19-21 pages.
  * - pagesPerDay : remplit chaque jour à la cible, le dernier est plus court.
  * - totalDays : répartition équilibrée sur n jours (surplus sur les premiers).
@@ -49,7 +49,7 @@ export function buildCycleDays(pages: number[], objective: Objective): CycleDay[
   if (objective.amount === 0.5) {
     for (let h = 1; h <= 60; h++) boundaryEnds.add(HIZB_PAGES[h].endPage);
   } else {
-    const step = objective.amount; // 1 ou 2
+    const step = objective.amount; // 1 à 5 juz' par journée
     for (let j = step; j <= 30; j += step) boundaryEnds.add(JUZ_PAGES[j].endPage);
     boundaryEnds.add(JUZ_PAGES[30].endPage);
   }

@@ -1,6 +1,7 @@
 // Libellés d'affichage partagés (écrans + widget + notifications).
 
 import { SURAH_PAGES } from '@/utils/exercises/surahPages';
+import type { Objective } from './types';
 
 /**
  * Repère d'une page EXPRIMÉ DANS SA SOURATE — « 02/page 1 » désigne la
@@ -87,4 +88,29 @@ export function formatDateKey(dateKey: string): string {
     day: 'numeric',
     month: 'long',
   });
+}
+
+// ---------------------------------------------------------------------------
+// Objectif
+// ---------------------------------------------------------------------------
+
+const JUZ_AMOUNT_LABELS: Record<string, string> = {
+  '0.5': 'un demi-juz’',
+  '1': 'un juz’',
+  '2': 'deux juz’',
+  '3': 'trois juz’',
+  '4': 'quatre juz’',
+  '5': 'cinq juz’',
+};
+
+/** « trois juz’ » — sans « par jour ». */
+export function juzAmountLabel(amount: number): string {
+  return JUZ_AMOUNT_LABELS[String(amount)] ?? `${amount} juz’`;
+}
+
+/** Libellé complet d'un objectif : « trois juz’ par jour », « 8 pages par jour »… */
+export function objectiveLabel(obj: Objective): string {
+  if (obj.kind === 'juzPerDay') return `${juzAmountLabel(obj.amount)} par jour`;
+  if (obj.kind === 'pagesPerDay') return `${obj.pages} pages par jour`;
+  return `tout le périmètre en ${obj.days} jours`;
 }

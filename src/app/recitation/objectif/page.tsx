@@ -9,32 +9,37 @@ import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { SetupFrame } from '@/components/recitation/SetupSteps';
 import { loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
-import { formatDateKey, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
+import { formatDateKey, juzAmountLabel, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
 import { perimeterPages } from '@/lib/recitation/perimeter';
 import { buildCycleDays, rotateCycleDays } from '@/lib/recitation/planner';
 import { addDays, cycleDayDates, toDateKey } from '@/lib/recitation/schedule';
 import { learningPagesForDay, learningProgress } from '@/lib/recitation/learning';
 import { loadProgram } from '@/lib/recitation/store';
-import type { Objective } from '@/lib/recitation/types';
+import { JUZ_PER_DAY_AMOUNTS, type JuzPerDayAmount, type Objective } from '@/lib/recitation/types';
 
-type PresetId = 'half-juz' | 'one-juz' | 'two-juz' | 'pages' | 'days';
+type PresetId = 'half-juz' | 'juz' | 'pages' | 'days';
+
+// Rythmes en juz' entiers proposés sous le preset « juz' par jour » (1 à 5).
+const JUZ_CHOICES = JUZ_PER_DAY_AMOUNTS.filter((a): a is JuzPerDayAmount => a >= 1);
 
 const PRESETS: { id: PresetId; label: string; hint: string }[] = [
   { id: 'half-juz', label: 'Un demi-juz’ par jour', hint: 'Découpé aux frontières de hizb' },
-  { id: 'one-juz', label: 'Un juz’ par jour', hint: 'Un juz’ entier chaque jour' },
-  { id: 'two-juz', label: 'Deux juz’ par jour', hint: 'Rythme soutenu' },
+  { id: 'juz', label: 'Des juz’ entiers par jour', hint: 'De 1 à 5 juz’ chaque jour' },
   { id: 'pages', label: 'Un nombre de pages par jour', hint: 'Vous choisissez la quantité' },
   { id: 'days', label: 'Terminer en un nombre de jours', hint: 'Répartition équilibrée' },
 ];
 
-function toObjective(preset: PresetId, pagesPerDay: number, days: number): Objective {
+function toObjective(
+  preset: PresetId,
+  pagesPerDay: number,
+  days: number,
+  juzPerDay: JuzPerDayAmount
+): Objective {
   switch (preset) {
     case 'half-juz':
       return { kind: 'juzPerDay', amount: 0.5 };
-    case 'one-juz':
-      return { kind: 'juzPerDay', amount: 1 };
-    case 'two-juz':
-      return { kind: 'juzPerDay', amount: 2 };
+    case 'juz':
+      return { kind: 'juzPerDay', amount: juzPerDay };
     case 'pages':
       return { kind: 'pagesPerDay', pages: pagesPerDay };
     case 'days':
@@ -44,7 +49,7 @@ function toObjective(preset: PresetId, pagesPerDay: number, days: number): Objec
 
 function fromObjective(obj: Objective | null): PresetId | null {
   if (!obj) return null;
-  if (obj.kind === 'juzPerDay') return obj.amount === 0.5 ? 'half-juz' : obj.amount === 1 ? 'one-juz' : 'two-juz';
+  if (obj.kind === 'juzPerDay') return obj.amount === 0.5 ? 'half-juz' : 'juz';
   return obj.kind === 'pagesPerDay' ? 'pages' : 'days';
 }
 
@@ -54,6 +59,7 @@ export default function ObjectifPage() {
   const [preset, setPreset] = useState<PresetId | null>(null);
   const [pagesPerDay, setPagesPerDay] = useState(5);
   const [days, setDays] = useState(7);
+  const [juzPerDay, setJuzPerDay] = useState<JuzPerDayAmount>(1);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -62,6 +68,8 @@ export default function ObjectifPage() {
     setPreset(fromObjective(d.objective));
     if (d.objective?.kind === 'pagesPerDay') setPagesPerDay(d.objective.pages);
     if (d.objective?.kind === 'totalDays') setDays(d.objective.days);
+    if (d.objective?.kind === 'juzPerDay' && d.objective.amount >= 1)
+      setJuzPerDay(d.objective.amount);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -73,7 +81,7 @@ export default function ObjectifPage() {
     if (!cfg) return null;
     return { config: cfg, pages: learningPagesForDay(cfg, 0), progress: learningProgress(cfg) };
   }, [draft]);
-  const objective = preset ? toObjective(preset, pagesPerDay, days) : null;
+  const objective = preset ? toObjective(preset, pagesPerDay, days, juzPerDay) : null;
   // Jours dans l'ordre du mushaf (pour le sélecteur de départ)…
   const baseDays = useMemo(
     () => (objective ? buildCycleDays(pages, objective) : []),
@@ -91,9 +99,14 @@ export default function ObjectifPage() {
 
   if (!draft) return <AppShell><div /></AppShell>;
 
-  const persist = (p: PresetId, nPages = pagesPerDay, nDays = days) => {
+  const persist = (
+    p: PresetId,
+    nPages = pagesPerDay,
+    nDays = days,
+    nJuz: JuzPerDayAmount = juzPerDay
+  ) => {
     setPreset(p);
-    const next = { ...draft, objective: toObjective(p, nPages, nDays) };
+    const next = { ...draft, objective: toObjective(p, nPages, nDays, nJuz) };
     setDraft(next);
     saveDraft(next);
   };
@@ -125,6 +138,30 @@ export default function ObjectifPage() {
             >
               <span className="font-bold text-[15px]">{p.label}</span>
               <span className="block text-[13px] text-[var(--ds-n600)] mt-0.5">{p.hint}</span>
+              {p.id === 'juz' && preset === 'juz' && (
+                <span className="flex flex-wrap items-center gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
+                  {JUZ_CHOICES.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        setJuzPerDay(n);
+                        persist('juz', pagesPerDay, days, n);
+                      }}
+                      className={`min-w-[44px] rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
+                        juzPerDay === n
+                          ? 'bg-[var(--ds-green)] text-white'
+                          : 'bg-white border border-[var(--ds-divider)] text-[var(--ds-n700)] hover:border-[var(--ds-n400)]'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <span className="text-sm text-[var(--ds-n600)]">
+                    juz’ par jour — {juzAmountLabel(juzPerDay)} chaque jour
+                  </span>
+                </span>
+              )}
               {p.id === 'pages' && preset === 'pages' && (
                 <span className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                   <input

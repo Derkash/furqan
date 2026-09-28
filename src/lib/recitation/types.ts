@@ -31,10 +31,18 @@ export interface PerimeterSummary {
 // Objectif et cycle
 // ---------------------------------------------------------------------------
 
+/**
+ * Rythmes « juz' par jour » proposés, du plus doux au plus soutenu.
+ * 0.5 = un hizb ; au-delà de 1, on regroupe n juz' entiers par journée.
+ */
+export const JUZ_PER_DAY_AMOUNTS = [0.5, 1, 2, 3, 4, 5] as const;
+
+export type JuzPerDayAmount = (typeof JUZ_PER_DAY_AMOUNTS)[number];
+
 /** Objectif de récitation choisi (construit le cycle). */
 export type Objective =
-  /** n juz' par jour (0.5 = un hizb) : découpe aux frontières réelles du mushaf. */
-  | { kind: 'juzPerDay'; amount: 0.5 | 1 | 2 }
+  /** n juz' par jour (0.5 = un hizb, jusqu'à 5) : découpe aux frontières réelles du mushaf. */
+  | { kind: 'juzPerDay'; amount: JuzPerDayAmount }
   /** n pages par jour : jours remplis à la cible, dernier jour plus court. */
   | { kind: 'pagesPerDay'; pages: number }
   /** Terminer tout le périmètre en n jours : répartition équilibrée. */

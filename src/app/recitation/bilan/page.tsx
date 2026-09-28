@@ -21,14 +21,14 @@ import {
   saveProgram,
   clearDayState,
 } from '@/lib/recitation/store';
-import type { MasteryLevel, Objective } from '@/lib/recitation/types';
+import { JUZ_PER_DAY_AMOUNTS, type MasteryLevel, type Objective } from '@/lib/recitation/types';
+import { objectiveLabel } from '@/lib/recitation/labels';
 
-function objectiveLabel(obj: Objective): string {
-  if (obj.kind === 'juzPerDay') {
-    return obj.amount === 0.5 ? 'un demi-juz’ par jour' : obj.amount === 1 ? 'un juz’ par jour' : 'deux juz’ par jour';
-  }
-  if (obj.kind === 'pagesPerDay') return `${obj.pages} pages par jour`;
-  return `tout le périmètre en ${obj.days} jours`;
+/** Rythme juz'/jour voisin : d'un cran plus doux (-1) ou plus soutenu (+1). */
+function juzNeighbour(amount: number, direction: -1 | 1) {
+  const i = JUZ_PER_DAY_AMOUNTS.indexOf(amount as (typeof JUZ_PER_DAY_AMOUNTS)[number]);
+  if (i === -1) return null;
+  return JUZ_PER_DAY_AMOUNTS[i + direction] ?? null;
 }
 
 export default function BilanPage() {
@@ -77,8 +77,8 @@ export default function BilanPage() {
     const softer: Objective =
       program.objective.kind === 'pagesPerDay'
         ? { kind: 'pagesPerDay', pages: Math.max(1, Math.floor(program.objective.pages * 0.7)) }
-        : program.objective.kind === 'juzPerDay' && program.objective.amount > 0.5
-          ? { kind: 'juzPerDay', amount: program.objective.amount === 2 ? 1 : 0.5 }
+        : program.objective.kind === 'juzPerDay' && juzNeighbour(program.objective.amount, -1) != null
+          ? { kind: 'juzPerDay', amount: juzNeighbour(program.objective.amount, -1)! }
           : { kind: 'totalDays', days: cycle.days.length + Math.ceil(cycle.days.length / 2) };
     proposal = {
       text: `Une partie du cycle n’a pas pu être récitée : un rythme un peu plus doux (${objectiveLabel(softer)}) rendrait le programme plus serein.`,
@@ -88,8 +88,8 @@ export default function BilanPage() {
     const harder: Objective =
       program.objective.kind === 'pagesPerDay'
         ? { kind: 'pagesPerDay', pages: program.objective.pages + Math.max(1, Math.round(program.objective.pages * 0.25)) }
-        : program.objective.kind === 'juzPerDay' && program.objective.amount < 2
-          ? { kind: 'juzPerDay', amount: program.objective.amount === 0.5 ? 1 : 2 }
+        : program.objective.kind === 'juzPerDay' && juzNeighbour(program.objective.amount, 1) != null
+          ? { kind: 'juzPerDay', amount: juzNeighbour(program.objective.amount, 1)! }
           : program.objective;
     if (JSON.stringify(harder) !== JSON.stringify(program.objective)) {
       proposal = {
