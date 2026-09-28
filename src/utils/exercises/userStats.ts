@@ -14,6 +14,7 @@ import {
 } from './progressSync';
 import { hydrateSetupsLocal } from './exerciseMemory';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
+import { flushStateBackup, scheduleStateBackup } from '@/utils/nativeStateBackup';
 
 /**
  * Événement par mot : 'faute' (difficulté déclarée) ou 'ok' (mot récité sans
@@ -101,11 +102,18 @@ function setUserCookie(username: string | null) {
     try {
       window.localStorage.removeItem(SESSION_KEY);
     } catch {}
+    // Déconnexion : le miroir durable est réécrit TOUT DE SUITE, sinon une
+    // fermeture dans la foulée le laisserait rétablir la session au lancement
+    // suivant (on se retrouverait reconnecté sans l'avoir demandé).
+    void flushStateBackup();
   } else {
     document.cookie = `${COOKIE_NAME}=${encodeURIComponent(username)}; path=/; max-age=31536000`;
     try {
       window.localStorage.setItem(SESSION_KEY, username);
     } catch {}
+    // La session fait partie du miroir : sans elle, l'app redémarre
+    // déconnectée et ne peut plus rien réhydrater depuis Supabase.
+    scheduleStateBackup();
   }
 }
 
@@ -284,6 +292,7 @@ function saveStats(username: string, stats: UserStats) {
         verseResults: stats.verseResults.slice(-MAX_ENTRIES),
       })
     );
+    scheduleStateBackup();
   } catch {
     // Quota plein : on ignore.
   }

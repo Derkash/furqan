@@ -6,9 +6,27 @@ import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initAudioStore, isNativeApp } from '@/utils/audioStore';
 import { refreshRecitationNative } from '@/lib/recitation/appSync';
+import { hydrateRecitationFromRemote, loadProgram } from '@/lib/recitation/store';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
 import { applyOrientationPref } from '@/utils/orientation';
+import { flushStateBackup, restoreStateFromDisk } from '@/utils/nativeStateBackup';
+
+/**
+ * Recharge la page UNE SEULE FOIS par lancement et par motif : les écrans déjà
+ * montés ont lu un stockage vide, il faut les refaire lire. La garde (par
+ * motif) rend toute boucle impossible.
+ */
+function reloadOnce(reason: string): void {
+  const key = `almuraja3a:reloaded:${reason}`;
+  try {
+    if (window.sessionStorage.getItem(key) === '1') return;
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    return; // sessionStorage indisponible : on s'abstient plutôt que boucler
+  }
+  window.location.reload();
+}
 
 /**
  * Initialisations côté client au démarrage. Dans l'app iPad (Capacitor) :
@@ -25,6 +43,30 @@ export default function AppInit() {
       // Orientation choisie par l'utilisateur (Auto par défaut) : rien n'est
       // imposé, on se contente de rétablir son réglage.
       applyOrientationPref();
+
+      // Filet contre les purges du WKWebView (iOS peut vider localStorage au
+      // redémarrage de l'appareil) : on rétablit ce qui manque depuis le
+      // miroir du conteneur. Si quelque chose a été rétabli, on recharge une
+      // fois — les écrans déjà montés ont lu un stockage vide.
+      restoreStateFromDisk()
+        .then((restored) => {
+          if (restored > 0) {
+            reloadOnce('disk');
+            return;
+          }
+          // Rien à rétablir : on (re)pose le miroir pour la prochaine fois.
+          void flushStateBackup();
+        })
+        .catch(() => {});
+
+      // Sauvegarde du miroir quand l'app quitte le premier plan (dernier
+      // moment sûr avant une mise en veille ou un redémarrage).
+      const backupNow = () => {
+        if (document.visibilityState === 'hidden') void flushStateBackup();
+      };
+      document.addEventListener('visibilitychange', backupNow);
+      window.addEventListener('pagehide', () => void flushStateBackup());
+      cleanups.push(() => document.removeEventListener('visibilitychange', backupNow));
 
       // Deep link du widget / de l'activité en direct :
       // almuraja3a://recitation/en-cours → page « Récitation en cours ».
@@ -51,6 +93,7 @@ export default function AppInit() {
       refreshRecitationNative();
       CapApp.addListener('appStateChange', ({ isActive }) => {
         if (isActive) refreshRecitationNative();
+        else void flushStateBackup(); // passage en arrière-plan : on fige le miroir
       });
       const recitationTimer = window.setInterval(() => refreshRecitationNative(), 5 * 60 * 1000);
       cleanups.push(() => window.clearInterval(recitationTimer));
@@ -70,7 +113,20 @@ export default function AppInit() {
     // applique le nettoyage distant (dédup + forme coranique exacte) sans
     // devoir se reconnecter. No-op si Supabase absent.
     const user = getCurrentUser();
-    if (user) hydrateVocab(user).catch(() => {});
+    if (user) {
+      hydrateVocab(user).catch(() => {});
+      // Second filet pour le programme de récitation : s'il manque ALORS QU'UN
+      // COMPTE est connecté (purge sans miroir exploitable, nouvel appareil),
+      // on le récupère depuis Supabase. Jamais d'écrasement : on n'y touche que
+      // si le local est vide.
+      if (!loadProgram()) {
+        hydrateRecitationFromRemote(user)
+          .then(() => {
+            if (loadProgram()) reloadOnce('remote-program');
+          })
+          .catch(() => {});
+      }
+    }
 
     return () => {
       cleanups.forEach((fn) => fn());

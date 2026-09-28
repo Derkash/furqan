@@ -5,6 +5,7 @@ import type { RangeMode } from './rangeToPages';
 import type { VersePositionType } from '@/types/exercises';
 import { getCurrentUser } from './userStats';
 import { pushSetup } from './progressSync';
+import { scheduleStateBackup } from '@/utils/nativeStateBackup';
 
 export interface StoredSetup {
   /** Mode de plage (page / hizb / juz / sourate) — pour les exercices à plage. */
@@ -63,6 +64,7 @@ export function saveSetup(exerciseId: string, data: StoredSetup): void {
   if (!isBrowser()) return;
   try {
     window.localStorage.setItem(PREFIX + exerciseId, JSON.stringify(data));
+    scheduleStateBackup();
   } catch {
     // Quota plein ou stockage indisponible : on ignore silencieusement.
   }

@@ -7,6 +7,7 @@
 
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import { pushVocabEntry, deleteVocabRemote, pushVocabBulk } from './vocabSync';
+import { scheduleStateBackup } from '@/utils/nativeStateBackup';
 
 export interface VocabEntry {
   id: string; // ancre : "r:<racine>" ou "f:<forme nue>"
@@ -142,6 +143,7 @@ function writeVocab(list: VocabEntry[]) {
   if (!getCurrentUser()) return;
   try {
     window.localStorage.setItem(PREFIX + userKey(), JSON.stringify(list));
+    scheduleStateBackup();
   } catch {
     /* quota — silencieux */
   }

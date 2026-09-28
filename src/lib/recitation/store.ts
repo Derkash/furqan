@@ -5,6 +5,7 @@
 // L'historique (sessions, évaluations) est en APPEND : jamais purgé (brief §19).
 
 import { supabase } from '@/lib/supabase';
+import { scheduleStateBackup } from '@/utils/nativeStateBackup';
 import { getCurrentUser } from '@/utils/exercises/userStats';
 import type { Cycle, DayState, PageEvaluation, Program, SessionRecord } from './types';
 
@@ -41,6 +42,8 @@ function writeLocal(key: StateKey, value: unknown): void {
   if (!isBrowser()) return;
   try {
     window.localStorage.setItem(KEYS[key], JSON.stringify(value));
+    // Miroir durable (app native) : le WKWebView peut être purgé par iOS.
+    scheduleStateBackup();
   } catch (e) {
     warn(`writeLocal:${key}`, e);
   }
@@ -93,6 +96,7 @@ export function clearDayState(): void {
   if (isBrowser()) {
     try {
       window.localStorage.removeItem(KEYS.dayState);
+      scheduleStateBackup();
     } catch {}
   }
 }
