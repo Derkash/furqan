@@ -89,6 +89,29 @@ export function rotateCycleDays(days: CycleDay[], startPage: number | null | und
   return [...days.slice(k), ...days.slice(0, k)].map((d, i) => ({ ...d, index: i }));
 }
 
+/** Choix proposés pour la répétition de chaque portion (jours consécutifs). */
+export const REPEAT_DAYS_CHOICES = [1, 2, 3] as const;
+
+/**
+ * Répète chaque journée `repeat` fois de suite : avec 2, [juz 1-2, juz 3-4]
+ * devient [1-2, 1-2, 3-4, 3-4] — on consolide une portion avant d'avancer.
+ */
+export function repeatCycleDays(days: CycleDay[], repeat: number | null | undefined): CycleDay[] {
+  const n = Math.max(1, Math.floor(repeat ?? 1));
+  if (n === 1) return days;
+  return days.flatMap((d) => Array.from({ length: n }, () => d.pages)).map((pages, index) => ({ index, pages }));
+}
+
+/** Journées du cycle d'un programme : découpe → point de départ → répétition. */
+export function buildProgramCycleDays(
+  pages: number[],
+  objective: Objective,
+  startPage: number | null | undefined,
+  repeatDays: number | null | undefined
+): CycleDay[] {
+  return repeatCycleDays(rotateCycleDays(buildCycleDays(pages, objective), startPage), repeatDays);
+}
+
 // ---------------------------------------------------------------------------
 // Répartition d'une journée entre les créneaux
 // ---------------------------------------------------------------------------

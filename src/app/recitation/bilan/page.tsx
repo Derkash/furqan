@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { MASTERY_LABELS, masteryBreakdown } from '@/lib/recitation/mastery';
-import { buildCycleDays, rotateCycleDays } from '@/lib/recitation/planner';
+import { buildProgramCycleDays } from '@/lib/recitation/planner';
 import { toDateKey } from '@/lib/recitation/schedule';
 import {
   evaluationsByPage,
@@ -106,7 +106,7 @@ export default function BilanPage() {
     saveCycle({
       number: cycle.number + 1,
       startDate: toDateKey(new Date()),
-      days: rotateCycleDays(buildCycleDays(updated.perimeterPages, proposal.objective), updated.startPage),
+      days: buildProgramCycleDays(updated.perimeterPages, proposal.objective, updated.startPage, updated.repeatDays),
     });
     clearDayState();
     setApplied(true);

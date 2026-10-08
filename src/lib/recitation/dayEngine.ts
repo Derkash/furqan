@@ -10,15 +10,16 @@
 
 import {
   DEFAULT_MIN_PER_PAGE,
-  buildCycleDays,
+  buildProgramCycleDays,
   carryOverPages,
-  rotateCycleDays,
   splitPagesAcrossSlots,
   splitPagesCustom,
 } from './planner';
 import {
-  cycleDayDates,
+  cycleDates,
+  firstActiveDate,
   slotsForWeekday,
+  startDateForIndex,
   toDateKey,
   weekdayOf,
 } from './schedule';
@@ -53,33 +54,33 @@ export interface TodayContext {
   todayKey: string;
   /** Dates planifiées de chaque jour du cycle courant. */
   dayDates: string[];
-  /** Journées passées du cycle sans aucune session enregistrée (retard). */
-  missedDates: string[];
 }
 
 // ---------------------------------------------------------------------------
 // Construction d'une journée
 // ---------------------------------------------------------------------------
 
-/** Pages prévues d'un jour du cycle + renforcement + rattrapage en tête. */
+/**
+ * Pages prévues d'un jour du cycle (moins celles déjà faites lors d'une
+ * tentative précédente de cette même journée) + renforcement en tête.
+ */
 function pagesForDay(
   program: Program,
   cycle: Cycle,
   cycleDayIndex: number,
   todayKey: string,
-  catchUp: number[]
+  doneEarlier: number[]
 ): { pages: number[]; reinforcement: number[] } {
-  const base = cycle.days[cycleDayIndex]?.pages ?? [];
+  const done = new Set(doneEarlier);
+  const base = (cycle.days[cycleDayIndex]?.pages ?? []).filter((p) => !done.has(p));
   let reinforcement: number[] = [];
   if (program.reinforcementEnabled) {
     const evals = evaluationsByPage(loadEvaluations());
-    reinforcement = reinforcementDuePages(evals, todayKey, new Set(base)).filter(
-      (p) => !catchUp.includes(p)
-    );
+    reinforcement = reinforcementDuePages(evals, todayKey, new Set(base));
   }
   // Ordre : renforcement d'abord (brief §9 : début du prochain créneau),
-  // puis rattrapage, puis le programme du jour — sans doublon.
-  const pages = carryOverPages([...reinforcement, ...catchUp], base);
+  // puis le programme du jour — sans doublon.
+  const pages = carryOverPages(reinforcement, base);
   return { pages, reinforcement };
 }
 
@@ -100,10 +101,11 @@ function buildDayState(
   cycle: Cycle,
   todayKey: string,
   cycleDayIndex: number,
-  catchUp: number[]
+  doneEarlier: number[],
+  resumed: boolean
 ): DayState {
   const slots = slotsForWeekday(program.schedule, weekdayOf(todayKey));
-  const { pages, reinforcement } = pagesForDay(program, cycle, cycleDayIndex, todayKey, catchUp);
+  const { pages, reinforcement } = pagesForDay(program, cycle, cycleDayIndex, todayKey, doneEarlier);
   const planned: PlannedSlot[] = (
     program.slotSplit.mode === 'custom'
       ? splitPagesCustom(pages, slots, program.slotSplit.pagesPerSlot)
@@ -131,7 +133,8 @@ function buildDayState(
     closedSlots: [],
     overdueDecision: null,
     reinforcementPages: reinforcement,
-    pendingCatchUp: [],
+    doneEarlier,
+    resumed,
   };
 }
 
@@ -177,14 +180,17 @@ function closePastDay(state: DayState): void {
 }
 
 /**
- * Pages non récitées d'une journée pour le rattrapage. Seul le CYCLE est
- * rattrapé : la sourate en cours se récite le jour même ou pas du tout —
- * la reporter reviendrait à doubler la séance du lendemain.
+ * Où reprendre après une journée passée : la journée suivante du cycle si
+ * toutes ses pages ont été récitées (cette fois-ci ou lors d'une tentative
+ * précédente), sinon LA MÊME journée, amputée de ce qui est déjà fait.
+ * Seul le cycle compte : la sourate en cours se récite le jour même.
  */
-function unrecitedPages(state: DayState): number[] {
-  const recited = new Set(state.recitedPages);
-  const all = state.slots.filter((s) => s.kind !== 'learning').flatMap((s) => s.pages);
-  return [...new Set(all.filter((p) => !recited.has(p)))];
+function nextPosition(cycle: Cycle, state: DayState): { index: number; doneEarlier: number[]; resumed: boolean } {
+  const index = Math.min(state.cycleDayIndex, cycle.days.length);
+  const base = cycle.days[index]?.pages ?? [];
+  const done = new Set([...(state.doneEarlier ?? []), ...state.recitedPages]);
+  if (base.every((p) => done.has(p))) return { index: index + 1, doneEarlier: [], resumed: false };
+  return { index, doneEarlier: base.filter((p) => done.has(p)), resumed: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -194,9 +200,12 @@ function unrecitedPages(state: DayState): number[] {
 /**
  * Garantit un état du jour cohérent pour `now` :
  * - clôt (journalise) une éventuelle journée précédente restée ouverte ;
- * - avance dans le cycle (jours actifs uniquement) et bascule sur un nouveau
- *   cycle quand le précédent est terminé ;
- * - détecte les journées manquées (brief §16 — l'UI propose alors les options).
+ * - avance dans le cycle selon la PROGRESSION, jamais selon le calendrier :
+ *   une journée non terminée est reprise le lendemain (seulement ce qui
+ *   reste), et la suite du cycle glisse d'autant. Plusieurs jours sans
+ *   ouvrir l'app → on reprend exactement où on s'était arrêté, sans pile
+ *   de pages en retard ;
+ * - bascule sur un nouveau cycle quand la dernière journée est terminée.
  * Renvoie null si aucun programme n'est enregistré.
  */
 export function ensureToday(now: Date): TodayContext | null {
@@ -206,59 +215,72 @@ export function ensureToday(now: Date): TodayContext | null {
 
   const todayKey = toDateKey(now);
   let state = loadDayState();
-  let catchUp: number[] = [];
+  let resume: ReturnType<typeof nextPosition> | null = null;
 
-  // 1. Journée précédente restée ouverte → clôture. Les pages restantes ne
-  // sont reprises aujourd'hui QUE si le report automatique est choisi —
-  // brief §16 : ne jamais surcharger la journée sans l'accord de l'utilisateur.
+  // 1. Journée précédente restée ouverte → clôture, puis position de reprise.
+  // L'état clos reste stocké jusqu'à la prochaine journée active : un jour de
+  // repos recalcule la même reprise (idempotent).
   if (state && state.date !== todayKey) {
-    const leftover = unrecitedPages(state);
     closePastDay(state);
     saveDayState(state); // closedSlots à jour (évite une double journalisation)
-    catchUp = program.carryOver === 'auto' ? [...leftover, ...(state.pendingCatchUp ?? [])] : [];
+    resume = nextPosition(cycle, state);
     state = null;
   }
 
-  // 2. Dates planifiées du cycle courant.
-  let dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  if (resume) {
+    if (resume.index >= cycle.days.length) {
+      // 2a. Dernière journée terminée → nouveau cycle. Le point de départ
+      // choisi (« je commence par le juz 3 ») et la répétition valent pour
+      // chaque cycle.
+      cycle = {
+        number: cycle.number + 1,
+        startDate: todayKey,
+        days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays),
+      };
+      saveCycle(cycle);
+      resume = { index: 0, doneEarlier: [], resumed: false };
+    } else {
+      // 2b. Recaler le calendrier : la journée à reprendre tombe au prochain
+      // jour actif (aujourd'hui s'il l'est), la suite glisse derrière.
+      const target = firstActiveDate(program.schedule, todayKey);
+      const anchor = target ? startDateForIndex(program.schedule, target, resume.index) : null;
+      if (anchor && anchor !== (cycle.anchorDate ?? cycle.startDate)) {
+        cycle = { ...cycle, anchorDate: anchor };
+        saveCycle(cycle);
+      }
+    }
+  }
 
-  // 3. Cycle terminé ? (toutes les dates passées) → nouveau cycle dès aujourd'hui.
-  if (dayDates.length && dayDates[dayDates.length - 1] < todayKey) {
-    const nextNumber = cycle.number + 1;
-    // Le point de départ choisi (« je commence par le juz 3 ») vaut pour
-    // chaque cycle : l'ordre tourné est l'ordre du programme.
-    const days = rotateCycleDays(
-      buildCycleDays(program.perimeterPages, program.objective),
-      program.startPage
-    );
-    cycle = { number: nextNumber, startDate: todayKey, days };
+  let dayDates = cycleDates(program.schedule, cycle);
+
+  // 3. Sans journée précédente connue (premier lancement, programme modifié) :
+  // cycle entièrement passé → nouveau cycle dès aujourd'hui.
+  if (!resume && dayDates.length && dayDates[dayDates.length - 1] < todayKey) {
+    cycle = {
+      number: cycle.number + 1,
+      startDate: todayKey,
+      days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays),
+    };
     saveCycle(cycle);
-    dayDates = cycleDayDates(program.schedule, todayKey, days.length);
+    dayDates = cycleDates(program.schedule, cycle);
   }
 
   // 4. Index du jour courant dans le cycle.
   const todayIndex = dayDates.indexOf(todayKey);
 
-  // 5. Journées passées du cycle sans session (retard à signaler à l'UI).
-  const sessions = loadSessionDates();
-  const missedDates = dayDates.filter((d) => d < todayKey && !sessions.has(d));
-
-  // 6. Jour inactif : pas d'état du jour (repos), l'UI affiche la prochaine date.
+  // 5. Jour inactif : pas d'état du jour (repos), l'UI affiche la prochaine date.
   if (todayIndex === -1) {
-    return { program, cycle, dayState: null, todayKey, dayDates, missedDates };
+    return { program, cycle, dayState: null, todayKey, dayDates };
   }
 
-  // 7. Construire l'état du jour s'il n'existe pas encore.
+  // 6. Construire l'état du jour s'il n'existe pas encore.
   if (!state) {
-    state = buildDayState(program, cycle, todayKey, todayIndex, catchUp);
+    const carry = resume && resume.index === todayIndex ? resume : null;
+    state = buildDayState(program, cycle, todayKey, todayIndex, carry?.doneEarlier ?? [], carry?.resumed ?? false);
     saveDayState(state);
   }
 
-  return { program, cycle, dayState: state, todayKey, dayDates, missedDates };
-}
-
-function loadSessionDates(): Set<string> {
-  return new Set(loadSessions().map((s) => s.date));
+  return { program, cycle, dayState: state, todayKey, dayDates };
 }
 
 // ---------------------------------------------------------------------------
@@ -308,14 +330,22 @@ export function rebuildToday(now: Date): TodayContext | null {
     return ensureToday(now);
   }
 
-  const dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  const dayDates = cycleDates(program.schedule, cycle);
   const index = dayDates.indexOf(todayKey);
   if (index === -1) {
     clearDayState();
     return ensureToday(now);
   }
 
-  const fresh = buildDayState(program, cycle, todayKey, index, previous.pendingCatchUp ?? []);
+  const sameDay = previous.cycleDayIndex === index;
+  const fresh = buildDayState(
+    program,
+    cycle,
+    todayKey,
+    index,
+    sameDay ? (previous.doneEarlier ?? []) : [],
+    sameDay && !!previous.resumed
+  );
   const closedSignatures = new Set(
     previous.closedSlots.map((i) => {
       const slot = previous.slots[i];
@@ -606,48 +636,6 @@ export function pendingOverdue(program: Program, state: DayState, nowMin: number
 /** Décision sur le retard du jour (mode « demander »). */
 export function resolveOverdue(state: DayState, accept: boolean): DayState {
   const next: DayState = { ...state, overdueDecision: accept ? 'accepted' : 'declined' };
-  saveDayState(next);
-  return next;
-}
-
-/**
- * Traitement d'un retard (brief §16). `mode` :
- * - 'catch-up'  : répartir les pages manquées sur les créneaux restants du jour ;
- * - 'skip'      : reprendre aujourd'hui sans rattrapage (le cycle continue) ;
- * (le décalage du cycle est le comportement par défaut d'ensureToday).
- */
-export function resolveMissedDays(
-  program: Program,
-  cycle: Cycle,
-  state: DayState,
-  missedDates: string[],
-  mode: 'catch-up' | 'skip'
-): DayState {
-  if (mode === 'skip' || !missedDates.length) return state;
-  // Pages des jours manqués = jours du cycle planifiés à ces dates.
-  const dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
-  const recited = new Set(state.recitedPages);
-  const missedPages: number[] = [];
-  for (const d of missedDates) {
-    const idx = dayDates.indexOf(d);
-    if (idx >= 0) for (const p of cycle.days[idx].pages) if (!recited.has(p)) missedPages.push(p);
-  }
-  if (!missedPages.length) return state;
-  // Répartition limitée : au plus +50 % de pages par créneau restant (pas de surcharge).
-  const next: DayState = { ...state, slots: state.slots.map((s) => ({ ...s })) };
-  const openSlots = next.slots
-    .map((s, i) => ({ s, i }))
-    .filter(({ s, i }) => s.kind !== 'learning' && !next.closedSlots.includes(i));
-  if (!openSlots.length) return state;
-  const queue = [...new Set(missedPages)];
-  for (const { s, i } of openSlots) {
-    if (!queue.length) break;
-    const cap = Math.max(1, Math.ceil(s.pages.length * 0.5));
-    const take = queue.splice(0, cap);
-    next.slots[i] = { ...s, pages: carryOverPages(take, s.pages) };
-  }
-  // Le surplus reste en attente pour demain.
-  next.pendingCatchUp = queue;
   saveDayState(next);
   return next;
 }

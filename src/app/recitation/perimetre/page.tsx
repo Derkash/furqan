@@ -11,7 +11,7 @@ import { SetupFrame } from '@/components/recitation/SetupSteps';
 import { loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
 import { pageRefLabel } from '@/lib/recitation/labels';
 import { perimeterPages, perimeterSummary } from '@/lib/recitation/perimeter';
-import { buildCycleDays } from '@/lib/recitation/planner';
+import { buildProgramCycleDays } from '@/lib/recitation/planner';
 import { SURAH_PAGES } from '@/utils/exercises/surahPages';
 import type { MemorizedSelection } from '@/lib/recitation/types';
 
@@ -78,7 +78,7 @@ export default function PerimetrePage() {
   const pages = useMemo(() => (draft ? perimeterPages(draft.selections) : []), [draft]);
   const summary = useMemo(() => perimeterSummary(pages), [pages]);
   const cycleLen = useMemo(
-    () => (draft?.objective ? buildCycleDays(pages, draft.objective).length : null),
+    () => (draft?.objective ? buildProgramCycleDays(pages, draft.objective, null, draft.repeatDays).length : null),
     [draft, pages]
   );
 

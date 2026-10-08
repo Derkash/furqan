@@ -9,7 +9,6 @@ import {
   cycleProgress,
   ensureToday,
   resolveOverdue,
-  resolveMissedDays,
   setPageRecited,
   clearPendingEvaluation,
   tick,
@@ -31,7 +30,6 @@ export interface RecitationApi {
   evaluate: (page: number, level: MasteryLevel, note?: string) => void;
   skipEvaluation: (page: number) => void;
   decideOverdue: (accept: boolean) => void;
-  decideMissed: (mode: 'catch-up' | 'skip') => void;
   refresh: () => void;
 }
 
@@ -136,17 +134,6 @@ export function useRecitation(): RecitationApi {
     [withState]
   );
 
-  const decideMissed = useCallback(
-    (mode: 'catch-up' | 'skip') => {
-      setCtx((prev) => {
-        if (!prev?.dayState) return prev;
-        const nextState = resolveMissedDays(prev.program, prev.cycle, prev.dayState, prev.missedDates, mode);
-        return { ...prev, dayState: nextState, missedDates: [] };
-      });
-    },
-    []
-  );
-
   const cycleStats = ctx ? cycleProgress(ctx.cycle, ctx.dayState) : null;
 
   return {
@@ -158,7 +145,6 @@ export function useRecitation(): RecitationApi {
     evaluate,
     skipEvaluation,
     decideOverdue,
-    decideMissed,
     refresh,
   };
 }

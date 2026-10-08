@@ -5,9 +5,9 @@
 // l'historique (sessions, évaluations) n'est JAMAIS touché (brief §19).
 
 import { archiveToday } from './dayEngine';
-import { buildCycleDays, rotateCycleDays } from './planner';
+import { buildProgramCycleDays } from './planner';
 import { perimeterPages } from './perimeter';
-import { cycleDayDates, startDateForIndex, toDateKey } from './schedule';
+import { cycleDates, startDateForIndex, toDateKey } from './schedule';
 import {
   clearDayState,
   loadCycle,
@@ -31,6 +31,8 @@ export interface ProgramDraft {
   learning: Program['learning'];
   /** Première page du cycle (le cycle tourne autour) — null = début du périmètre. */
   startPage: number | null;
+  /** Jours consécutifs par portion avant d'avancer (1 = on avance chaque jour). */
+  repeatDays: number;
   /** Rappels d'adhkar (lever / zénith / coucher du soleil). */
   adhkarEnabled: boolean;
 }
@@ -54,6 +56,7 @@ export function emptyDraft(): ProgramDraft {
     endReminderMin: 15,
     learning: null,
     startPage: null,
+    repeatDays: 1,
     adhkarEnabled: true,
   };
 }
@@ -79,6 +82,7 @@ export function loadDraft(): ProgramDraft {
       endReminderMin: existing.endReminderMin,
       learning: existing.learning ?? null,
       startPage: existing.startPage ?? null,
+      repeatDays: existing.repeatDays ?? 1,
       adhkarEnabled: existing.adhkarEnabled ?? true,
     };
   }
@@ -106,7 +110,7 @@ export function cyclePosition(now: Date): { dayNumber: number; totalDays: number
   const program = loadProgram();
   const cycle = loadCycle();
   if (!program || !cycle || !cycle.days.length) return null;
-  const dates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  const dates = cycleDates(program.schedule, cycle);
   const todayKey = toDateKey(now);
   let idx = dates.indexOf(todayKey);
   if (idx === -1) idx = Math.min(dates.filter((d) => d < todayKey).length, cycle.days.length - 1);
@@ -151,6 +155,7 @@ export function finalizeProgram(
     endReminderMin: draft.endReminderMin,
     learning: draft.learning,
     startPage: draft.startPage,
+    repeatDays: draft.repeatDays,
     adhkarEnabled: draft.adhkarEnabled,
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
@@ -162,17 +167,19 @@ export function finalizeProgram(
     const samePlan =
       JSON.stringify(existing.perimeterPages) === JSON.stringify(pages) &&
       JSON.stringify(existing.objective) === JSON.stringify(draft.objective) &&
-      (existing.startPage ?? null) === (draft.startPage ?? null);
-    const oldDates = cycleDayDates(existing.schedule, previous.startDate, previous.days.length);
+      (existing.startPage ?? null) === (draft.startPage ?? null) &&
+      (existing.repeatDays ?? 1) === (draft.repeatDays ?? 1);
+    const oldDates = cycleDates(existing.schedule, previous);
     let idx = oldDates.indexOf(todayKey);
     if (idx === -1) idx = Math.min(oldDates.filter((d) => d < todayKey).length, previous.days.length - 1);
 
     if (samePlan) {
       // Même plan : on garde les journées du cycle, on recale seulement la
-      // date de départ pour que le jour courant reste le jour courant.
+      // calendrier (l'ancre) pour que le jour courant reste le jour courant.
       cycle = {
         number: previous.number,
-        startDate: startDateForIndex(draft.schedule, todayKey, idx),
+        startDate: previous.startDate,
+        anchorDate: startDateForIndex(draft.schedule, todayKey, idx),
         days: previous.days,
       };
     } else {
@@ -189,19 +196,19 @@ export function finalizeProgram(
         ? {
             number: previous.number,
             startDate: todayKey,
-            days: rotateCycleDays(buildCycleDays(remaining, draft.objective), draft.startPage),
+            days: buildProgramCycleDays(remaining, draft.objective, draft.startPage, draft.repeatDays),
           }
         : {
             number: previous.number + 1,
             startDate: todayKey,
-            days: rotateCycleDays(buildCycleDays(pages, draft.objective), draft.startPage),
+            days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays),
           };
     }
   } else {
     cycle = {
       number: previous ? previous.number + (previous.startDate === todayKey ? 0 : 1) : 1,
       startDate: todayKey,
-      days: rotateCycleDays(buildCycleDays(pages, draft.objective), draft.startPage),
+      days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays),
     };
   }
 

@@ -49,7 +49,7 @@ function EmptyState() {
 }
 
 export default function RecitationPage() {
-  const { ctx, ready, now, cycleStats, decideOverdue, decideMissed } = useRecitation();
+  const { ctx, ready, now, cycleStats, decideOverdue } = useRecitation();
 
   if (!ready) return <AppShell><div /></AppShell>;
   if (!ctx) {
@@ -60,7 +60,7 @@ export default function RecitationPage() {
     );
   }
 
-  const { cycle, dayState, todayKey, dayDates, missedDates } = ctx;
+  const { cycle, dayState, todayKey, dayDates } = ctx;
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const active = dayState ? currentSlot(dayState.slots, nowMin) : null;
   const upcoming = dayState ? nextSlot(dayState.slots, nowMin) : null;
@@ -73,6 +73,11 @@ export default function RecitationPage() {
   const askOverdue = dayState ? pendingOverdue(ctx.program, dayState, nowMin) : [];
   const dayNumber = (dayState?.cycleDayIndex ?? dayDates.indexOf(todayKey)) + 1;
   const endDate = dayDates[dayDates.length - 1];
+  // Répétition : chaque portion revient n jours de suite (2ᵉ passage…).
+  const repeat = Math.max(1, ctx.program.repeatDays ?? 1);
+  const passLabel = (index: number) =>
+    repeat > 1 ? (index % repeat === 0 ? '1er passage' : `${(index % repeat) + 1}ᵉ passage`) : null;
+  const todayPass = dayState ? passLabel(dayState.cycleDayIndex) : null;
 
   const slotStatusLabel = (i: number) => {
     const slot = dayState!.slots[i];
@@ -91,6 +96,7 @@ export default function RecitationPage() {
           <p className="ds-kicker">
             Cycle de {cycle.days.length} jour{cycle.days.length > 1 ? 's' : ''}
             {dayNumber > 0 && ` — jour ${dayNumber} sur ${cycle.days.length}`}
+            {todayPass && ` · ${todayPass}`}
           </p>
           <h1 className="ds-title text-3xl mt-1">Mon programme</h1>
         </div>
@@ -99,27 +105,18 @@ export default function RecitationPage() {
         </Link>
       </header>
 
-      {/* Retard (brief §16) */}
-      {missedDates.length > 0 && dayState && (
+      {/* Reprise : la journée précédente n'avait pas été terminée. Le cycle
+          a glissé d'autant — rien n'est sauté, rien ne s'empile. */}
+      {dayState?.resumed && (
         <section className="rounded-[20px] border border-[var(--ds-gold)] bg-[var(--ds-gold-100)] p-5 mb-5">
           <p className="text-sm font-extrabold text-[var(--ds-gold-700)]">
-            {missedDates.length} journée{missedDates.length > 1 ? 's' : ''} du cycle non réalisée
-            {missedDates.length > 1 ? 's' : ''}
+            Vous reprenez là où vous vous êtes arrêté
           </p>
           <p className="text-[13px] text-[var(--ds-n700)] mt-1">
-            Rien n’est perdu — choisissez comment reprendre, sans surcharge imposée.
+            La journée précédente n’était pas terminée : il reste{' '}
+            {pagesLabel(cycle.days[dayState.cycleDayIndex]?.pages.filter((p) => !(dayState.doneEarlier ?? []).includes(p)) ?? [])}
+            . La suite du cycle est décalée d’autant — pas de pages en double.
           </p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button type="button" onClick={() => decideMissed('catch-up')} className="ds-btn-gold px-4 py-2 text-[13px]">
-              Rattraper progressivement
-            </button>
-            <button type="button" onClick={() => decideMissed('skip')} className="ds-btn-ghost px-4 py-2 text-[13px]">
-              Reprendre sans rattrapage
-            </button>
-            <Link href="/recitation/objectif" className="ds-btn-ghost px-4 py-2 text-[13px]">
-              Replanifier
-            </Link>
-          </div>
         </section>
       )}
 
@@ -135,7 +132,7 @@ export default function RecitationPage() {
               Les garder pour aujourd’hui
             </button>
             <button type="button" onClick={() => decideOverdue(false)} className="ds-btn-ghost px-4 py-2 text-[13px]">
-              Les reprendre au prochain cycle
+              Les reprendre demain
             </button>
           </div>
         </section>
@@ -282,7 +279,12 @@ export default function RecitationPage() {
                 <span className="flex-none w-36 text-[13px] font-bold text-[var(--ds-n600)] capitalize">
                   {formatDateKey(date)}
                 </span>
-                <span className="text-sm font-semibold flex-1">{pagesLabel(day.pages)}</span>
+                <span className="text-sm font-semibold flex-1">
+                  {pagesLabel(day.pages)}
+                  {passLabel(i) && (
+                    <span className="text-[var(--ds-n500)] font-normal"> · {passLabel(i)}</span>
+                  )}
+                </span>
                 <span className="text-xs text-[var(--ds-n500)] hidden sm:block">{surahSpanLabel(day.pages)}</span>
               </div>
             );

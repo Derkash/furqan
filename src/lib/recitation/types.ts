@@ -60,8 +60,15 @@ export interface Cycle {
   days: CycleDay[];
   /** Numéro du cycle depuis la création du programme (1-based). */
   number: number;
-  /** Date (YYYY-MM-DD) du premier jour du cycle. */
+  /** Date (YYYY-MM-DD) du premier jour du cycle (statistiques du cycle). */
   startDate: string;
+  /**
+   * Date à partir de laquelle les journées du cycle sont posées sur le
+   * calendrier — absent = startDate. Recalée chaque jour sur la PROGRESSION
+   * réelle : une journée non terminée est reprise le lendemain et la suite
+   * du cycle glisse d'autant (rien n'est sauté, rien ne s'empile).
+   */
+  anchorDate?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +166,12 @@ export interface Program {
   startPage?: number | null;
   /** Rappels d'adhkar calés sur le soleil (lever, zénith, coucher). */
   adhkarEnabled?: boolean;
+  /**
+   * Nombre de jours consécutifs pendant lesquels chaque portion est récitée
+   * avant d'avancer (consolidation) : 2 → J1 juz' 1-2, J2 juz' 1-2, J3 juz'
+   * 3-4… Absent = 1 (on avance chaque jour).
+   */
+  repeatDays?: number;
   /** Quiz audio quotidien sur le périmètre mémorisé — null = jamais configuré. */
   quiz?: { enabled: boolean; hourMin: number; questionCount: 5 | 10 | 15 | 20 } | null;
   createdAt: string; // ISO
@@ -216,11 +229,16 @@ export interface DayState {
   /**
    * Mode « toujours demander » : décision sur les pages en retard du jour.
    * null = pas encore demandé ; 'accepted' = elles restent dues aujourd'hui ;
-   * 'declined' = reprises au cycle suivant. (Modes auto/jamais : ignoré.)
+   * 'declined' = reprises le lendemain (la journée n'est pas validée). (Modes auto/jamais : ignoré.)
    */
   overdueDecision: 'accepted' | 'declined' | null;
   /** Pages ajoutées aujourd'hui par le renforcement (pour l'explication). */
   reinforcementPages: number[];
-  /** Pages de journées manquées, en attente de rattrapage progressif. */
-  pendingCatchUp: number[];
+  /**
+   * Pages de cette journée du cycle déjà récitées un jour PRÉCÉDENT : la
+   * journée n'avait pas été terminée, on la reprend là où on s'était arrêté.
+   */
+  doneEarlier?: number[];
+  /** Journée reprise (la veille n'avait pas été terminée) — pour l'explication. */
+  resumed?: boolean;
 }

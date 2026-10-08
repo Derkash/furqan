@@ -248,7 +248,7 @@ export default function RepartitionPage() {
           <div className="flex flex-col gap-1.5">
             {([
               { v: 'auto', label: 'Reporter automatiquement les pages restantes' },
-              { v: 'never', label: 'Ne jamais reporter (reprises au cycle suivant)' },
+              { v: 'never', label: 'Ne pas reporter dans la journée (reprises le lendemain)' },
               { v: 'ask', label: 'Toujours me demander' },
             ] as const).map((o) => (
               <label key={o.v} className="flex items-center gap-2.5 cursor-pointer">

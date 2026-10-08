@@ -138,3 +138,17 @@ export function cycleDayDates(config: ScheduleConfig, startDate: string, dayCoun
   }
   return dates;
 }
+
+/** Premier jour actif à partir de `dateKey` (incluse), ou null si aucun. */
+export function firstActiveDate(config: ScheduleConfig, dateKey: string): string | null {
+  const offset = nextActiveDayOffset(config, weekdayOf(dateKey), true);
+  return offset == null ? null : addDays(dateKey, offset);
+}
+
+/** Dates des journées d'un cycle, posées depuis son ancre (sinon son départ). */
+export function cycleDates(
+  config: ScheduleConfig,
+  cycle: { startDate: string; anchorDate?: string; days: unknown[] }
+): string[] {
+  return cycleDayDates(config, cycle.anchorDate ?? cycle.startDate, cycle.days.length);
+}

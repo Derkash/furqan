@@ -21,7 +21,7 @@ import { duePages } from './dayEngine';
 import { buildLearningSlot } from './learning';
 import { pagesLabel } from './labels';
 import { splitPagesAcrossSlots, splitPagesCustom } from './planner';
-import { addDays, cycleDayDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
+import { addDays, cycleDates, formatTime, slotsForWeekday, toDateKey, weekdayOf } from './schedule';
 import { DEFAULT_QUIZ_SETTINGS } from './quiz';
 import { solarEvents } from './solar';
 import type { Cycle, DayState, PlannedSlot, Program } from './types';
@@ -127,7 +127,7 @@ export function buildNotificationPlan(
   dayState: DayState | null
 ): PlannedNotification[] {
   if (!program.schedule.remindersEnabled) return [];
-  const dayDates = cycleDayDates(program.schedule, cycle.startDate, cycle.days.length);
+  const dayDates = cycleDates(program.schedule, cycle);
   const todayKey = toDateKey(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const plan: PlannedNotification[] = [];

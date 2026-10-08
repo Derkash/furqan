@@ -11,7 +11,7 @@ import { SetupFrame } from '@/components/recitation/SetupSteps';
 import { loadDraft, saveDraft, type ProgramDraft } from '@/lib/recitation/draft';
 import { formatDateKey, juzAmountLabel, pagesLabel, surahSpanLabel } from '@/lib/recitation/labels';
 import { perimeterPages } from '@/lib/recitation/perimeter';
-import { buildCycleDays, rotateCycleDays } from '@/lib/recitation/planner';
+import { REPEAT_DAYS_CHOICES, buildCycleDays, repeatCycleDays, rotateCycleDays } from '@/lib/recitation/planner';
 import { addDays, cycleDayDates, toDateKey } from '@/lib/recitation/schedule';
 import { learningPagesForDay, learningProgress } from '@/lib/recitation/learning';
 import { loadProgram } from '@/lib/recitation/store';
@@ -87,9 +87,11 @@ export default function ObjectifPage() {
     () => (objective ? buildCycleDays(pages, objective) : []),
     [pages, objective]
   );
-  // …puis pivotés sur le point de départ choisi : c'est l'ordre réel du cycle.
+  // …puis pivotés sur le point de départ choisi et répétés (consolidation) :
+  // c'est l'ordre réel du cycle.
+  const repeat = draft?.repeatDays ?? 1;
   const cycleDays = useMemo(
-    () => rotateCycleDays(baseDays, draft?.startPage ?? null),
+    () => repeatCycleDays(rotateCycleDays(baseDays, draft?.startPage ?? null), draft?.repeatDays),
     [baseDays, draft]
   );
   const dates = useMemo(() => {
@@ -231,6 +233,41 @@ export default function ObjectifPage() {
           </section>
         )}
 
+        {/* Consolidation : chaque portion revient n jours de suite avant
+            d'avancer — J1 juz' 1-2, J2 juz' 1-2, J3 juz' 3-4… */}
+        {baseDays.length > 0 && (
+          <section className="ds-card p-4 mt-4">
+            <p className="text-sm font-extrabold">Réciter chaque portion…</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {REPEAT_DAYS_CHOICES.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    const next = { ...draft, repeatDays: n };
+                    setDraft(next);
+                    saveDraft(next);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
+                    repeat === n
+                      ? 'bg-[var(--ds-green)] text-white'
+                      : 'bg-white border border-[var(--ds-divider)] text-[var(--ds-n700)] hover:border-[var(--ds-n400)]'
+                  }`}
+                >
+                  {n === 1 ? '1 jour' : `${n} jours de suite`}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px] text-[var(--ds-n600)] mt-2">
+              {repeat === 1
+                ? 'On avance chaque jour sur la portion suivante.'
+                : baseDays.length > 1
+                  ? `Consolidation : ${pagesLabel(baseDays[0].pages)} ${repeat} jours de suite, puis ${pagesLabel(baseDays[1].pages)} ${repeat} jours, etc. — le cycle dure ${repeat} fois plus longtemps.`
+                  : `Consolidation : la même portion ${repeat} jours de suite avant d’avancer.`}
+            </p>
+          </section>
+        )}
+
         {/* La sourate en cours s'ajoute à cet objectif */}
         {learning?.progress && learning.pages.length > 0 && (
           <section className="rounded-[20px] border border-[var(--ds-gold)] bg-[var(--ds-gold-100)] p-4 mt-4">
@@ -263,6 +300,9 @@ export default function ObjectifPage() {
                   </span>
                   <span className="text-sm font-semibold flex-1">
                     {pagesLabel(day.pages)}
+                    {repeat > 1 && i % repeat > 0 && (
+                      <span className="text-[var(--ds-n500)] font-normal"> · {(i % repeat) + 1}ᵉ passage</span>
+                    )}
                     <span className="text-[var(--ds-n500)] font-normal"> · {day.pages.length} p.</span>
                   </span>
                   <span className="text-xs text-[var(--ds-n500)] text-right hidden sm:block">

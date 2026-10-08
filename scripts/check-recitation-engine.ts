@@ -76,7 +76,7 @@ function mkState(slots: PlannedSlot[]): DayState {
     closedSlots: [],
     overdueDecision: null,
     reinforcementPages: [],
-    pendingCatchUp: [],
+    doneEarlier: [],
   };
 }
 
