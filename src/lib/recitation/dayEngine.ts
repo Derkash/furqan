@@ -10,6 +10,7 @@
 
 import {
   DEFAULT_MIN_PER_PAGE,
+  applyPassOrder,
   buildProgramCycleDays,
   carryOverPages,
   splitPagesAcrossSlots,
@@ -214,6 +215,21 @@ export function ensureToday(now: Date): TodayContext | null {
   if (!program || !cycle) return null;
 
   const todayKey = toDateKey(now);
+
+  // 0. Ordre des passages (répétition) : réappliqué au cycle stocké — un
+  // cycle construit avant le réglage « inverser l'ordre » (ou après son
+  // changement) se remet d'aplomb sans repartir au jour 1. Idempotent. Si
+  // la journée en cours est touchée, elle est replanifiée sans rien perdre.
+  if ((program.repeatDays ?? 1) > 1) {
+    const ordered = applyPassOrder(cycle.days, program.repeatDays, program.repeatReverse ?? true);
+    if (JSON.stringify(ordered) !== JSON.stringify(cycle.days)) {
+      cycle = { ...cycle, days: ordered };
+      saveCycle(cycle);
+      const current = loadDayState();
+      if (current?.date === todayKey) return rebuildToday(now);
+    }
+  }
+
   let state = loadDayState();
   let resume: ReturnType<typeof nextPosition> | null = null;
 
@@ -235,7 +251,7 @@ export function ensureToday(now: Date): TodayContext | null {
       cycle = {
         number: cycle.number + 1,
         startDate: todayKey,
-        days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays),
+        days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays, program.repeatReverse),
       };
       saveCycle(cycle);
       resume = { index: 0, doneEarlier: [], resumed: false };
@@ -259,7 +275,7 @@ export function ensureToday(now: Date): TodayContext | null {
     cycle = {
       number: cycle.number + 1,
       startDate: todayKey,
-      days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays),
+      days: buildProgramCycleDays(program.perimeterPages, program.objective, program.startPage, program.repeatDays, program.repeatReverse),
     };
     saveCycle(cycle);
     dayDates = cycleDates(program.schedule, cycle);
@@ -583,7 +599,7 @@ export interface DuePages {
   current: number[];
   /** Pages des créneaux passés, non récitées — le retard du jour. */
   overdue: number[];
-  /** current + overdue, ordre du mushaf, sans doublon. */
+  /** overdue puis current, ordre du plan, sans doublon. */
   all: number[];
 }
 
@@ -614,10 +630,12 @@ export function duePages(
     for (const p of slot.pages) if (!recited.has(p)) target.push(p);
   }
   const kept = includeOverdue ? overdue : [];
+  // Ordre du PLAN (créneaux puis pages) et non du mushaf : un 2ᵉ passage
+  // « juz' 2 puis juz' 1 » se récite dans cet ordre.
   return {
-    current: [...new Set(current)].sort((a, b) => a - b),
-    overdue: [...new Set(kept)].sort((a, b) => a - b),
-    all: [...new Set([...kept, ...current])].sort((a, b) => a - b),
+    current: [...new Set(current)],
+    overdue: [...new Set(kept)],
+    all: [...new Set([...kept, ...current])],
   };
 }
 

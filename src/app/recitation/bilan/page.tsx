@@ -106,7 +106,7 @@ export default function BilanPage() {
     saveCycle({
       number: cycle.number + 1,
       startDate: toDateKey(new Date()),
-      days: buildProgramCycleDays(updated.perimeterPages, proposal.objective, updated.startPage, updated.repeatDays),
+      days: buildProgramCycleDays(updated.perimeterPages, proposal.objective, updated.startPage, updated.repeatDays, updated.repeatReverse),
     });
     clearDayState();
     setApplied(true);

@@ -44,6 +44,15 @@ export function pageRefLabel(page: number, preferred?: number): string {
  */
 export function pagesLabel(pages: number[], preferred?: number): string {
   if (!pages.length) return '';
+  // Ordre non croissant (2ᵉ passage « juz' 2 puis juz' 1 ») : un libellé par
+  // tronçon croissant, dans l'ordre de récitation.
+  const runs: number[][] = [];
+  for (const p of pages) {
+    const last = runs[runs.length - 1];
+    if (last && p > last[last.length - 1]) last.push(p);
+    else runs.push([p]);
+  }
+  if (runs.length > 1) return runs.map((r) => pagesLabel(r, preferred)).join(' puis ');
   const first = pages[0];
   const last = pages[pages.length - 1];
   const a = surahPageRef(first, preferred);

@@ -98,8 +98,8 @@ export default function EnCoursPage() {
   const overdueSet = new Set(due.overdue);
   const slotRecited = (slot?.pages ?? []).filter((p) => recitedSet.has(p));
   // Affichage : retard + pages du créneau courant (récitées comprises, pour
-  // pouvoir décocher), ordre du mushaf.
-  const pages = [...new Set([...due.overdue, ...(slot?.pages ?? [])])].sort((a, b) => a - b);
+  // pouvoir décocher), dans l'ordre du plan (2ᵉ passage : juz' inversés).
+  const pages = [...new Set([...due.overdue, ...(slot?.pages ?? [])])];
   const done = slotRecited.length;
   const dueCount = due.all.length;
   const nextPage = due.all[0] ?? null;

@@ -172,6 +172,11 @@ export interface Program {
    * 3-4… Absent = 1 (on avance chaque jour).
    */
   repeatDays?: number;
+  /**
+   * Avec la répétition, inverser l'ordre des juz' d'un passage à l'autre :
+   * J1 juz' 1 puis 2, J2 juz' 2 puis 1. Absent = oui.
+   */
+  repeatReverse?: boolean;
   /** Quiz audio quotidien sur le périmètre mémorisé — null = jamais configuré. */
   quiz?: { enabled: boolean; hourMin: number; questionCount: 5 | 10 | 15 | 20 } | null;
   createdAt: string; // ISO

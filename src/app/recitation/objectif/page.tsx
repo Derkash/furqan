@@ -90,10 +90,19 @@ export default function ObjectifPage() {
   // …puis pivotés sur le point de départ choisi et répétés (consolidation) :
   // c'est l'ordre réel du cycle.
   const repeat = draft?.repeatDays ?? 1;
+  const reverse = draft?.repeatReverse ?? true;
   const cycleDays = useMemo(
-    () => repeatCycleDays(rotateCycleDays(baseDays, draft?.startPage ?? null), draft?.repeatDays),
+    () =>
+      repeatCycleDays(
+        rotateCycleDays(baseDays, draft?.startPage ?? null),
+        draft?.repeatDays,
+        draft?.repeatReverse ?? true
+      ),
     [baseDays, draft]
   );
+  // L'inversion n'a de sens que si une journée couvre plusieurs juz'.
+  const multiJuzDay = (objective?.kind === 'juzPerDay' && objective.amount >= 2) ||
+    cycleDays.some((d, i) => i > 0 && d.pages[0] > d.pages[d.pages.length - 1]);
   const dates = useMemo(() => {
     if (!draft || !cycleDays.length) return [];
     return cycleDayDates(draft.schedule, toDateKey(new Date()), cycleDays.length);
@@ -261,10 +270,29 @@ export default function ObjectifPage() {
             <p className="text-[12px] text-[var(--ds-n600)] mt-2">
               {repeat === 1
                 ? 'On avance chaque jour sur la portion suivante.'
-                : baseDays.length > 1
-                  ? `Consolidation : ${pagesLabel(baseDays[0].pages)} ${repeat} jours de suite, puis ${pagesLabel(baseDays[1].pages)} ${repeat} jours, etc. — le cycle dure ${repeat} fois plus longtemps.`
-                  : `Consolidation : la même portion ${repeat} jours de suite avant d’avancer.`}
+                : `Consolidation : la même portion ${repeat} jours de suite avant d’avancer — le cycle dure ${repeat} fois plus longtemps.`}
             </p>
+            {repeat > 1 && multiJuzDay && (
+              <label className="flex items-start justify-between gap-3 cursor-pointer mt-3 pt-3 border-t border-[var(--ds-divider)]">
+                <span className="text-sm font-semibold">
+                  Inverser l’ordre des juz’ au passage suivant
+                  <span className="block text-[12px] font-normal text-[var(--ds-n600)]">
+                    Jour 1 : juz’ 1 puis juz’ 2 · Jour 2 : juz’ 2 puis juz’ 1 — chaque juz’ reste lu dans
+                    l’ordre du mushaf.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={reverse}
+                  onChange={(e) => {
+                    const next = { ...draft, repeatReverse: e.target.checked };
+                    setDraft(next);
+                    saveDraft(next);
+                  }}
+                  className="w-5 h-5 mt-0.5 accent-[var(--ds-gold)] flex-none"
+                />
+              </label>
+            )}
           </section>
         )}
 

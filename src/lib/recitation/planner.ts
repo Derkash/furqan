@@ -92,14 +92,52 @@ export function rotateCycleDays(days: CycleDay[], startPage: number | null | und
 /** Choix proposés pour la répétition de chaque portion (jours consécutifs). */
 export const REPEAT_DAYS_CHOICES = [1, 2, 3] as const;
 
+/** Juz' d'une page du mushaf. */
+function juzOfPage(page: number): number {
+  for (let j = 1; j <= 30; j++) if (page <= JUZ_PAGES[j].endPage) return j;
+  return 30;
+}
+
+/**
+ * Ordre des pages d'une journée selon son passage : ordre du mushaf au 1er
+ * passage (et aux passages impairs) ; si `reverse`, les juz' sont pris en
+ * ordre inverse aux passages pairs — chaque juz' reste lu dans l'ordre du
+ * mushaf : [juz 1, juz 2] → [juz 2, juz 1]. Idempotent.
+ */
+export function orderDayPages(pages: number[], pass: number, reverse: boolean): number[] {
+  const sorted = [...pages].sort((a, b) => a - b);
+  if (!reverse || pass % 2 === 0) return sorted;
+  const groups: number[][] = [];
+  for (const p of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && juzOfPage(last[0]) === juzOfPage(p)) last.push(p);
+    else groups.push([p]);
+  }
+  return groups.reverse().flat();
+}
+
+/** Réapplique l'ordre de passage à des journées déjà répétées (idempotent). */
+export function applyPassOrder(days: CycleDay[], repeat: number | null | undefined, reverse: boolean): CycleDay[] {
+  const n = Math.max(1, Math.floor(repeat ?? 1));
+  return days.map((d, i) => ({ ...d, pages: orderDayPages(d.pages, n > 1 ? i % n : 0, reverse) }));
+}
+
 /**
  * Répète chaque journée `repeat` fois de suite : avec 2, [juz 1-2, juz 3-4]
- * devient [1-2, 1-2, 3-4, 3-4] — on consolide une portion avant d'avancer.
+ * devient [1-2, 2-1, 3-4, 4-3] (ou [1-2, 1-2, …] sans inversion) — on
+ * consolide une portion avant d'avancer.
  */
-export function repeatCycleDays(days: CycleDay[], repeat: number | null | undefined): CycleDay[] {
+export function repeatCycleDays(
+  days: CycleDay[],
+  repeat: number | null | undefined,
+  reverse = true
+): CycleDay[] {
   const n = Math.max(1, Math.floor(repeat ?? 1));
   if (n === 1) return days;
-  return days.flatMap((d) => Array.from({ length: n }, () => d.pages)).map((pages, index) => ({ index, pages }));
+  const repeated = days
+    .flatMap((d) => Array.from({ length: n }, () => d.pages))
+    .map((pages, index) => ({ index, pages }));
+  return applyPassOrder(repeated, n, reverse);
 }
 
 /** Journées du cycle d'un programme : découpe → point de départ → répétition. */
@@ -107,9 +145,14 @@ export function buildProgramCycleDays(
   pages: number[],
   objective: Objective,
   startPage: number | null | undefined,
-  repeatDays: number | null | undefined
+  repeatDays: number | null | undefined,
+  repeatReverse: boolean | null | undefined = true
 ): CycleDay[] {
-  return repeatCycleDays(rotateCycleDays(buildCycleDays(pages, objective), startPage), repeatDays);
+  return repeatCycleDays(
+    rotateCycleDays(buildCycleDays(pages, objective), startPage),
+    repeatDays,
+    repeatReverse ?? true
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,8 @@ export interface ProgramDraft {
   startPage: number | null;
   /** Jours consécutifs par portion avant d'avancer (1 = on avance chaque jour). */
   repeatDays: number;
+  /** Répétition : juz' en ordre inverse au passage suivant. */
+  repeatReverse: boolean;
   /** Rappels d'adhkar (lever / zénith / coucher du soleil). */
   adhkarEnabled: boolean;
 }
@@ -57,6 +59,7 @@ export function emptyDraft(): ProgramDraft {
     learning: null,
     startPage: null,
     repeatDays: 1,
+    repeatReverse: true,
     adhkarEnabled: true,
   };
 }
@@ -83,6 +86,7 @@ export function loadDraft(): ProgramDraft {
       learning: existing.learning ?? null,
       startPage: existing.startPage ?? null,
       repeatDays: existing.repeatDays ?? 1,
+      repeatReverse: existing.repeatReverse ?? true,
       adhkarEnabled: existing.adhkarEnabled ?? true,
     };
   }
@@ -156,6 +160,7 @@ export function finalizeProgram(
     learning: draft.learning,
     startPage: draft.startPage,
     repeatDays: draft.repeatDays,
+    repeatReverse: draft.repeatReverse,
     adhkarEnabled: draft.adhkarEnabled,
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
@@ -169,6 +174,8 @@ export function finalizeProgram(
       JSON.stringify(existing.objective) === JSON.stringify(draft.objective) &&
       (existing.startPage ?? null) === (draft.startPage ?? null) &&
       (existing.repeatDays ?? 1) === (draft.repeatDays ?? 1);
+    // (repeatReverse n'en fait pas partie : ensureToday réordonne le cycle
+    // conservé, la position est gardée.)
     const oldDates = cycleDates(existing.schedule, previous);
     let idx = oldDates.indexOf(todayKey);
     if (idx === -1) idx = Math.min(oldDates.filter((d) => d < todayKey).length, previous.days.length - 1);
@@ -196,19 +203,19 @@ export function finalizeProgram(
         ? {
             number: previous.number,
             startDate: todayKey,
-            days: buildProgramCycleDays(remaining, draft.objective, draft.startPage, draft.repeatDays),
+            days: buildProgramCycleDays(remaining, draft.objective, draft.startPage, draft.repeatDays, draft.repeatReverse),
           }
         : {
             number: previous.number + 1,
             startDate: todayKey,
-            days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays),
+            days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays, draft.repeatReverse),
           };
     }
   } else {
     cycle = {
       number: previous ? previous.number + (previous.startDate === todayKey ? 0 : 1) : 1,
       startDate: todayKey,
-      days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays),
+      days: buildProgramCycleDays(pages, draft.objective, draft.startPage, draft.repeatDays, draft.repeatReverse),
     };
   }
 
