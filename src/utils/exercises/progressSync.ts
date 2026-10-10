@@ -15,6 +15,26 @@ function warn(context: string, error: unknown) {
   }
 }
 
+/**
+ * Traduit une erreur d'appel RPC en message clair pour l'espace compte.
+ * Cas le plus fréquent : la fonction n'existe pas encore (migration 0005 non
+ * appliquée) → PostgREST renvoie PGRST202 / « Could not find function ».
+ */
+function rpcErrorMessage(error: { message?: string; code?: string } | null): string {
+  const code = error?.code ?? '';
+  const msg = (error?.message ?? '').toLowerCase();
+  if (code === 'PGRST202' || msg.includes('could not find') || msg.includes('does not exist') || msg.includes('function')) {
+    return 'Fonctionnalité pas encore activée côté serveur : applique la migration 0005 dans Supabase (SQL Editor).';
+  }
+  if (code === 'PGRST301' || msg.includes('jwt') || msg.includes('api key') || msg.includes('apikey') || msg.includes('unauthorized')) {
+    return 'Clé Supabase refusée : vérifie la clé anon (nouveau format sb_publishable_…) dans l’app.';
+  }
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to')) {
+    return 'Connexion au serveur impossible (réseau).';
+  }
+  return error?.message || 'Opération impossible côté serveur.';
+}
+
 // ---------- Auth distante ----------
 
 /** Suppression du compte distant (App Store 5.1.1(v)) — hash exigé. */
@@ -80,7 +100,7 @@ export async function setEmailRemote(
   });
   if (error) {
     warn('setEmailRemote', error);
-    return null;
+    return { ok: false, error: rpcErrorMessage(error) };
   }
   return data as { ok: boolean; error?: string; email?: string };
 }
@@ -99,7 +119,7 @@ export async function changePasswordRemote(
   });
   if (error) {
     warn('changePasswordRemote', error);
-    return null;
+    return { ok: false, error: rpcErrorMessage(error) };
   }
   return data as { ok: boolean; error?: string };
 }
@@ -116,7 +136,7 @@ export async function getAccountRemote(
   });
   if (error) {
     warn('getAccountRemote', error);
-    return null;
+    return { ok: false, error: rpcErrorMessage(error) };
   }
   return data as { ok: boolean; error?: string; username?: string; email?: string };
 }

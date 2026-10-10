@@ -246,7 +246,7 @@ export async function setAccountEmail(
   const hash = getStoredHash(username);
   if (!hash) return { ok: false, error: NOT_PROVEN };
   const remote = await setEmailRemote(username, hash, email);
-  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  if (!remote) return { ok: false, error: 'Supabase non configuré (clés absentes du build).' };
   return remote;
 }
 
@@ -257,7 +257,7 @@ export async function getAccountInfo(
   const hash = getStoredHash(username);
   if (!hash) return { ok: false, error: NOT_PROVEN };
   const remote = await getAccountRemote(username, hash);
-  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  if (!remote) return { ok: false, error: 'Supabase non configuré (clés absentes du build).' };
   return remote;
 }
 
@@ -277,7 +277,7 @@ export async function changePassword(
   if (!oldHash) return { ok: false, error: NOT_PROVEN };
   const newHash = hashPassword(newPassword);
   const remote = await changePasswordRemote(username, oldHash, newHash);
-  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  if (!remote) return { ok: false, error: 'Supabase non configuré (clés absentes du build).' };
   if (!remote.ok) return remote;
   try {
     window.localStorage.setItem(ACCOUNT_PREFIX + username.toLowerCase(), newHash);
