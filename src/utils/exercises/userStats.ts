@@ -217,54 +217,68 @@ export async function register(
 }
 
 /**
- * ESPACE COMPTE — pose/modifie/retire l'email de récupération (sert aussi
- * d'identifiant de connexion). Le mot de passe courant est exigé.
+ * Preuve d'identité SANS redemander le mot de passe : le hash déposé en local
+ * à la connexion. Être « connecté » = ce hash est présent sur l'appareil. On
+ * le renvoie au serveur comme preuve (les RPC le revérifient), ce qui évite de
+ * retaper le mot de passe TOUT en empêchant qu'un compte soit modifié à
+ * distance par quelqu'un qui connaîtrait juste l'identifiant.
+ */
+export function getStoredHash(username: string): string | null {
+  if (!isBrowser()) return null;
+  try {
+    return window.localStorage.getItem(ACCOUNT_PREFIX + username.toLowerCase());
+  } catch {
+    return null;
+  }
+}
+
+const NOT_PROVEN = 'Session non vérifiée sur cet appareil — reconnecte-toi une fois.';
+
+/**
+ * ESPACE COMPTE — pose/modifie/retire l'email (sert aussi d'identifiant de
+ * connexion). Aucune ressaisie du mot de passe : on utilise la preuve locale.
  */
 export async function setAccountEmail(
   username: string,
-  password: string,
   email: string
 ): Promise<{ ok: boolean; error?: string; email?: string }> {
   if (!isBrowser()) return { ok: false, error: 'Stockage indisponible' };
-  if (!password) return { ok: false, error: 'Mot de passe requis' };
-  const hash = hashPassword(password);
+  const hash = getStoredHash(username);
+  if (!hash) return { ok: false, error: NOT_PROVEN };
   const remote = await setEmailRemote(username, hash, email);
   if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
   return remote;
 }
 
-/** Infos compte (email courant), gardées par le mot de passe. */
+/** Email courant du compte (via la preuve locale, sans mot de passe). */
 export async function getAccountInfo(
-  username: string,
-  password: string
+  username: string
 ): Promise<{ ok: boolean; error?: string; username?: string; email?: string }> {
-  if (!password) return { ok: false, error: 'Mot de passe requis' };
-  const hash = hashPassword(password);
+  const hash = getStoredHash(username);
+  if (!hash) return { ok: false, error: NOT_PROVEN };
   const remote = await getAccountRemote(username, hash);
   if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
   return remote;
 }
 
 /**
- * Change le mot de passe. Vérifie l'ancien côté serveur, puis met à jour le
- * hash local (pour que la connexion hors-ligne ultérieure fonctionne).
+ * Change le mot de passe SANS redemander l'actuel : la preuve locale (hash
+ * déposé à la connexion) sert d'ancien hash. Met à jour le hash local après
+ * succès (connexion hors-ligne ultérieure + preuve pour les prochaines modifs).
  */
 export async function changePassword(
   username: string,
-  oldPassword: string,
   newPassword: string
 ): Promise<{ ok: boolean; error?: string }> {
   if (!isBrowser()) return { ok: false, error: 'Stockage indisponible' };
-  if (!oldPassword) return { ok: false, error: 'Mot de passe actuel requis' };
   if (!newPassword) return { ok: false, error: 'Nouveau mot de passe requis' };
   if (newPassword.length < 4) return { ok: false, error: 'Nouveau mot de passe trop court (4 caractères min.)' };
-  const oldHash = hashPassword(oldPassword);
+  const oldHash = getStoredHash(username);
+  if (!oldHash) return { ok: false, error: NOT_PROVEN };
   const newHash = hashPassword(newPassword);
   const remote = await changePasswordRemote(username, oldHash, newHash);
   if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
   if (!remote.ok) return remote;
-  // Miroir local : le hash stocké doit suivre, sinon la connexion hors-ligne
-  // échouerait avec le nouveau mot de passe.
   try {
     window.localStorage.setItem(ACCOUNT_PREFIX + username.toLowerCase(), newHash);
   } catch {

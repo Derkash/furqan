@@ -14,8 +14,9 @@ import {
 
 /**
  * Espace compte : identifiant, email (ajout/modif — sert aussi d'identifiant de
- * connexion), changement de mot de passe. Le mot de passe courant est exigé
- * pour chaque opération sensible (le serveur le revérifie).
+ * connexion), changement de mot de passe. AUCUNE ressaisie du mot de passe
+ * actuel : être connecté sur l'appareil suffit (preuve locale réutilisée en
+ * silence par userStats).
  */
 export default function ComptePage() {
   const [checked, setChecked] = useState(false);
@@ -52,45 +53,34 @@ function Flash({ kind, text }: { kind: 'ok' | 'err'; text: string }) {
 
 function AccountInner({ user, onLoggedOut }: { user: string; onLoggedOut: () => void }) {
   // Email
-  const [emailPwd, setEmailPwd] = useState('');
   const [email, setEmail] = useState('');
   const [emailMsg, setEmailMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
-  const [emailLoaded, setEmailLoaded] = useState(false);
 
-  // Mot de passe
-  const [oldPwd, setOldPwd] = useState('');
+  // Mot de passe (uniquement le NOUVEAU + confirmation)
   const [newPwd, setNewPwd] = useState('');
   const [newPwd2, setNewPwd2] = useState('');
   const [pwdMsg, setPwdMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [pwdBusy, setPwdBusy] = useState(false);
 
-  const loadEmail = async () => {
-    if (!emailPwd) {
-      setEmailMsg({ kind: 'err', text: 'Entre ton mot de passe actuel pour voir / modifier l’email.' });
-      return;
-    }
-    setEmailBusy(true);
-    setEmailMsg(null);
-    const res = await getAccountInfo(user, emailPwd);
-    setEmailBusy(false);
-    if (!res.ok) {
-      setEmailMsg({ kind: 'err', text: res.error ?? 'Impossible de charger le compte' });
-      return;
-    }
-    setEmail(res.email ?? '');
-    setEmailLoaded(true);
-    setEmailMsg({ kind: 'ok', text: res.email ? 'Email actuel chargé.' : 'Aucun email pour l’instant — ajoute-le.' });
-  };
+  // Charge l'email actuel au montage (preuve locale, sans mot de passe).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getAccountInfo(user);
+      if (cancelled) return;
+      if (res.ok) setEmail(res.email ?? '');
+      else setEmailMsg({ kind: 'err', text: res.error ?? 'Impossible de charger le compte' });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const saveEmail = async () => {
-    if (!emailPwd) {
-      setEmailMsg({ kind: 'err', text: 'Mot de passe actuel requis.' });
-      return;
-    }
     setEmailBusy(true);
     setEmailMsg(null);
-    const res = await setAccountEmail(user, emailPwd, email);
+    const res = await setAccountEmail(user, email);
     setEmailBusy(false);
     setEmailMsg(
       res.ok
@@ -106,14 +96,13 @@ function AccountInner({ user, onLoggedOut }: { user: string; onLoggedOut: () => 
     }
     setPwdBusy(true);
     setPwdMsg(null);
-    const res = await changePassword(user, oldPwd, newPwd);
+    const res = await changePassword(user, newPwd);
     setPwdBusy(false);
     if (!res.ok) {
       setPwdMsg({ kind: 'err', text: res.error ?? 'Changement impossible' });
       return;
     }
     setPwdMsg({ kind: 'ok', text: 'Mot de passe changé. Utilise-le pour te reconnecter sur tes autres appareils.' });
-    setOldPwd('');
     setNewPwd('');
     setNewPwd2('');
   };
@@ -149,37 +138,21 @@ function AccountInner({ user, onLoggedOut }: { user: string; onLoggedOut: () => 
         <h2 className="font-bold text-[var(--ds-green)] mb-1">Email de connexion / récupération</h2>
         <p className="text-xs text-[var(--ds-n600)] mb-3">
           Ajoute un email : il te servira d’identifiant de connexion (en plus de ton identifiant) et
-          de point de récupération. Ton mot de passe actuel est demandé pour toute modification.
+          de point de récupération. Pas besoin de retaper ton mot de passe : tu es déjà connecté.
         </p>
-        <label className={kicker}>Mot de passe actuel</label>
+        <label className={kicker}>Email</label>
         <input
-          type="password"
-          value={emailPwd}
-          onChange={(e) => setEmailPwd(e.target.value)}
-          autoComplete="current-password"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          placeholder="toncompte@exemple.com"
           className={`${field} mb-2`}
         />
-        {!emailLoaded ? (
-          <button onClick={loadEmail} disabled={emailBusy} className={primaryBtn}>
-            {emailBusy ? 'Chargement…' : 'Afficher / modifier mon email'}
-          </button>
-        ) : (
-          <>
-            <label className={kicker}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="toncompte@exemple.com"
-              className={`${field} mb-2`}
-            />
-            <button onClick={saveEmail} disabled={emailBusy} className={primaryBtn}>
-              {emailBusy ? 'Enregistrement…' : 'Enregistrer l’email'}
-            </button>
-            <p className="text-[11px] text-[var(--ds-n500)] mt-1">Laisse vide puis enregistre pour retirer l’email.</p>
-          </>
-        )}
+        <button onClick={saveEmail} disabled={emailBusy} className={primaryBtn}>
+          {emailBusy ? 'Enregistrement…' : 'Enregistrer l’email'}
+        </button>
+        <p className="text-[11px] text-[var(--ds-n500)] mt-1">Laisse vide puis enregistre pour retirer l’email.</p>
         {emailMsg && <Flash kind={emailMsg.kind} text={emailMsg.text} />}
       </section>
 
@@ -187,16 +160,14 @@ function AccountInner({ user, onLoggedOut }: { user: string; onLoggedOut: () => 
       <section className="ds-card p-4 mb-5">
         <h2 className="font-bold text-[var(--ds-green)] mb-1">Changer mon mot de passe</h2>
         <p className="text-xs text-[var(--ds-n600)] mb-3">
-          Depuis un appareil où tu es connecté, définis un nouveau mot de passe pour reprendre la
-          main partout ailleurs.
+          Définis un nouveau mot de passe (pas besoin de l’actuel, tu es connecté) pour reprendre la
+          main sur tes autres appareils.
         </p>
-        <label className={kicker}>Mot de passe actuel</label>
-        <input type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} autoComplete="current-password" className={`${field} mb-2`} />
         <label className={kicker}>Nouveau mot de passe</label>
         <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} autoComplete="new-password" className={`${field} mb-2`} />
         <label className={kicker}>Confirmer le nouveau mot de passe</label>
         <input type="password" value={newPwd2} onChange={(e) => setNewPwd2(e.target.value)} autoComplete="new-password" className={`${field} mb-3`} />
-        <button onClick={savePassword} disabled={pwdBusy || !oldPwd || !newPwd} className={primaryBtn}>
+        <button onClick={savePassword} disabled={pwdBusy || !newPwd} className={primaryBtn}>
           {pwdBusy ? 'Changement…' : 'Changer le mot de passe'}
         </button>
         {pwdMsg && <Flash kind={pwdMsg.kind} text={pwdMsg.text} />}
