@@ -53,7 +53,6 @@ export default function FillGapsGame({
     setPhase('play');
   }, [startPage, endPage]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     prepare();
   }, [prepare]);
@@ -69,7 +68,6 @@ export default function FillGapsGame({
       cancelled = true;
     };
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const item = items[idx];
 

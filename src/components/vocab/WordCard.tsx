@@ -84,7 +84,6 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
   );
 
   // Charge la morphologie déterministe puis l'analyse (sens général + en contexte).
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const id = ++reqId.current;
     setMorph(null);
@@ -216,7 +215,6 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       }
     })();
   }, [verseKey, position]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const snippet = span ? snippetOf(verseWords, span.start, span.end) : '';
 
