@@ -176,7 +176,7 @@ export default function FillGapsGame({
       </div>
 
       <h2 className="text-sm md:text-base font-bold text-center text-[var(--ds-text)] mb-3">
-        Replace {item.gaps.length > 1 ? 'les mots manquants' : 'le mot manquant'}
+        Replace {item.gaps.length > 1 ? 'les mots manquants' : 'le mot manquant'} dans le verset
       </h2>
 
       {/* Fragment à trous */}
@@ -215,9 +215,17 @@ export default function FillGapsGame({
           })}
         </p>
         <p className="text-[11px] text-[var(--ds-n500)] italic mt-1" dir="ltr">
-          Fragment du verset {item.verseKey} — touche un trou rempli pour le vider.
+          Verset {item.verseKey} en entier — touche un trou rempli pour le vider.
         </p>
       </div>
+
+      {/* Traduction Hamidullah COMPLÈTE du verset (contexte permanent) */}
+      {trans?.[item.verseKey] && (
+        <p className="text-[13px] text-gray-700 leading-relaxed bg-white/70 rounded-xl px-3 py-2 mb-3 border border-[var(--ds-gold)]/20">
+          <span className="font-bold text-[#7a5d2c]">Traduction (Hamidullah) : </span>
+          {trans[item.verseKey]}
+        </p>
+      )}
 
       {/* Indice : sens dans ce verset */}
       {phase === 'play' && (
@@ -255,12 +263,6 @@ export default function FillGapsGame({
               </li>
             ))}
           </ul>
-          {trans?.[item.verseKey] && (
-            <p className="text-[12px] text-gray-600 leading-relaxed">
-              <span className="font-bold text-[#7a5d2c]">Verset {item.verseKey} (Hamidullah) : </span>
-              {trans[item.verseKey]}
-            </p>
-          )}
         </div>
       )}
 

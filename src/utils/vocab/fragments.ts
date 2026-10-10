@@ -20,9 +20,7 @@ export interface GapWord {
 
 export interface GapItem {
   verseKey: string;
-  spanStart: number;
-  spanEnd: number;
-  words: VerseMorphWord[]; // mots du fragment, dans l'ordre
+  words: VerseMorphWord[]; // VERSET ENTIER, dans l'ordre
   gaps: GapWord[]; // trous (sous-ensemble de `words`), dans l'ordre
   tiles: string[]; // banque mélangée : réponses + leurres
 }
@@ -106,11 +104,13 @@ export async function buildGapItems(
       start = Math.max(start, a.position - 4);
       end = Math.min(end, start + MAX_WORDS - 1);
     }
-    const frag = words.filter((w) => w.position >= start && w.position <= end);
+    // Fenêtre seulement pour CHOISIR les trous (garder un nombre raisonnable) ;
+    // l'affichage, lui, montre le VERSET ENTIER (words).
+    const windowWords = words.filter((w) => w.position >= start && w.position <= end);
 
-    // Trous : le mot visé d'abord, puis les autres mots du lexique du fragment.
+    // Trous : le mot visé d'abord, puis d'autres mots du lexique proches.
     const gaps: GapWord[] = [];
-    const target = frag.find((w) => w.position === a.position);
+    const target = words.find((w) => w.position === a.position);
     if (!target) continue;
     gaps.push({
       position: target.position,
@@ -118,7 +118,7 @@ export async function buildGapItems(
       answer: target.display,
       gloss: senseAt(e, a.verseKey, a.position),
     });
-    for (const w of frag) {
+    for (const w of windowWords) {
       if (gaps.length >= MAX_GAPS) break;
       if (w.position === a.position) continue;
       const other = lookup(w);
@@ -148,9 +148,7 @@ export async function buildGapItems(
     usedVerses.add(a.verseKey);
     items.push({
       verseKey: a.verseKey,
-      spanStart: start,
-      spanEnd: end,
-      words: frag,
+      words, // verset entier
       gaps,
       tiles: shuffle([...gaps.map((g) => g.answer), ...distractors]),
     });

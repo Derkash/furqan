@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import LoginCard from '@/components/exercises/LoginCard';
 import AppShell from '@/components/AppShell';
 import {
@@ -285,6 +286,9 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 flex-none">
+          <Link href="/compte" className="ds-btn-ghost px-4 py-2 text-sm">
+            Mon compte
+          </Link>
           <button
             onClick={() => {
               logout();

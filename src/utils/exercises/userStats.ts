@@ -11,6 +11,9 @@ import {
   fetchSetups,
   pushWordMistakes,
   pushVerseResult,
+  setEmailRemote,
+  changePasswordRemote,
+  getAccountRemote,
 } from './progressSync';
 import { hydrateSetupsLocal } from './exerciseMemory';
 import { hydrateVocab } from '@/utils/vocab/vocabSync';
@@ -166,14 +169,17 @@ export async function login(
   const remote = await loginRemote(creds.name, creds.hash);
   if (remote) {
     if (!remote.ok) return remote;
-    // Cache local (permet lecture synchrone + connexion hors-ligne ultérieure).
-    window.localStorage.setItem(creds.key, creds.hash);
-    setUserCookie(creds.name);
-    await hydrateFromRemote(creds.name);
+    // L'utilisateur a pu se connecter via son EMAIL : on rattache la session au
+    // username CANONIQUE renvoyé par le serveur (toutes les données y sont clées).
+    const canonical = (remote.username && remote.username.trim()) || creds.name;
+    window.localStorage.setItem(ACCOUNT_PREFIX + canonical.toLowerCase(), creds.hash);
+    setUserCookie(canonical);
+    await hydrateFromRemote(canonical);
     return { ok: true };
   }
 
-  // Fallback local (Supabase absent ou injoignable).
+  // Fallback local (Supabase absent ou injoignable). La connexion par EMAIL
+  // n'est pas résoluble hors-ligne (le cache local est clé par identifiant).
   const existing = window.localStorage.getItem(creds.key);
   if (existing === null) {
     return { ok: false, error: 'Cet identifiant n’existe pas. Créez un compte.' };
@@ -207,6 +213,63 @@ export async function register(
   }
   window.localStorage.setItem(creds.key, creds.hash);
   setUserCookie(creds.name);
+  return { ok: true };
+}
+
+/**
+ * ESPACE COMPTE — pose/modifie/retire l'email de récupération (sert aussi
+ * d'identifiant de connexion). Le mot de passe courant est exigé.
+ */
+export async function setAccountEmail(
+  username: string,
+  password: string,
+  email: string
+): Promise<{ ok: boolean; error?: string; email?: string }> {
+  if (!isBrowser()) return { ok: false, error: 'Stockage indisponible' };
+  if (!password) return { ok: false, error: 'Mot de passe requis' };
+  const hash = hashPassword(password);
+  const remote = await setEmailRemote(username, hash, email);
+  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  return remote;
+}
+
+/** Infos compte (email courant), gardées par le mot de passe. */
+export async function getAccountInfo(
+  username: string,
+  password: string
+): Promise<{ ok: boolean; error?: string; username?: string; email?: string }> {
+  if (!password) return { ok: false, error: 'Mot de passe requis' };
+  const hash = hashPassword(password);
+  const remote = await getAccountRemote(username, hash);
+  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  return remote;
+}
+
+/**
+ * Change le mot de passe. Vérifie l'ancien côté serveur, puis met à jour le
+ * hash local (pour que la connexion hors-ligne ultérieure fonctionne).
+ */
+export async function changePassword(
+  username: string,
+  oldPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isBrowser()) return { ok: false, error: 'Stockage indisponible' };
+  if (!oldPassword) return { ok: false, error: 'Mot de passe actuel requis' };
+  if (!newPassword) return { ok: false, error: 'Nouveau mot de passe requis' };
+  if (newPassword.length < 4) return { ok: false, error: 'Nouveau mot de passe trop court (4 caractères min.)' };
+  const oldHash = hashPassword(oldPassword);
+  const newHash = hashPassword(newPassword);
+  const remote = await changePasswordRemote(username, oldHash, newHash);
+  if (!remote) return { ok: false, error: 'Connexion au serveur impossible' };
+  if (!remote.ok) return remote;
+  // Miroir local : le hash stocké doit suivre, sinon la connexion hors-ligne
+  // échouerait avec le nouveau mot de passe.
+  try {
+    window.localStorage.setItem(ACCOUNT_PREFIX + username.toLowerCase(), newHash);
+  } catch {
+    /* stockage indisponible */
+  }
   return { ok: true };
 }
 

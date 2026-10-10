@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { login, register } from '@/utils/exercises/userStats';
+import { login, register, getCurrentUser } from '@/utils/exercises/userStats';
 
 interface LoginCardProps {
   onLoggedIn: (username: string) => void;
@@ -34,7 +34,7 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
     setError(null);
     try {
       const result = mode === 'login' ? await login(username, password) : await register(username, password);
-      if (result.ok) onLoggedIn(username.trim());
+      if (result.ok) onLoggedIn(getCurrentUser() ?? username.trim());
       else setError(result.error ?? 'Opération impossible');
     } catch {
       setError('Connexion au serveur impossible');
@@ -78,13 +78,14 @@ export default function LoginCard({ onLoggedIn }: LoginCardProps) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)] block mb-1">
-              Identifiant
+              {mode === 'login' ? 'Identifiant ou email' : 'Identifiant'}
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
+              placeholder={mode === 'login' ? 'ton identifiant ou ton email' : undefined}
               className="w-full px-3 py-2.5 rounded-xl border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none text-[#1a1a1a]"
             />
           </div>

@@ -53,7 +53,7 @@ export async function registerRemote(
 export async function loginRemote(
   username: string,
   passwordHash: string
-): Promise<{ ok: boolean; error?: string } | null> {
+): Promise<{ ok: boolean; error?: string; username?: string } | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('app_login', {
     p_username: username,
@@ -63,7 +63,62 @@ export async function loginRemote(
     warn('loginRemote', error);
     return null;
   }
+  return data as { ok: boolean; error?: string; username?: string };
+}
+
+/** Pose / modifie / retire l'email d'un compte (mot de passe courant exigé). */
+export async function setEmailRemote(
+  username: string,
+  passwordHash: string,
+  email: string
+): Promise<{ ok: boolean; error?: string; email?: string } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('app_set_email', {
+    p_username: username,
+    p_password_hash: passwordHash,
+    p_email: email,
+  });
+  if (error) {
+    warn('setEmailRemote', error);
+    return null;
+  }
+  return data as { ok: boolean; error?: string; email?: string };
+}
+
+/** Change le mot de passe (ancien hash exigé). */
+export async function changePasswordRemote(
+  username: string,
+  oldHash: string,
+  newHash: string
+): Promise<{ ok: boolean; error?: string } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('app_change_password', {
+    p_username: username,
+    p_old_hash: oldHash,
+    p_new_hash: newHash,
+  });
+  if (error) {
+    warn('changePasswordRemote', error);
+    return null;
+  }
   return data as { ok: boolean; error?: string };
+}
+
+/** Infos du compte (username canonique + email), gardées par le hash. */
+export async function getAccountRemote(
+  username: string,
+  passwordHash: string
+): Promise<{ ok: boolean; error?: string; username?: string; email?: string } | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('app_get_account', {
+    p_username: username,
+    p_password_hash: passwordHash,
+  });
+  if (error) {
+    warn('getAccountRemote', error);
+    return null;
+  }
+  return data as { ok: boolean; error?: string; username?: string; email?: string };
 }
 
 // ---------- Hydratation (Supabase → cache local) ----------
