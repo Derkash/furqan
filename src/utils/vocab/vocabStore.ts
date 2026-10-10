@@ -31,6 +31,23 @@ export interface VocabEntry {
   // lecture/hifz. Portés par l'entrée conservée (ex. أَعْرَضَ porte مُعْرِض).
   aliasLemmas?: string[]; // lemmes des formes fusionnées
   aliasForms?: string[]; // formes nues des formes fusionnées sans lemme
+  // SENS EN CONTEXTE : un même mot peut avoir un sens différent selon le
+  // verset (ex. ضَرَبَ « frapper » / « citer (un exemple) » / « parcourir »).
+  // Chaque ajout via « + » depuis un verset enregistre le sens DANS CE VERSET,
+  // avec le fragment arabe où il se lit. `gloss` reste le sens général.
+  contexts?: VocabContext[];
+}
+
+/** Un sens capturé dans un verset précis. */
+export interface VocabContext {
+  verseKey: string; // "s:v"
+  position: number; // position du mot dans le verset (1-based)
+  gloss: string; // sens du mot DANS CE VERSET
+  snippet: string; // fragment arabe (quelques mots autour), vocalisé
+  spanStart: number; // positions (1-based, inclusives) du fragment
+  spanEnd: number;
+  note?: string; // pourquoi ce sens diffère du sens général (facultatif)
+  addedAt: string;
 }
 
 const PREFIX = 'almuraja3a:vocab:';
@@ -164,18 +181,62 @@ export interface AddInput {
   nahw?: string;
   sampleVerseKey?: string;
   source?: VocabEntry['source'];
+  /** Sens dans le verset d'où le mot est ajouté (voir VocabContext). */
+  context?: Omit<VocabContext, 'addedAt'>;
 }
 
 export type AddResult =
   | { status: 'added'; entry: VocabEntry }
-  | { status: 'duplicate'; entry: VocabEntry };
+  | { status: 'duplicate'; entry: VocabEntry }
+  // Le mot existait déjà, mais ce verset lui apporte un NOUVEAU sens.
+  | { status: 'context-added'; entry: VocabEntry };
 
-/** Ajoute un mot. Si sa racine (ou sa forme) existe déjà → "duplicate". */
+/** Normalisation légère d'un gloss pour comparer deux sens. */
+function glossKey(g: string): string {
+  return g
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** Vrai si l'entrée porte déjà un contexte pour ce verset+mot. */
+function hasContextAt(e: VocabEntry, verseKey: string, position: number): boolean {
+  return (e.contexts ?? []).some((c) => c.verseKey === verseKey && c.position === position);
+}
+
+/** Vrai si ce sens (gloss) est déjà connu de l'entrée (général ou contextuel). */
+export function knowsSense(e: VocabEntry, gloss: string): boolean {
+  const k = glossKey(gloss);
+  if (!k) return true;
+  if (glossKey(e.gloss) === k) return true;
+  return (e.contexts ?? []).some((c) => glossKey(c.gloss) === k);
+}
+
+/**
+ * Ajoute un mot. Si son lemme (ou racine/forme) existe déjà :
+ *  - avec un contexte portant un sens NOUVEAU → le sens est ajouté à l'entrée
+ *    existante ("context-added") ;
+ *  - sinon → "duplicate".
+ */
 export function addVocab(input: AddInput): AddResult {
   const list = getVocab();
   const id = anchorOf(input.lemma, input.root, input.arabic);
   const existing = list.find((e) => e.id === id);
-  if (existing) return { status: 'duplicate', entry: existing };
+  if (existing) {
+    const ctx = input.context;
+    if (
+      ctx &&
+      ctx.gloss.trim() &&
+      !hasContextAt(existing, ctx.verseKey, ctx.position) &&
+      !knowsSense(existing, ctx.gloss)
+    ) {
+      const updated = addVocabContext(existing.id, ctx);
+      if (updated) return { status: 'context-added', entry: updated };
+    }
+    return { status: 'duplicate', entry: existing };
+  }
 
   const entry: VocabEntry = {
     id,
@@ -193,9 +254,53 @@ export function addVocab(input: AddInput): AddResult {
     seen: 0,
     correct: 0,
   };
+  if (input.context && input.context.gloss.trim()) {
+    entry.contexts = [{ ...input.context, addedAt: entry.addedAt }];
+  }
   writeVocab([entry, ...list]);
   pushVocabEntry(getCurrentUser(), entry); // sync Supabase (compte)
   return { status: 'added', entry };
+}
+
+/** Ajoute (ou remplace, même verset+mot) un sens en contexte sur une entrée. */
+export function addVocabContext(
+  id: string,
+  ctx: Omit<VocabContext, 'addedAt'>
+): VocabEntry | null {
+  const list = getVocab();
+  const target = list.find((e) => e.id === id);
+  if (!target) return null;
+  const kept = (target.contexts ?? []).filter(
+    (c) => !(c.verseKey === ctx.verseKey && c.position === ctx.position)
+  );
+  const updated: VocabEntry = {
+    ...target,
+    contexts: [...kept, { ...ctx, addedAt: new Date().toISOString() }],
+  };
+  writeVocab(list.map((e) => (e.id === id ? updated : e)));
+  pushVocabEntry(getCurrentUser(), updated);
+  return updated;
+}
+
+/** Retire un sens en contexte (verset+mot) d'une entrée. */
+export function removeVocabContext(id: string, verseKey: string, position: number): void {
+  const list = getVocab();
+  const target = list.find((e) => e.id === id);
+  if (!target?.contexts) return;
+  const updated: VocabEntry = {
+    ...target,
+    contexts: target.contexts.filter((c) => !(c.verseKey === verseKey && c.position === position)),
+  };
+  writeVocab(list.map((e) => (e.id === id ? updated : e)));
+  pushVocabEntry(getCurrentUser(), updated);
+}
+
+/** Le sens d'une entrée pour un verset+mot précis, sinon son sens général. */
+export function senseAt(e: VocabEntry, verseKey: string, position?: number): string {
+  const exact = (e.contexts ?? []).find(
+    (c) => c.verseKey === verseKey && (position == null || c.position === position)
+  );
+  return exact?.gloss || e.gloss;
 }
 
 /** Vrai si le lemme (ou racine/forme) est déjà dans la liste. */

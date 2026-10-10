@@ -39,7 +39,7 @@ function writeMap<T>(key: string, map: Record<string, Timed<T>>, cap: number): v
   }
 }
 
-const ANALYZE_KEY = 'almuraja3a:cache:wordanalyze:v1';
+const ANALYZE_KEY = 'almuraja3a:cache:wordanalyze:v2'; // v2 : sens en contexte + fragment
 const OCC_KEY = 'almuraja3a:cache:occinfo:v5'; // v5 : lots découpés (plus de troncature)
 const CAP = 4000;
 
@@ -50,6 +50,12 @@ export interface WordAnalysisCache {
   baseFormType?: string;
   frenchGloss?: string;
   nahw?: string;
+  // Sens DANS LE VERSET (peut différer du sens général) + fragment minimal
+  // (positions 1-based, inclusives) où ce sens se lit.
+  contextGloss?: string;
+  contextNote?: string;
+  spanStart?: number;
+  spanEnd?: number;
 }
 
 export function getCachedAnalysis(k: string): WordAnalysisCache | null {
@@ -80,4 +86,37 @@ export function setCachedOccInfoBulk(entries: Record<string, OccInfoCache>): voi
   const t = Date.now();
   for (const [k, v] of Object.entries(entries)) m[k] = { v, t };
   writeMap(OCC_KEY, m, CAP);
+}
+
+// ---- Famille de sens d'une racine (OccurrencesExplorer) ----
+// Pour un mot étudié (lemme) et un autre lemme de la MÊME racine : proximité de
+// sens. Une racine couvre souvent des mots sans rapport (فَتاة « jeune fille »
+// vs اِسْتَفْتَى « demander un avis ») → on ne les associe plus aveuglément.
+
+// 'unknown' : lien non évalué (mode gratuit, hors ligne) — affiché à part,
+// sans prétendre à une parenté de sens.
+export type RootRelation = 'same' | 'close' | 'far' | 'unknown';
+
+export interface RootFamilyCache {
+  relation: RootRelation;
+  gloss: string; // sens du lemme comparé
+  note: string; // lien de sens (ou absence de lien), une phrase
+}
+
+const FAMILY_KEY = 'almuraja3a:cache:rootfamily:v1';
+
+export function familyKey(root: string, studiedLemma: string, otherLemma: string): string {
+  return `${root}|${studiedLemma.normalize('NFC')}|${otherLemma.normalize('NFC')}`;
+}
+
+export function getCachedRootFamily(k: string): RootFamilyCache | null {
+  return readMap<RootFamilyCache>(FAMILY_KEY)[k]?.v ?? null;
+}
+
+export function setCachedRootFamilyBulk(entries: Record<string, RootFamilyCache>): void {
+  if (!Object.keys(entries).length) return;
+  const m = readMap<RootFamilyCache>(FAMILY_KEY);
+  const t = Date.now();
+  for (const [k, v] of Object.entries(entries)) m[k] = { v, t };
+  writeMap(FAMILY_KEY, m, CAP);
 }

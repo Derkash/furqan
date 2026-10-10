@@ -292,6 +292,8 @@ export default function SwipeReview({
 
 function Card({ item, rightHint = 0, leftHint = 0 }: { item: QItem; rightHint?: number; leftHint?: number }) {
   const { entry, ref, count } = item;
+  const ctx =
+    entry.contexts?.find((c) => ref && c.verseKey === ref.verseKey) ?? entry.contexts?.[0];
   return (
     <div className="relative bg-white rounded-3xl shadow-xl border-2 border-[var(--ds-gold)]/30 p-8 min-h-[280px] flex flex-col items-center justify-center gap-4 text-center">
       <div className="absolute top-4 left-4 text-[var(--ds-green)] font-black text-lg border-2 border-[var(--ds-green)] rounded-lg px-2 py-0.5 rotate-[-12deg]" style={{ opacity: rightHint }}>
@@ -305,6 +307,18 @@ function Card({ item, rightHint = 0, leftHint = 0 }: { item: QItem; rightHint?: 
         {entry.arabic}
       </span>
       <span className="text-[var(--ds-sage)] text-xl font-semibold">{entry.gloss}</span>
+
+      {/* Sens en contexte : de préférence celui du verset de la plage. */}
+      {ctx && (
+        <div className="w-full bg-[var(--ds-gold)]/10 rounded-xl px-3 py-2">
+          <span dir="rtl" className="block text-[var(--ds-green)]" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.3em', lineHeight: 1.7 }}>
+            {ctx.snippet}
+          </span>
+          <span className="block text-[12px] text-gray-600">
+            <span className="font-bold text-[#7a5d2c]">{ctx.verseKey}</span> · {ctx.gloss}
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap justify-center">
         {entry.root && (

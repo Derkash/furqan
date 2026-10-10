@@ -82,6 +82,7 @@ async function freeAnalyze(input: {
   verbForm?: string;
   verseKey?: string;
   position?: number;
+  wordCount?: number;
 }) {
   let frenchGloss = '';
   if (input.verseKey && input.position) {
@@ -93,14 +94,55 @@ async function freeAnalyze(input: {
       /* réseau — on renvoie sans gloss */
     }
   }
+  // Le mot-à-mot de Quran.com est déjà le sens EN CONTEXTE ; le fragment est
+  // une fenêtre fixe autour du mot (pas d'analyse sémantique en mode gratuit).
+  const span = defaultSpan(input.position, input.wordCount);
   return {
     baseForm: await baseForm(input),
     baseFormType: baseTypeFromPos(input.pos),
     frenchGloss,
+    contextGloss: frenchGloss,
+    contextNote: '',
+    spanStart: span.start,
+    spanEnd: span.end,
     nahw: '',
     llm: false,
     source: 'quran.com+bing',
   };
+}
+
+const SPAN_RADIUS = 3;
+
+/** Fenêtre par défaut autour du mot : ±3 mots, bornée au verset. */
+function defaultSpan(position?: number, wordCount?: number): { start: number; end: number } {
+  const p = position ?? 1;
+  const n = wordCount ?? p + SPAN_RADIUS;
+  return { start: Math.max(1, p - SPAN_RADIUS), end: Math.min(n, p + SPAN_RADIUS) };
+}
+
+/** Borne un fragment renvoyé par le LLM : il doit contenir le mot et rester court. */
+function clampSpan(
+  start: unknown,
+  end: unknown,
+  position?: number,
+  wordCount?: number
+): { start: number; end: number } {
+  const d = defaultSpan(position, wordCount);
+  let s = typeof start === 'number' && Number.isFinite(start) ? Math.round(start) : d.start;
+  let e = typeof end === 'number' && Number.isFinite(end) ? Math.round(end) : d.end;
+  const n = wordCount ?? Math.max(e, d.end);
+  s = Math.max(1, Math.min(s, n));
+  e = Math.max(s, Math.min(e, n));
+  if (position != null) {
+    if (s > position) s = position;
+    if (e < position) e = position;
+    // Fragment trop long (> 9 mots) → on resserre autour du mot.
+    if (e - s + 1 > 9) {
+      s = Math.max(s, position - 4);
+      e = Math.min(e, s + 8);
+    }
+  }
+  return { start: s, end: e };
 }
 
 // ---- Mode Claude (optionnel) ----
@@ -116,6 +158,9 @@ On te donne l'analyse morphologique DÉJÀ ÉTABLIE d'un mot (elle est fiable, n
   • Ex. préfère « semer la corruption / corrompre » à « détériorer » ; « craindre » à « appréhender par révérence ». Pas de calque morphologique.
   • RÈGLE GÉNÉRALE : traduis UNIQUEMENT le sens porté par le MOT lui-même (sa racine + son schème + les éventuels clitiques COLLÉS : pronom, article). N'inclus JAMAIS le sens d'un élément EXTÉRIEUR au mot — qu'il vienne d'un autre mot du verset OU d'une particule attachée en tête : négation (لا, ما, لم, لن, ألا…), interrogation (أ, ءَ, هل…), emphase / tawkid (إنّ, قد, لام التوكيد لَـ, nūn de tawkid…), conjonction (و, ف), préposition (بِ, كَ, لِ), futur (سَ)… Donne toujours le mot en forme neutre et affirmative. Ex : تَعُولُوا dans « أَلَّا تَعُولُوا » → « être injuste / avoir trop de charges » (JAMAIS « ne pas… ») ; أَتُحَاجُّونَ → « argumenter/disputer » (JAMAIS « est-ce que vous argumentez »).
 - nahw : UNE à DEUX phrases en français expliquant la forme fléchie telle qu'elle apparaît dans le verset — temps/mode, personne, et surtout les préfixes/particules (ex. « précédé de لا nāhiya, d'où le مجزوم », « و de coordination », « article défini », préposition attachée…). Concret et pédagogique, sans jargon inutile.
+- contextGloss : le sens du mot DANS CE VERSET PRÉCIS (1 à 6 mots). Un mot coranique prend souvent un sens particulier selon le contexte (ضَرَبَ « frapper » / « citer un exemple » / « parcourir la terre » ; كَتَبَ « écrire » / « prescrire » ; وَجَدَ « trouver » / « éprouver »). Pars du sens général, puis donne ce que le mot veut dire ICI, aligné sur Hamidullah quand il traduit ce mot. Même règle que frenchGloss : seulement le sens porté par le mot (racine + schème + clitiques collés), forme neutre et affirmative. Si le sens en contexte est le même que le sens général, répète-le tel quel.
+- contextNote : si contextGloss diffère vraiment du sens général, UNE phrase courte expliquant le glissement de sens dans ce verset (ex. « Ici, "frapper" prend le sens de "citer (une parabole)" : ضرب مثلا »). Sinon chaîne vide "".
+- spanStart / spanEnd : positions (1 = premier mot du verset, inclusives) du FRAGMENT MINIMAL du verset où ce sens se comprend : la proposition ou le groupe de mots autour du mot (3 à 8 mots), PAS le verset entier. Le mot ciblé (sa position est fournie) doit être dedans. Coupe aux frontières naturelles (début/fin de proposition, avant une conjonction, à un signe de pause).
 
 Réponds uniquement via le format structuré demandé.`;
 
@@ -129,8 +174,12 @@ const SCHEMA = {
     },
     frenchGloss: { type: 'string' },
     nahw: { type: 'string' },
+    contextGloss: { type: 'string' },
+    contextNote: { type: 'string' },
+    spanStart: { type: 'integer' },
+    spanEnd: { type: 'integer' },
   },
-  required: ['baseForm', 'baseFormType', 'frenchGloss', 'nahw'],
+  required: ['baseForm', 'baseFormType', 'frenchGloss', 'nahw', 'contextGloss', 'contextNote', 'spanStart', 'spanEnd'],
   additionalProperties: false,
 } as const;
 
@@ -143,18 +192,29 @@ async function claudeAnalyze(input: {
   morphology?: string[];
   verseKey?: string;
   verseText?: string;
+  position?: number;
+  wordCount?: number;
 }) {
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const trad = input.verseKey ? (await getHamidullah())[input.verseKey] : undefined;
+  // Verset numéroté mot par mot : le LLM renvoie des positions fiables.
+  const numbered = input.verseText
+    ? input.verseText
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w, i) => `[${i + 1}] ${w}`)
+        .join(' ')
+    : '';
   const facts = [
     `Mot fléchi : ${input.form}`,
+    input.position ? `Position du mot dans le verset : ${input.position}` : null,
     input.root ? `Racine : ${input.root}` : null,
     input.lemma ? `Lemme (QAC) : ${input.lemma}` : null,
     input.pos ? `Nature : ${input.pos}` : null,
     input.verbForm ? `Forme verbale (wazn) : ${input.verbForm} (I=فَعَلَ, IV=أَفْعَلَ, VIII=اِفْتَعَلَ, X=اِسْتَفْعَلَ…)` : null,
     input.morphology?.length ? `Analyse : ${input.morphology.join(' ; ')}` : null,
     input.verseKey ? `Référence : ${input.verseKey}` : null,
-    input.verseText ? `Verset : ${input.verseText}` : null,
+    numbered ? `Verset (mots numérotés) : ${numbered}` : null,
     trad ? `Traduction Hamidullah du verset : ${trad}` : null,
   ]
     .filter(Boolean)
@@ -170,7 +230,17 @@ async function claudeAnalyze(input: {
   });
   const textBlock = message.content.find((b) => b.type === 'text');
   if (!textBlock || textBlock.type !== 'text') throw new Error('Réponse vide');
-  return { ...JSON.parse(textBlock.text), llm: true, source: 'claude' };
+  const parsed = JSON.parse(textBlock.text);
+  const span = clampSpan(parsed.spanStart, parsed.spanEnd, input.position, input.wordCount);
+  return {
+    ...parsed,
+    contextGloss: parsed.contextGloss || parsed.frenchGloss || '',
+    contextNote: parsed.contextNote || '',
+    spanStart: span.start,
+    spanEnd: span.end,
+    llm: true,
+    source: 'claude',
+  };
 }
 
 // ---- Point d'entrée ----
@@ -194,7 +264,8 @@ export async function POST(req: NextRequest) {
     return new Response('Corps JSON invalide', { status: 400 });
   }
   if (!body.form) return new Response('form requis', { status: 400 });
-  const input = { ...body, form: body.form };
+  const wordCount = body.verseText ? body.verseText.split(/\s+/).filter(Boolean).length : undefined;
+  const input = { ...body, form: body.form, wordCount };
 
   // Claude UNIQUEMENT pour les comptes autorisés (sinon repli sur le gratuit).
   if (claudeAllowed(body.user)) {

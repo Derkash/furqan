@@ -264,6 +264,43 @@ export async function getVerseRoots(
     }));
 }
 
+/** Mots complets d'un verset (position, forme, lemme, racine), triés. */
+export async function getVerseMorphWords(
+  verseKey: string
+): Promise<VerseMorphWord[]> {
+  const [s, v] = verseKey.split(':').map(Number);
+  const surah = await loadSurah(s);
+  return Object.keys(surah)
+    .filter((k) => Number(k.split(':')[0]) === v)
+    .map((k) => {
+      const m = surah[k];
+      const display = stripLeadingParticles(m);
+      // Particule(s) collée(s) en tête (و, ف, بِ…) : affichée HORS du trou dans
+      // l'exercice de reconstruction, pour ne pas trahir la réponse.
+      const prefix = m.form.endsWith(display) ? m.form.slice(0, m.form.length - display.length) : '';
+      return {
+        position: Number(k.split(':')[1]),
+        form: m.form,
+        display,
+        prefix,
+        lemma: m.lemma,
+        root: m.root,
+        pos: m.pos,
+      };
+    })
+    .sort((a, b) => a.position - b.position);
+}
+
+export interface VerseMorphWord {
+  position: number;
+  form: string; // forme coranique exacte
+  display: string; // forme sans les particules de tête (= forme du lexique)
+  prefix: string; // particules de tête retirées (peut être vide)
+  lemma?: string;
+  root?: string;
+  pos: string;
+}
+
 /** Mots (position + forme) d'un verset, pour surligner un mot précis. */
 export async function getVerseWords(
   verseKey: string

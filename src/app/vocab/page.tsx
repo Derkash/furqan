@@ -13,6 +13,7 @@ import WordCard from '@/components/vocab/WordCard';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 import ReviewTab from '@/components/vocab/ReviewTab';
 import MatchGame from '@/components/vocab/MatchGame';
+import FillGapsGame from '@/components/vocab/FillGapsGame';
 import { getRootFirstPage } from '@/utils/vocab/morphology';
 import { useScopedVocab } from '@/hooks/useScopedVocab';
 import { loadSharedRange, saveSharedRange } from '@/utils/exercises/sharedRange';
@@ -38,7 +39,7 @@ function pairOf(page: number): PagePair {
   return { rightPage: Math.max(1, right), leftPage: Math.min(604, Math.max(1, right) + 1) };
 }
 
-type Mode = 'review' | 'match' | 'capture' | 'list';
+type Mode = 'review' | 'match' | 'gaps' | 'capture' | 'list';
 
 export default function VocabPage() {
   // Le vocabulaire est PERSONNEL : accès réservé aux comptes connectés.
@@ -101,6 +102,7 @@ function VocabPageInner() {
   const tabs: { id: Mode; label: string }[] = [
     { id: 'review', label: '🔁 Réviser' },
     { id: 'match', label: '🎯 Associer' },
+    { id: 'gaps', label: '🧩 Replacer' },
     { id: 'capture', label: '➕ Enregistrer' },
     { id: 'list', label: '📚 Lexique' },
   ];
@@ -166,6 +168,11 @@ function VocabPageInner() {
         {mode === 'match' && (
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <MatchGame startPage={startPage} endPage={endPage} />
+          </div>
+        )}
+        {mode === 'gaps' && (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <FillGapsGame startPage={startPage} endPage={endPage} />
           </div>
         )}
         {mode === 'capture' && <ReadMode />}

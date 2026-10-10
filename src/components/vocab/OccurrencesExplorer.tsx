@@ -9,7 +9,15 @@ import {
   type RootOccurrence,
 } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { getCachedOccInfo, setCachedOccInfoBulk } from '@/utils/vocab/glossCache';
+import {
+  getCachedOccInfo,
+  setCachedOccInfoBulk,
+  getCachedRootFamily,
+  setCachedRootFamilyBulk,
+  familyKey,
+  type RootFamilyCache,
+  type RootRelation,
+} from '@/utils/vocab/glossCache';
 import { highlightFrench } from '@/utils/vocab/frHighlight';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { unitToPageRange } from '@/utils/exercises/rangeToPages';
@@ -20,7 +28,8 @@ import RangePicker, { type RangePickerValue } from '@/components/exercises/Range
 interface Props {
   root: string;
   gloss?: string;
-  /** Lemme du mot étudié (conservé pour compat. d'appel). */
+  /** Lemme du mot ÉTUDIÉ : sert à regrouper les occurrences par proximité de
+   *  SENS (même mot / même famille de sens / sens éloigné malgré la racine). */
   lemma?: string;
   onClose: () => void;
   /**
@@ -40,11 +49,24 @@ function infoKey(o: RootOccurrence): string {
   return `${o.verseKey}:${o.word}`;
 }
 
-/** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR LEMME
- *  (une même racine peut couvrir plusieurs sens : فَتَاة « jeune fille » vs
- *   اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي mais pas le sens). */
-export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, fullQuran, embedded }: Props) {
+const RELATION_LABEL: Record<RootRelation, string> = {
+  same: 'Même mot',
+  close: 'Même famille de sens',
+  far: 'Sens éloigné (même racine, autre mot)',
+  unknown: 'Autres mots de la racine (lien de sens non vérifié)',
+};
+
+/** Explorateur : occurrences d'une racine sur une plage, REGROUPÉES PAR SENS.
+ *  Une même racine couvre souvent des mots sans rapport (فَتَاة « jeune fille »
+ *  vs اِسْتَفْتَى « demander un avis » partagent ف‑ت‑ي, pas le sens). On montre
+ *  d'abord le mot étudié, puis sa famille de sens, et on replie le reste. */
+export default function OccurrencesExplorer({ root, gloss, lemma, onClose, beforePage, fullQuran, embedded }: Props) {
   const locked = typeof beforePage === 'number' || !!fullQuran;
+  const studied = lemma ? lemma.normalize('NFC') : null;
+  // Verdict par lemme (autre que le mot étudié) : relation + sens + note.
+  const [family, setFamily] = useState<Record<string, RootFamilyCache>>({});
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [showFar, setShowFar] = useState(false);
   const { data: units } = useQuranUnits();
   // Par défaut, on se limite à la plage GLOBALE définie en entrant dans le
   // vocabulaire (modifiable via le sélecteur ci-dessous).
@@ -163,12 +185,74 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
   }, [root, start, end]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Formes distinctes rencontrées (pour un aperçu des variations)
+  // Classement des AUTRES lemmes de la racine par proximité de sens avec le
+  // mot étudié : cache local d'abord, API pour les lemmes encore inconnus.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!occ || !studied) return;
+    let cancelled = false;
+    const samples = new Map<string, RootOccurrence>();
+    for (const o of occ) {
+      const l = o.morph?.lemma?.normalize('NFC');
+      if (!l || l === studied || samples.has(l)) continue;
+      samples.set(l, o);
+    }
+    const known: Record<string, RootFamilyCache> = {};
+    const todo: { lemma: string; form?: string; pos?: string; verbForm?: string; verseKey: string }[] = [];
+    for (const [l, o] of samples) {
+      const hit = getCachedRootFamily(familyKey(root, studied, l));
+      if (hit && hit.relation !== 'unknown') known[l] = hit;
+      else todo.push({ lemma: l, form: o.morph?.form, pos: o.morph?.pos, verbForm: o.morph?.verbForm, verseKey: o.verseKey });
+    }
+    setFamily(known);
+    setShowFar(false);
+    if (!todo.length) return;
+    setFamilyLoading(true);
+    const studiedForm = occ.find((o) => o.morph?.lemma?.normalize('NFC') === studied)?.morph?.form;
+    fetch(apiUrl('/api/root-family'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root, lemma: studied, gloss, form: studiedForm, others: todo, user: getCurrentUser() ?? undefined }),
+    })
+      .then((r) => r.json())
+      .then((data: { info?: Record<string, RootFamilyCache> }) => {
+        if (cancelled || !data?.info) return;
+        const got: Record<string, RootFamilyCache> = {};
+        const toCache: Record<string, RootFamilyCache> = {};
+        for (const [l, v] of Object.entries(data.info)) {
+          const nl = l.normalize('NFC');
+          got[nl] = v;
+          if (v.relation !== 'unknown') toCache[familyKey(root, studied, nl)] = v;
+        }
+        setFamily((prev) => ({ ...prev, ...got }));
+        setCachedRootFamilyBulk(toCache);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setFamilyLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [occ, root, studied, gloss]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /** Relation d'une occurrence avec le mot étudié. */
+  const relationOf = (o: RootOccurrence): RootRelation => {
+    if (!studied) return 'same'; // pas de mot étudié : tout est listé ensemble
+    const l = o.morph?.lemma?.normalize('NFC');
+    if (!l) return 'unknown';
+    if (l === studied) return 'same';
+    return family[l]?.relation ?? 'unknown';
+  };
+
+  // Formes distinctes rencontrées — du mot étudié et de sa famille de sens
+  // seulement (pas des homographes de racine au sens éloigné).
   const distinctForms = useMemo(() => {
     if (!occ) return [];
     const seen = new Set<string>();
     const forms: string[] = [];
     for (const o of occ) {
+      const rel = relationOf(o);
+      if (rel === 'far' || rel === 'unknown') continue;
       const f = o.morph?.form;
       if (f && !seen.has(f)) {
         seen.add(f);
@@ -176,7 +260,8 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
       }
     }
     return forms;
-  }, [occ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occ, family, studied]);
 
   // Ordre d'apparition strict dans le Mushaf (page, puis verset, puis mot).
   const ordered = useMemo(() => {
@@ -186,11 +271,28 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
     );
   }, [occ]);
 
+  // Groupes par proximité de sens, dans l'ordre d'intérêt pour l'apprenant.
+  const groups = useMemo(() => {
+    const g: Record<RootRelation, RootOccurrence[]> = { same: [], close: [], far: [], unknown: [] };
+    for (const o of ordered) g[relationOf(o)].push(o);
+    return g;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordered, family, studied]);
+
   // Sur tout le Coran, une racine fréquente peut avoir des centaines
   // d'occurrences → on plafonne l'affichage pour rester fluide.
   const MAX_SHOWN = 150;
-  const shown = fullQuran ? ordered.slice(0, MAX_SHOWN) : ordered;
-  const hiddenCount = ordered.length - shown.length;
+  const nearCount = groups.same.length + groups.close.length;
+
+  /** Lemmes (avec sens) d'un groupe, pour l'en-tête du groupe. */
+  const lemmaChips = (list: RootOccurrence[]) => {
+    const seen = new Map<string, RootFamilyCache | undefined>();
+    for (const o of list) {
+      const l = o.morph?.lemma?.normalize('NFC');
+      if (l && !seen.has(l)) seen.set(l, family[l]);
+    }
+    return [...seen.entries()];
+  };
 
   const header = (
     <div className={embedded ? 'px-1 pt-1 pb-2' : 'flex-none p-4 border-b border-[var(--ds-gold)]/30'}>
@@ -231,6 +333,7 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
             </span>
             <span className="text-[var(--ds-sage)] font-bold whitespace-nowrap ml-2">
               {occ ? `${toArabicNumbers(occ.length)} fois` : ''}
+              {occ && studied && occ.length !== nearCount ? ` · ${toArabicNumbers(nearCount)} au même sens` : ''}
             </span>
           </div>
         ) : (
@@ -268,78 +371,159 @@ export default function OccurrencesExplorer({ root, gloss, onClose, beforePage, 
     </div>
   );
 
+  const renderOcc = (o: RootOccurrence) => {
+    const inf = info[infoKey(o)];
+    return (
+      <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[var(--ds-gold)]/20">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
+            {o.verseKey} · p.{toArabicNumbers(o.page)}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {o.morph?.lemma && (
+              <span dir="rtl" className="text-[10px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-1.5" style={{ fontFamily: "'Amiri',serif" }}>
+                {o.morph.lemma}
+              </span>
+            )}
+            {o.morph && (
+              <span className="text-[10px] text-gray-400 text-right">
+                {describeMorphology(o.morph).slice(0, 2).join(' · ')}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Verset arabe — le mot ciblé surligné */}
+        <p dir="rtl" className="text-[var(--ds-green)] leading-loose" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.6em' }}>
+          {(verseWords[o.verseKey] ?? []).map((w) => (
+            <span
+              key={w.position}
+              className={w.position === o.word ? 'bg-[var(--ds-gold)]/45 rounded px-0.5 font-bold' : ''}
+            >
+              {w.form}{' '}
+            </span>
+          ))}
+          {!verseWords[o.verseKey] && (o.morph?.form ?? '')}
+        </p>
+
+        {/* Traduction Hamidullah du verset (contexte) — le mot ciblé
+            surligné comme dans le verset arabe (portion FR exacte du LLM). */}
+        {trans?.[o.verseKey] && (
+          <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
+            {highlightFrench(trans[o.verseKey], inf?.frSpan ?? '', inf?.gloss ?? '', gloss ?? '').map((seg, i) =>
+              seg.hit ? (
+                <mark
+                  key={i}
+                  className="bg-[var(--ds-gold)]/45 text-[var(--ds-green)] rounded px-0.5 font-semibold"
+                >
+                  {seg.t}
+                </mark>
+              ) : (
+                <span key={i}>{seg.t}</span>
+              )
+            )}
+          </p>
+        )}
+
+        {/* Mini-explication du wazn (ce que la forme apporte au sens) */}
+        {inf?.note && (
+          <p className="text-[11px] text-gray-500 italic mt-0.5">{inf.note}</p>
+        )}
+      </div>
+    );
+  };
+
+  /** En-tête d'un groupe de sens : libellé + lemmes (sens + lien de sens). */
+  const groupHeader = (rel: RootRelation, list: RootOccurrence[]) => (
+    <div className="pt-1">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-gold)]">
+        {RELATION_LABEL[rel]} · {toArabicNumbers(list.length)}
+      </p>
+      {rel !== 'same' && (
+        <ul className="mt-1 space-y-0.5">
+          {lemmaChips(list).map(([l, v]) => (
+            <li key={l} className="text-[12px] text-gray-600 flex items-baseline gap-1.5 flex-wrap">
+              <span dir="rtl" className="text-[var(--ds-green)] font-bold" style={{ fontFamily: "'Amiri',serif", fontSize: '1.2em' }}>
+                {l}
+              </span>
+              {v?.gloss && <span className="font-semibold">{v.gloss}</span>}
+              {v?.note && <span className="italic text-gray-500">— {v.note}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
   const list = (
     <div className={embedded ? 'px-1 space-y-2' : 'flex-1 overflow-y-auto p-3 space-y-2'}>
       {loading && <p className="text-center text-gray-400 py-6 text-sm">Recherche…</p>}
       {!loading && occ?.length === 0 && (
         <p className="text-center text-gray-500 py-6 text-sm">Aucune occurrence sur cette plage.</p>
       )}
-      {!loading &&
-        shown.map((o) => {
-              const inf = info[infoKey(o)];
-              return (
-                <div key={o.location} className="bg-white/70 rounded-xl p-3 border border-[var(--ds-gold)]/20">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[11px] text-[#7a5d2c] font-bold whitespace-nowrap">
-                      {o.verseKey} · p.{toArabicNumbers(o.page)}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {o.morph?.lemma && (
-                        <span dir="rtl" className="text-[10px] text-[#7a5d2c] bg-[var(--ds-gold)]/15 rounded-full px-1.5" style={{ fontFamily: "'Amiri',serif" }}>
-                          {o.morph.lemma}
-                        </span>
-                      )}
-                      {o.morph && (
-                        <span className="text-[10px] text-gray-400 text-right">
-                          {describeMorphology(o.morph).slice(0, 2).join(' · ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Verset arabe — le mot ciblé surligné */}
-                  <p dir="rtl" className="text-[var(--ds-green)] leading-loose" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.6em' }}>
-                    {(verseWords[o.verseKey] ?? []).map((w) => (
-                      <span
-                        key={w.position}
-                        className={w.position === o.word ? 'bg-[var(--ds-gold)]/45 rounded px-0.5 font-bold' : ''}
-                      >
-                        {w.form}{' '}
-                      </span>
-                    ))}
-                    {!verseWords[o.verseKey] && (o.morph?.form ?? '')}
-                  </p>
-
-                  {/* Traduction Hamidullah du verset (contexte) — le mot ciblé
-                      surligné comme dans le verset arabe (portion FR exacte du LLM). */}
-                  {trans?.[o.verseKey] && (
-                    <p className="text-[12px] text-gray-600 mt-1.5 leading-relaxed">
-                      {highlightFrench(trans[o.verseKey], inf?.frSpan ?? '', inf?.gloss ?? '', gloss ?? '').map((seg, i) =>
-                        seg.hit ? (
-                          <mark
-                            key={i}
-                            className="bg-[var(--ds-gold)]/45 text-[var(--ds-green)] rounded px-0.5 font-semibold"
-                          >
-                            {seg.t}
-                          </mark>
-                        ) : (
-                          <span key={i}>{seg.t}</span>
-                        )
-                      )}
-                    </p>
-                  )}
-
-                  {/* Mini-explication du wazn (ce que la forme apporte au sens) */}
-                  {inf?.note && (
-                    <p className="text-[11px] text-gray-500 italic mt-0.5">{inf.note}</p>
-                  )}
-                </div>
-              );
-            })}
-      {!loading && hiddenCount > 0 && (
+      {/* Sans mot étudié : liste simple (comportement historique). */}
+      {!loading && !studied && ordered.slice(0, fullQuran ? MAX_SHOWN : undefined).map(renderOcc)}
+      {!loading && !studied && fullQuran && ordered.length > MAX_SHOWN && (
         <p className="text-center text-[11px] text-gray-400 py-2">
-          … et {toArabicNumbers(hiddenCount)} autres occurrences (racine fréquente)
+          … et {toArabicNumbers(ordered.length - MAX_SHOWN)} autres occurrences (racine fréquente)
         </p>
+      )}
+
+      {/* Avec mot étudié : même mot → famille de sens → (replié) sens éloigné. */}
+      {!loading && studied && groups.same.length > 0 && (
+        <>
+          {groupHeader('same', groups.same)}
+          {groups.same.slice(0, MAX_SHOWN).map(renderOcc)}
+          {groups.same.length > MAX_SHOWN && (
+            <p className="text-center text-[11px] text-gray-400 py-2">
+              … et {toArabicNumbers(groups.same.length - MAX_SHOWN)} autres occurrences de ce mot
+            </p>
+          )}
+        </>
+      )}
+      {!loading && studied && groups.close.length > 0 && (
+        <>
+          {groupHeader('close', groups.close)}
+          {groups.close.slice(0, MAX_SHOWN).map(renderOcc)}
+        </>
+      )}
+      {!loading && studied && familyLoading && (
+        <p className="text-[11px] text-gray-400 flex items-center gap-2 pt-1">
+          <span className="w-3 h-3 border-2 border-[var(--ds-gold)] border-t-transparent rounded-full animate-spin" />
+          Classement des autres mots de la racine par proximité de sens…
+        </p>
+      )}
+      {!loading && studied && !familyLoading && groups.unknown.length > 0 && (
+        <>
+          {groupHeader('unknown', groups.unknown)}
+          {groups.unknown.slice(0, 40).map(renderOcc)}
+        </>
+      )}
+      {!loading && studied && groups.far.length > 0 && (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setShowFar((v) => !v)}
+            className="w-full text-left text-[12px] text-gray-500 bg-white/50 border border-dashed border-[var(--ds-gold)]/40 rounded-xl px-3 py-2 hover:bg-white/80"
+          >
+            <span className="font-bold text-[#7a5d2c]">
+              {toArabicNumbers(groups.far.length)} occurrence{groups.far.length > 1 ? 's' : ''} d’un autre mot de la racine, au sens éloigné
+            </span>
+            <span className="block mt-0.5">
+              {lemmaChips(groups.far)
+                .map(([l, v]) => `${l}${v?.gloss ? ` (${v.gloss})` : ''}`)
+                .join(' · ')}
+            </span>
+            <span className="block mt-0.5 underline">{showFar ? 'Masquer' : 'Afficher quand même'}</span>
+          </button>
+          {showFar && (
+            <div className="space-y-2 mt-2">
+              {groupHeader('far', groups.far)}
+              {groups.far.slice(0, 60).map(renderOcc)}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -234,6 +234,21 @@ export default function ReviewSession({
                   </span>
                 </div>
               )}
+              {/* Sens en contexte : le fragment où le mot a été capturé + son sens là */}
+              {current.contexts && current.contexts.length > 0 && (
+                <ul className="mt-3 space-y-1.5 text-left">
+                  {current.contexts.slice(0, 2).map((c) => (
+                    <li key={`${c.verseKey}:${c.position}`} className="bg-[var(--ds-gold)]/10 rounded-lg px-2.5 py-1.5">
+                      <span dir="rtl" className="block text-[var(--ds-green)]" style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.25em', lineHeight: 1.7 }}>
+                        {c.snippet}
+                      </span>
+                      <span className="block text-[12px] text-gray-600">
+                        <span className="font-bold text-[#7a5d2c]">{c.verseKey}</span> · {c.gloss}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </button>
