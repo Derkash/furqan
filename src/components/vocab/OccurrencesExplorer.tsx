@@ -9,6 +9,7 @@ import {
   type RootOccurrence,
 } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { loadRootFamilies, familyOf } from '@/utils/vocab/rootFamilies';
 import {
   getCachedOccInfo,
   setCachedOccInfoBulk,
@@ -208,6 +209,28 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose, befor
     setShowFar(false);
     if (!todo.length) return;
     setFamilyLoading(true);
+    // 1) Table fixe des familles de sens (hors ligne, issue de la map en
+    //    contexte). 2) Sinon seulement : l'API (Claude).
+    loadRootFamilies().then((all) => {
+      if (cancelled) return;
+      const fams = all[root];
+      const mine = familyOf(fams, studied);
+      if (fams && mine) {
+        const fromTable: Record<string, RootFamilyCache> = {};
+        for (const t of todo) {
+          const f = familyOf(fams, t.lemma);
+          if (!f) continue;
+          fromTable[t.lemma] = { relation: f === mine ? 'close' : 'far', gloss: f.s, note: '' };
+        }
+        setFamily((prev) => ({ ...prev, ...fromTable }));
+        if (Object.keys(fromTable).length >= todo.length) {
+          setFamilyLoading(false);
+          return;
+        }
+      }
+      requestApi();
+    });
+    const requestApi = () => {
     const studiedForm = occ.find((o) => o.morph?.lemma?.normalize('NFC') === studied)?.morph?.form;
     fetch(apiUrl('/api/root-family'), {
       method: 'POST',
@@ -229,6 +252,7 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose, befor
       })
       .catch(() => {})
       .finally(() => !cancelled && setFamilyLoading(false));
+    };
     return () => {
       cancelled = true;
     };
