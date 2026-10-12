@@ -18,11 +18,17 @@ export interface GapWord {
   gloss: string; // sens dans ce verset (indice)
 }
 
+/** Tuile de la banque : un mot arabe + sa traduction française (affichée sous le mot). */
+export interface GapTile {
+  word: string;
+  gloss: string;
+}
+
 export interface GapItem {
   verseKey: string;
   words: VerseMorphWord[]; // VERSET ENTIER, dans l'ordre
   gaps: GapWord[]; // trous (sous-ensemble de `words`), dans l'ordre
-  tiles: string[]; // banque mélangée : réponses + leurres
+  tiles: GapTile[]; // banque mélangée : réponses + leurres, CHAQUE tuile porte sa traduction
 }
 
 const RADIUS = 3; // fenêtre par défaut autour du mot
@@ -133,24 +139,29 @@ export async function buildGapItems(
     }
     gaps.sort((x, y) => x.position - y.position);
 
-    // Leurres : formes d'autres mots du lexique (jamais une réponse du fragment).
+    // Leurres : d'autres mots du lexique (jamais une réponse), AVEC leur sens.
     const answers = new Set(gaps.map((g) => g.answer));
-    const distractors: string[] = [];
+    const distractors: GapTile[] = [];
+    const takenWords = new Set(answers);
     for (const d of shuffle(pool)) {
       if (distractors.length >= DISTRACTORS) break;
       if (gaps.some((g) => g.entryId === d.id)) continue;
       const form = d.arabic.trim();
-      if (!form || answers.has(form) || distractors.includes(form)) continue;
-      distractors.push(form);
+      if (!form || takenWords.has(form)) continue;
+      takenWords.add(form);
+      distractors.push({ word: form, gloss: d.gloss });
     }
 
     for (const g of gaps) covered.add(g.entryId);
     usedVerses.add(a.verseKey);
     items.push({
       verseKey: a.verseKey,
-      words, // verset entier
+      words, // verset entier (le composant fenêtre l'affichage)
       gaps,
-      tiles: shuffle([...gaps.map((g) => g.answer), ...distractors]),
+      tiles: shuffle([
+        ...gaps.map((g) => ({ word: g.answer, gloss: g.gloss })),
+        ...distractors,
+      ]),
     });
   }
   return items;

@@ -1,19 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getVocab, recordReview, type VocabEntry } from '@/utils/vocab/vocabStore';
 import { buildGapItems, playablePool, type GapItem } from '@/utils/vocab/fragments';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 
 /**
- * « Replacer les mots » (façon Duolingo) : un FRAGMENT de verset (pas le verset
- * entier) où les mots du lexique sont retirés ; on les remet depuis une banque
- * de tuiles (réponses + leurres tirés du lexique). Les particules collées
- * (و, ف, بِ…) restent affichées hors du trou. Indice : le sens DANS CE VERSET.
+ * « Replacer les mots » (façon Duolingo). Ordre d'affichage : (1) texte arabe
+ * FENÊTRÉ autour des trous (une ligne avant / après, bouton « voir tout »),
+ * (2) banque de tuiles — chaque tuile = un mot + SA TRADUCTION dessous,
+ * (3) traduction Hamidullah du verset (bouton « voir tout »). Les particules
+ * collées (و, ف, بِ) restent hors du trou. Arabe volontairement compact.
  */
 
 const SESSION = 10;
 const AR_FONT = "'UthmanicHafs','Amiri','Scheherazade New',serif";
+// Fenêtre par défaut autour des trous : ~une ligne de Mushaf de chaque côté.
+const LINE_WORDS = 7;
+const TRANS_PREVIEW = 90; // caractères de traduction avant « voir tout »
 
 type Phase = 'loading' | 'empty' | 'play' | 'checked' | 'done';
 
@@ -29,7 +33,8 @@ export default function FillGapsGame({
   const [idx, setIdx] = useState(0);
   const [filled, setFilled] = useState<(string | null)[]>([]); // par trou
   const [usedTiles, setUsedTiles] = useState<number[]>([]); // index de tuile par trou
-  const [hint, setHint] = useState(false);
+  const [showAllVerse, setShowAllVerse] = useState(false);
+  const [showAllTrans, setShowAllTrans] = useState(false);
   const [trans, setTrans] = useState<Record<string, string> | null>(null);
   const [score, setScore] = useState({ ok: 0, total: 0 });
   const [poolSize, setPoolSize] = useState(0);
@@ -43,13 +48,14 @@ export default function FillGapsGame({
     setItems(built);
     setIdx(0);
     setScore({ ok: 0, total: 0 });
-    setHint(false);
     if (!built.length) {
       setPhase('empty');
       return;
     }
     setFilled(Array(built[0].gaps.length).fill(null));
     setUsedTiles([]);
+    setShowAllVerse(false);
+    setShowAllTrans(false);
     setPhase('play');
   }, [startPage, endPage]);
 
@@ -57,7 +63,6 @@ export default function FillGapsGame({
     prepare();
   }, [prepare]);
 
-  // Traduction Hamidullah (affichée après vérification, comme contexte).
   useEffect(() => {
     let cancelled = false;
     fetch('/qcf-data/translation-hamidullah.fr.json')
@@ -71,13 +76,26 @@ export default function FillGapsGame({
 
   const item = items[idx];
 
+  // Fenêtre d'affichage : mots autour des trous (une ligne avant / après).
+  const window = useMemo(() => {
+    if (!item) return { start: 1, end: 1 };
+    const positions = item.gaps.map((g) => g.position);
+    const minG = Math.min(...positions);
+    const maxG = Math.max(...positions);
+    const n = item.words.length ? item.words[item.words.length - 1].position : maxG;
+    return {
+      start: Math.max(1, minG - LINE_WORDS),
+      end: Math.min(n, maxG + LINE_WORDS),
+    };
+  }, [item]);
+
   const placeTile = (tileIdx: number) => {
     if (phase !== 'play' || !item) return;
     if (usedTiles.includes(tileIdx)) return;
     const slot = filled.findIndex((f) => f === null);
     if (slot < 0) return;
     const nf = [...filled];
-    nf[slot] = item.tiles[tileIdx];
+    nf[slot] = item.tiles[tileIdx].word;
     setFilled(nf);
     const nu = [...usedTiles];
     nu[slot] = tileIdx;
@@ -115,14 +133,15 @@ export default function FillGapsGame({
     setIdx(n);
     setFilled(Array(items[n].gaps.length).fill(null));
     setUsedTiles([]);
-    setHint(false);
+    setShowAllVerse(false);
+    setShowAllTrans(false);
     setPhase('play');
   };
 
   if (phase === 'loading') {
     return (
       <Centered>
-        <p className="text-[var(--ds-n600)] text-sm">Préparation des fragments…</p>
+        <p className="text-[var(--ds-n600)] text-sm">Préparation des versets…</p>
       </Centered>
     );
   }
@@ -160,6 +179,18 @@ export default function FillGapsGame({
   if (!item) return null;
   const allFilled = filled.every((f) => f !== null);
   const gapIndexAt = (position: number) => item.gaps.findIndex((g) => g.position === position);
+  const visibleWords = showAllVerse
+    ? item.words
+    : item.words.filter((w) => w.position >= window.start && w.position <= window.end);
+  const truncatedStart = !showAllVerse && window.start > 1;
+  const truncatedEnd =
+    !showAllVerse && item.words.length > 0 && window.end < item.words[item.words.length - 1].position;
+  const verseHasMore =
+    item.words.length > visibleWords.length || showAllVerse;
+
+  const fullTrans = trans?.[item.verseKey] ?? '';
+  const transTooLong = fullTrans.length > TRANS_PREVIEW;
+  const shownTrans = showAllTrans || !transTooLong ? fullTrans : fullTrans.slice(0, TRANS_PREVIEW).trimEnd() + '…';
 
   return (
     <div dir="ltr" className="flex flex-col h-full max-w-2xl mx-auto" style={{ fontFamily: 'var(--ds-font)' }}>
@@ -175,14 +206,15 @@ export default function FillGapsGame({
         <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${(idx / items.length) * 100}%` }} />
       </div>
 
-      <h2 className="text-sm md:text-base font-bold text-center text-[var(--ds-text)] mb-3">
-        Replace {item.gaps.length > 1 ? 'les mots manquants' : 'le mot manquant'} dans le verset
+      <h2 className="text-sm font-bold text-center text-[var(--ds-text)] mb-3">
+        Replace {item.gaps.length > 1 ? 'les mots' : 'le mot'} dans le verset
       </h2>
 
-      {/* Fragment à trous */}
-      <div className="bg-white rounded-3xl shadow-sm border border-[var(--ds-gold)]/30 px-4 py-5 mb-4">
-        <p dir="rtl" className="text-[var(--ds-text)] leading-[2.4]" style={{ fontFamily: AR_FONT, fontSize: '1.9em' }}>
-          {item.words.map((w) => {
+      {/* 1) TEXTE ARABE fenêtré, compact */}
+      <div className="bg-white rounded-2xl shadow-sm border border-[var(--ds-gold)]/30 px-3 py-4 mb-2">
+        <p dir="rtl" className="text-[var(--ds-text)] text-center" style={{ fontFamily: AR_FONT, fontSize: '1.35em', lineHeight: 2.1 }}>
+          {truncatedStart && <span className="text-[var(--ds-n400)]">… </span>}
+          {visibleWords.map((w) => {
             const gi = gapIndexAt(w.position);
             if (gi < 0) return <span key={w.position}>{w.form} </span>;
             const value = filled[gi];
@@ -194,80 +226,43 @@ export default function FillGapsGame({
                 <button
                   type="button"
                   onClick={() => clearGap(gi)}
-                  className={`inline-flex items-center justify-center align-baseline min-w-[3.2em] px-2 mx-0.5 rounded-xl border-2 transition-colors ${
+                  className={`inline-flex items-center justify-center align-baseline min-w-[2.6em] px-1.5 mx-0.5 rounded-lg border-2 transition-colors ${
                     good
                       ? 'border-[var(--ds-green)] bg-[var(--ds-sage-100)] text-[var(--ds-green)]'
                       : bad
-                        ? 'border-red-400 bg-red-50 text-red-700 line-through'
+                        ? 'border-red-400 bg-red-50 text-red-700'
                         : value
                           ? 'border-[var(--ds-gold)] bg-[var(--ds-gold)]/15 text-[var(--ds-green)]'
                           : 'border-dashed border-[var(--ds-gold)]/60 bg-[var(--ds-bg)] text-transparent'
                   }`}
-                  style={{ lineHeight: 1.6 }}
+                  style={{ lineHeight: 1.4 }}
                 >
-                  {value ?? '…'}
+                  {value ?? '•••'}
                 </button>
-                {bad && (
-                  <span className="text-[var(--ds-green)] font-bold mx-0.5">{item.gaps[gi].answer}</span>
-                )}{' '}
+                {bad && <span className="text-[var(--ds-green)] font-bold mx-0.5">{item.gaps[gi].answer}</span>}{' '}
               </span>
             );
           })}
+          {truncatedEnd && <span className="text-[var(--ds-n400)]"> …</span>}
         </p>
-        <p className="text-[11px] text-[var(--ds-n500)] italic mt-1" dir="ltr">
-          Verset {item.verseKey} en entier — touche un trou rempli pour le vider.
-        </p>
-      </div>
-
-      {/* Traduction Hamidullah COMPLÈTE du verset (contexte permanent) */}
-      {trans?.[item.verseKey] && (
-        <p className="text-[13px] text-gray-700 leading-relaxed bg-white/70 rounded-xl px-3 py-2 mb-3 border border-[var(--ds-gold)]/20">
-          <span className="font-bold text-[#7a5d2c]">Traduction (Hamidullah) : </span>
-          {trans[item.verseKey]}
-        </p>
-      )}
-
-      {/* Indice : sens dans ce verset */}
-      {phase === 'play' && (
-        <div className="mb-3">
-          {hint ? (
-            <ul className="text-[13px] text-[var(--ds-n700)] bg-[var(--ds-gold)]/10 rounded-xl px-3 py-2 space-y-0.5">
-              {item.gaps.map((g, i) => (
-                <li key={g.position}>
-                  <span className="font-bold text-[#7a5d2c]">Mot {toArabicNumbers(i + 1)} :</span> {g.gloss || '—'}
-                </li>
-              ))}
-            </ul>
-          ) : (
+        {verseHasMore && (
+          <div className="text-center mt-1">
             <button
               type="button"
-              onClick={() => setHint(true)}
-              className="text-xs font-bold text-[var(--ds-sage)] border border-[var(--ds-gold)]/50 rounded-full px-3 py-1 hover:bg-white/60"
+              onClick={() => setShowAllVerse((v) => !v)}
+              className="text-[11px] font-bold text-[var(--ds-sage)] underline"
             >
-              💡 Indice (sens dans ce verset)
+              {showAllVerse ? 'Réduire au passage' : 'Voir tout le verset'}
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
-      {/* Après vérification : sens + traduction du verset */}
-      {phase === 'checked' && (
-        <div className="mb-3 rounded-xl border border-[var(--ds-gold)]/30 bg-white/70 px-3 py-2">
-          <ul className="text-[13px] text-[var(--ds-n700)] space-y-0.5 mb-1.5">
-            {item.gaps.map((g) => (
-              <li key={g.position} className="flex items-baseline gap-2">
-                <span dir="rtl" className="text-[var(--ds-green)] font-bold" style={{ fontFamily: AR_FONT, fontSize: '1.25em' }}>
-                  {g.answer}
-                </span>
-                <span>{g.gloss || '—'}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Banque de tuiles */}
-      <div className="flex flex-wrap gap-2 justify-center mb-5" dir="rtl">
+      {/* 2) BANQUE DE TUILES : chaque tuile = mot + sa traduction dessous */}
+      <p className="text-center text-[11px] text-[var(--ds-n500)] italic mb-2">
+        Touche une carte pour la placer dans le prochain trou — touche un trou rempli pour le vider.
+      </p>
+      <div className="flex flex-wrap gap-2 justify-center mb-4">
         {item.tiles.map((t, i) => {
           const used = usedTiles.includes(i);
           return (
@@ -276,22 +271,42 @@ export default function FillGapsGame({
               type="button"
               onClick={() => placeTile(i)}
               disabled={used || phase !== 'play'}
-              className={`rounded-2xl border-[1.5px] px-4 py-2 transition-all shadow-sm ${
+              className={`flex flex-col items-center rounded-2xl border-[1.5px] px-3 py-2 min-w-[5.5em] transition-all shadow-sm ${
                 used
                   ? 'opacity-25 border-[var(--ds-divider)] bg-white'
                   : 'border-[var(--ds-green)] bg-white hover:bg-[var(--ds-sage-100)] active:scale-[0.97]'
               }`}
             >
-              <span className="text-[var(--ds-text)]" style={{ fontFamily: AR_FONT, fontSize: '1.6em', lineHeight: 1.5 }}>
-                {t}
+              <span dir="rtl" className="text-[var(--ds-text)]" style={{ fontFamily: AR_FONT, fontSize: '1.5em', lineHeight: 1.5 }}>
+                {t.word}
               </span>
+              <span className="text-[11px] text-[var(--ds-n600)] text-center leading-tight mt-0.5">{t.gloss}</span>
             </button>
           );
         })}
       </div>
 
+      {/* 3) TRADUCTION Hamidullah, repliée par défaut */}
+      {fullTrans && (
+        <div className="bg-white/70 rounded-xl px-3 py-2 mb-4 border border-[var(--ds-gold)]/20">
+          <p className="text-[13px] text-gray-700 leading-relaxed">
+            <span className="font-bold text-[#7a5d2c]">Traduction : </span>
+            {shownTrans}
+          </p>
+          {transTooLong && (
+            <button
+              type="button"
+              onClick={() => setShowAllTrans((v) => !v)}
+              className="text-[11px] font-bold text-[var(--ds-sage)] underline mt-0.5"
+            >
+              {showAllTrans ? 'Réduire' : 'Voir toute la traduction'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex gap-3 max-w-md mx-auto w-full">
+      <div className="flex gap-3 max-w-md mx-auto w-full mt-auto">
         {phase === 'play' ? (
           <button
             onClick={check}
