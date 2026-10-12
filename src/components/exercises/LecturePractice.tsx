@@ -1140,6 +1140,9 @@ export default function LecturePractice() {
 
   const gestureEnd = () => {
     clearPress();
+    // « Affichage trad » : la bulle ne vit que pendant l'appui — elle
+    // disparaît dès que le doigt quitte l'écran.
+    setWordBubble(null);
     const s = swipe.current;
     if (s.active && s.dragging) {
       swipedFired.current = true; // neutralise le clic qui suit
