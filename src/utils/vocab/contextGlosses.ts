@@ -4,6 +4,7 @@
 // encore générée) renvoie simplement null → on retombe sur le sens existant.
 
 import { getVersePageMap } from './morphology';
+import { apiUrl } from '@/lib/apiUrl';
 
 export interface ContextGloss {
   p: number; // position du mot dans le verset
@@ -43,4 +44,44 @@ export async function getContextGloss(verseKey: string, position: number): Promi
   const list = await getVerseContextGlosses(verseKey);
   const hit = list?.find((w) => w.p === position);
   return hit && hit.g ? hit : null;
+}
+
+// ---- Traduction d'un mot pour la bulle de la Lecture ----
+
+
+const wordCache = new Map<string, Promise<{ text: string; note: string; contextual: boolean } | null>>();
+
+/**
+ * Traduction d'UN mot (bulle « Affichage trad ») : la traduction en contexte
+ * pré-générée d'abord (hors ligne), sinon le mot-à-mot Quran.com traduit (en
+ * ligne). Mise en cache mémoire par occurrence.
+ */
+export function getWordTranslation(
+  verseKey: string,
+  position: number
+): Promise<{ text: string; note: string; contextual: boolean } | null> {
+  const key = `${verseKey}:${position}`;
+  if (!wordCache.has(key)) {
+    wordCache.set(
+      key,
+      (async () => {
+        const ctx = await getContextGloss(verseKey, position).catch(() => null);
+        if (ctx) return { text: ctx.g, note: ctx.n, contextual: true };
+        try {
+          const r = await fetch(apiUrl('/api/word-glosses'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: [{ verseKey, position }] }),
+          });
+          const data = await r.json();
+          const text = data?.glosses?.[key];
+          return text ? { text, note: '', contextual: false } : null;
+        } catch {
+          wordCache.delete(key); // réessayable une fois en ligne
+          return null;
+        }
+      })()
+    );
+  }
+  return wordCache.get(key)!;
 }

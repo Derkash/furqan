@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import AVFoundation
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Session audio « lecture » : la récitation continue écran verrouillé
+        // et app réduite (avec UIBackgroundModes = audio dans Info.plist), et
+        // n'est pas coupée par le bouton silencieux. mixWithOthers évité : on
+        // veut les contrôles de l'écran verrouillé (Now Playing).
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("AVAudioSession: \(error)")
+        }
         return true
     }
 

@@ -88,12 +88,6 @@ function PracticeRouter() {
 // d'Ibn Kathir (complet). Passer à true pour le réafficher.
 const SHOW_MUKHTASAR = false;
 
-/** Découpe un texte en phrases (pour le suivi de lecture). */
-function splitSentences(text: string): string[] {
-  const parts = text.split(/(?<=[.!?؟…:])\s+|\n+/).filter((x) => x.trim().length > 0);
-  return parts.length > 0 ? parts : [text];
-}
-
 // Suites de texte arabe (citations du verset dans le tafsir) : affichées en
 // bloc séparé (retour à la ligne) et en grande police, façon tafsir imprimé.
 const ARABIC_RUN =
@@ -101,11 +95,6 @@ const ARABIC_RUN =
 
 function isArabicRun(part: string): boolean {
   return /[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF﴿﴾]/.test(part);
-}
-
-/** Longueur « parlée » d'un texte : l'arabe n'est pas lu par la voix. */
-function spokenLength(text: string): number {
-  return text.replace(new RegExp(ARABIC_RUN.source, 'g'), '').length + 1;
 }
 
 /** Rend un texte en séparant les citations arabes : bloc centré, police ~2x. */
@@ -148,69 +137,22 @@ function renderRich(text: string, keyPrefix: string) {
 }
 
 /**
- * Texte dont la phrase en cours de lecture est surlignée et suivie
- * (position estimée au prorata des caractères FRANÇAIS — l'arabe n'est pas
- * lu par la voix). Les citations arabes sont rendues en bloc, grande police.
+ * Texte lu à voix haute (tafsir, traduction). Volontairement SANS suivi : on
+ * ne surligne ni ne fait défiler la « phrase en cours », car la position
+ * estimée au prorata des caractères se décalait de l'audio et empêchait de
+ * suivre. L'audio est lancé, l'utilisateur suit lui-même le texte affiché.
+ * Les citations arabes restent rendues en bloc, grande police.
  */
 function KaraokeText({
   text,
-  playing,
-  progress,
   className,
 }: {
   text: string;
-  playing: boolean;
-  progress: number;
+  playing?: boolean;
+  progress?: number;
   className: string;
 }) {
-  const sentences = useMemo(() => splitSentences(text), [text]);
-  const totalLen = useMemo(
-    () => sentences.reduce((sum, x) => sum + spokenLength(x), 0),
-    [sentences]
-  );
-
-  let activeIdx = -1;
-  if (playing) {
-    let acc = 0;
-    activeIdx = sentences.length - 1;
-    for (let i = 0; i < sentences.length; i++) {
-      acc += spokenLength(sentences[i]);
-      if (progress < acc / totalLen) {
-        activeIdx = i;
-        break;
-      }
-    }
-  }
-
-  const activeRef = useRef<HTMLSpanElement | null>(null);
-  useEffect(() => {
-    if (activeIdx >= 0) {
-      activeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  }, [activeIdx]);
-
-  if (!playing) {
-    return (
-      <p className={`${className} whitespace-pre-line`}>{renderRich(text, 'r')}</p>
-    );
-  }
-  return (
-    <p className={className}>
-      {sentences.map((sentence, i) => (
-        <span
-          key={i}
-          ref={i === activeIdx ? activeRef : undefined}
-          className={
-            i === activeIdx
-              ? 'bg-[var(--ds-gold)]/35 rounded px-0.5 transition-colors'
-              : 'transition-colors'
-          }
-        >
-          {renderRich(sentence, `k${i}`)}{' '}
-        </span>
-      ))}
-    </p>
-  );
+  return <p className={`${className} whitespace-pre-line`}>{renderRich(text, 'r')}</p>;
 }
 
 function MushafPractice() {

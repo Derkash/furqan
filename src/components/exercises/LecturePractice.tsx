@@ -40,6 +40,7 @@ import PlaybackConfig from '@/components/exercises/LecturePlaybackConfig';
 import { RailToggle, railHiddenInitial, persistRailHidden } from '@/components/AppShell';
 import OrientationControl from '@/components/OrientationControl';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { getWordTranslation } from '@/utils/vocab/contextGlosses';
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -74,6 +75,7 @@ interface LecturePrefs {
   showThemes: boolean;
   showMistakes: boolean;
   showTrans: boolean;
+  wordTrans?: boolean; // « Affichage trad » : appui long sur un mot = bulle de traduction
 }
 
 // Réglages du comportement de l'appui long (persistés dans localStorage).
@@ -187,6 +189,20 @@ export default function LecturePractice() {
   const [verseLayer, setVerseLayer] = useState<{ verseKey: string; tab: 'trans' | 'tafsir' } | null>(null);
   const [tafsirPlaying, setTafsirPlaying] = useState(false);
   const [isFs, setIsFs] = useState(false);
+  // « Affichage trad » : l'appui long sur un MOT affiche sa traduction dans une
+  // bulle au-dessus (au lieu de lancer la récitation). Désactivé = comportement
+  // historique (appui long → récitation).
+  const [wordTrans, setWordTrans] = useState(() => loadJSON<LecturePrefs>(LECTURE_PREFS_KEY)?.wordTrans ?? false);
+  const [wordBubble, setWordBubble] = useState<{
+    key: string;
+    x: number;
+    y: number;
+    below: boolean;
+    text: string | null;
+    note: string;
+    contextual: boolean;
+    failed: boolean;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const tafsirAudioRef = useRef<HTMLAudioElement | null>(null);
   // Réécoute de l'enregistrement micro : lecteur + vitesse (auto ×1,5).
@@ -225,8 +241,8 @@ export default function LecturePractice() {
 
   // Persistance des préférences : plus jamais à re-régler en entrant.
   useEffect(() => {
-    saveJSON(LECTURE_PREFS_KEY, { rate, showLexicon, showThemes, showMistakes, showTrans });
-  }, [rate, showLexicon, showThemes, showMistakes, showTrans]);
+    saveJSON(LECTURE_PREFS_KEY, { rate, showLexicon, showThemes, showMistakes, showTrans, wordTrans });
+  }, [rate, showLexicon, showThemes, showMistakes, showTrans, wordTrans]);
   useEffect(() => {
     saveJSON(LECTURE_PLAY_KEY, config);
   }, [config]);
@@ -978,6 +994,41 @@ export default function LecturePractice() {
     pressStart.current = null;
   }
 
+  // Ferme la bulle au toucher n'importe où (rail, barres…).
+  useEffect(() => {
+    if (!wordBubble) return;
+    const close = () => setWordBubble(null);
+    const t = setTimeout(() => {
+      document.addEventListener('pointerdown', close, { once: true });
+      document.addEventListener('touchstart', close, { once: true });
+    }, 50);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [wordBubble]);
+
+  // Bulle de traduction au-dessus du mot (mode « Affichage trad »).
+  function openWordBubble(el: Element, verseKey: string, position: number) {
+    hapticLight();
+    const r = el.getBoundingClientRect();
+    const below = r.top < 90; // pas la place au-dessus → sous le mot
+    const key = `${verseKey}:${position}`;
+    const margin = 90;
+    const x = Math.min(window.innerWidth - margin, Math.max(margin, r.left + r.width / 2));
+    setWordBubble({ key, x, y: below ? r.bottom : r.top, below, text: null, note: '', contextual: false, failed: false });
+    getWordTranslation(verseKey, position).then((t) => {
+      setWordBubble((b) =>
+        b && b.key === key
+          ? t
+            ? { ...b, text: t.text, note: t.note, contextual: t.contextual }
+            : { ...b, failed: true }
+          : b
+      );
+    });
+  }
+
   // ---- Feuilletage par glissement ----
   function setWrapTransform(x: number, transition: string) {
     const el = flipWrapRef.current;
@@ -1042,6 +1093,7 @@ export default function LecturePractice() {
       animating: false,
     };
     swipedFired.current = false;
+    setWordBubble(null); // tout nouveau geste ferme la bulle de traduction
     // Appui long : seulement sur un verset (désactivé en mode marquage, mais le
     // glissement reste actif).
     const page = Number(el?.getAttribute('data-page'));
@@ -1049,10 +1101,15 @@ export default function LecturePractice() {
     if (!el || !verseKey || !Number.isFinite(page) || markingMode) return;
     longPressFired.current = false;
     pressStart.current = { x, y, page, verseKey };
+    const position = Number(el.getAttribute('data-pos'));
+    const isWord = !el.classList.contains('ayah-marker') && Number.isFinite(position) && position > 0;
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       pressTimer.current = null;
-      void readLongPress(page, verseKey);
+      // « Affichage trad » : appui long sur un mot = sa traduction, pas la
+      // récitation. Sur le numéro de verset, la récitation reste disponible.
+      if (wordTrans && isWord) openWordBubble(el, verseKey, position);
+      else void readLongPress(page, verseKey);
     }, 450);
   };
 
@@ -1467,6 +1524,14 @@ export default function LecturePractice() {
                       },
                     },
                     { label: 'Traduction FR', active: showTrans, onClick: () => setShowTrans((v) => !v) },
+                    {
+                      label: 'Affichage trad',
+                      active: wordTrans,
+                      onClick: () => {
+                        setWordTrans((v) => !v);
+                        setWordBubble(null);
+                      },
+                    },
                   ].map((t) => (
                     <button
                       key={t.label}
@@ -1492,6 +1557,38 @@ export default function LecturePractice() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Bulle « Affichage trad » : traduction du mot pressé longuement */}
+      {wordBubble && (
+        <div
+          className="fixed z-[60] pointer-events-none"
+          style={{
+            left: wordBubble.x,
+            top: wordBubble.y,
+            transform: wordBubble.below ? 'translate(-50%, 10px)' : 'translate(-50%, calc(-100% - 10px))',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="relative max-w-[250px] rounded-2xl bg-[var(--ds-green)] text-white px-3.5 py-2 shadow-xl text-center">
+            {wordBubble.text ? (
+              <>
+                <p className="text-[15px] font-bold leading-snug">{wordBubble.text}</p>
+                {wordBubble.note && <p className="text-[11px] opacity-85 mt-0.5 leading-snug">{wordBubble.note}</p>}
+                {!wordBubble.contextual && <p className="text-[9px] opacity-60 mt-0.5">mot à mot</p>}
+              </>
+            ) : wordBubble.failed ? (
+              <p className="text-[12px]">Traduction indisponible hors ligne</p>
+            ) : (
+              <p className="text-[12px] opacity-80">…</p>
+            )}
+            <span
+              className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-[var(--ds-green)]"
+              style={wordBubble.below ? { top: -5 } : { bottom: -5 }}
+            />
+          </div>
+        </div>
       )}
 
       {/* ---- Livre : rien d’autre que la double page ---- */}
