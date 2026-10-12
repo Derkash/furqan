@@ -150,6 +150,8 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
         setCtxGloss(pre.g);
         if (pre.n) setCtxNote(pre.n);
         setSpan(defaultSpan);
+        // Mot nouveau : la map sert aussi de sens par défaut (hors ligne).
+        if (!ex) setGloss(pre.g);
       }
 
       const apply = (a: WordAnalysisCache, stored: boolean, llm: boolean) => {
@@ -172,7 +174,9 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
           llm,
           stored,
         });
-        if (!ex) setGloss(a.frenchGloss || '');
+        // Sens général : l'analyse Claude si elle a tourné ; sinon la map en
+        // contexte (bien meilleure que le mot-à-mot traduit automatiquement).
+        if (!ex) setGloss((llm ? a.frenchGloss : pre?.g || a.frenchGloss) || '');
         setCtxGloss(a.contextGloss || a.frenchGloss || '');
         setCtxNote(a.contextNote || '');
         setSpan(s);

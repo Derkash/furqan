@@ -494,13 +494,10 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose, befor
           Classement des autres mots de la racine par proximité de sens…
         </p>
       )}
-      {!loading && studied && !familyLoading && groups.unknown.length > 0 && (
-        <>
-          {groupHeader('unknown', groups.unknown)}
-          {groups.unknown.slice(0, 40).map(renderOcc)}
-        </>
-      )}
-      {!loading && studied && groups.far.length > 0 && (
+      {/* Autres mots de la racine : REPLIÉS par défaut, qu'ils soient jugés
+          éloignés ou pas encore vérifiés — une racine commune ne suffit pas à
+          rapprocher deux mots (ex. دَائِرَة « revers du sort » / دِيَار « demeures »). */}
+      {!loading && studied && !familyLoading && groups.far.length + groups.unknown.length > 0 && (
         <div className="pt-1">
           <button
             type="button"
@@ -508,10 +505,11 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose, befor
             className="w-full text-left text-[12px] text-gray-500 bg-white/50 border border-dashed border-[var(--ds-gold)]/40 rounded-xl px-3 py-2 hover:bg-white/80"
           >
             <span className="font-bold text-[#7a5d2c]">
-              {toArabicNumbers(groups.far.length)} occurrence{groups.far.length > 1 ? 's' : ''} d’un autre mot de la racine, au sens éloigné
+              {toArabicNumbers(groups.far.length + groups.unknown.length)} occurrence
+              {groups.far.length + groups.unknown.length > 1 ? 's' : ''} d’autres mots de la même racine, au sens différent
             </span>
             <span className="block mt-0.5">
-              {lemmaChips(groups.far)
+              {lemmaChips([...groups.far, ...groups.unknown])
                 .map(([l, v]) => `${l}${v?.gloss ? ` (${v.gloss})` : ''}`)
                 .join(' · ')}
             </span>
@@ -519,8 +517,10 @@ export default function OccurrencesExplorer({ root, gloss, lemma, onClose, befor
           </button>
           {showFar && (
             <div className="space-y-2 mt-2">
-              {groupHeader('far', groups.far)}
+              {groups.far.length > 0 && groupHeader('far', groups.far)}
               {groups.far.slice(0, 60).map(renderOcc)}
+              {groups.unknown.length > 0 && groupHeader('unknown', groups.unknown)}
+              {groups.unknown.slice(0, 60).map(renderOcc)}
             </div>
           )}
         </div>
