@@ -21,6 +21,7 @@ import {
 } from '@/utils/vocab/vocabStore';
 import { getCachedAnalysis, setCachedAnalysis, type WordAnalysisCache } from '@/utils/vocab/glossCache';
 import { getCurrentUser } from '@/utils/exercises/userStats';
+import { getContextGloss } from '@/utils/vocab/contextGlosses';
 import OccurrencesExplorer from '@/components/vocab/OccurrencesExplorer';
 
 interface WordCardProps {
@@ -140,7 +141,21 @@ export default function WordCard({ verseKey, position, side, onClose, onAdded, o
       }
       if (ex) setGloss(ex.gloss);
 
+      // Traduction en contexte pré-générée (alignée Hamidullah) : prioritaire
+      // sur le sens contextuel de l'analyse, et dispo hors ligne.
+      const pre = await getContextGloss(verseKey, position).catch(() => null);
+      if (id !== reqId.current) return;
+      // Affiché tout de suite, même si l'analyse réseau échoue ensuite.
+      if (pre) {
+        setCtxGloss(pre.g);
+        if (pre.n) setCtxNote(pre.n);
+        setSpan(defaultSpan);
+      }
+
       const apply = (a: WordAnalysisCache, stored: boolean, llm: boolean) => {
+        if (pre) {
+          a = { ...a, contextGloss: pre.g, contextNote: pre.n || a.contextNote };
+        }
         const s = {
           start: a.spanStart ?? defaultSpan.start,
           end: a.spanEnd ?? defaultSpan.end,

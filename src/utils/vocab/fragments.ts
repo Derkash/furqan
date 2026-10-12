@@ -10,6 +10,7 @@
 import { getVerseMorphWords, type VerseMorphWord } from './morphology';
 import { bareForm, senseAt, type VocabEntry } from './vocabStore';
 import { scopeVocabToPages } from './rangeScope';
+import { getVerseContextGlosses } from './contextGlosses';
 
 export interface GapWord {
   position: number;
@@ -138,6 +139,15 @@ export async function buildGapItems(
       });
     }
     gaps.sort((x, y) => x.position - y.position);
+
+    // Traduction EN CONTEXTE pré-générée (alignée Hamidullah) : prioritaire.
+    const ctx = await getVerseContextGlosses(a.verseKey).catch(() => null);
+    if (ctx) {
+      for (const g of gaps) {
+        const c = ctx.find((w) => w.p === g.position);
+        if (c?.g) g.gloss = c.g;
+      }
+    }
 
     // Leurres : d'autres mots du lexique (jamais une réponse), AVEC leur sens.
     const answers = new Set(gaps.map((g) => g.answer));
