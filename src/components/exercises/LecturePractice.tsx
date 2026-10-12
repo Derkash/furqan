@@ -1319,6 +1319,93 @@ export default function LecturePractice() {
   }, [right, left, pair.rightPage, pair.leftPage, verseMap]);
   const selCount = selRef.current.length;
 
+  // Bascules d'affichage : directement sur le rail gauche (et dans le layer).
+  const ico = (d: React.ReactNode) => (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {d}
+    </svg>
+  );
+  const displayToggles: { key: string; label: string; short: string; active: boolean; onClick: () => void; icon: React.ReactNode }[] = [
+    {
+      key: 'themes',
+      label: 'Thèmes',
+      short: 'Thèmes',
+      active: showThemes,
+      onClick: () => setShowThemes((t) => !t),
+      icon: ico(<><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></>),
+    },
+    {
+      key: 'mark',
+      label: '✍ Marquer',
+      short: 'Marquer',
+      active: markingMode,
+      onClick: () =>
+        setMarkingMode((m) => {
+          if (!m) {
+            setCaptureMode(false);
+            setVerseMenu(null);
+            setSelected(null);
+          } else {
+            setSelWords(new Map());
+          }
+          return !m;
+        }),
+      icon: ico(<><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13 7 4 4" /></>),
+    },
+    {
+      key: 'mistakes',
+      label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
+      short: mistakeWords.size > 0 ? `Fautes ${toArabicNumbers(mistakeWords.size)}` : 'Fautes',
+      active: showMistakes && mistakeWords.size > 0,
+      onClick: () => setShowMistakes((v) => !v),
+      icon: ico(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5v.01" /></>),
+    },
+    {
+      key: 'lexicon',
+      label: 'Lexique',
+      short: 'Lexique',
+      active: showLexicon,
+      onClick: () => setShowLexicon((v) => !v),
+      icon: ico(<><path d="M6 3h12v18l-6-4-6 4V3Z" /></>),
+    },
+    {
+      key: 'capture',
+      label: '➕ Ajouter un mot',
+      short: 'Ajouter',
+      active: captureMode,
+      onClick: () => {
+        setCaptureMode((m) => {
+          if (!m) {
+            setMarkingMode(false);
+            setSelWords(new Map());
+          }
+          return !m;
+        });
+        setSelected(null);
+      },
+      icon: ico(<><path d="M12 5v14" /><path d="M5 12h14" /></>),
+    },
+    {
+      key: 'trans',
+      label: 'Traduction FR',
+      short: 'Trad. FR',
+      active: showTrans,
+      onClick: () => setShowTrans((v) => !v),
+      icon: ico(<><path d="M4 6h16" /><path d="M4 11h16" /><path d="M4 16h10" /></>),
+    },
+    {
+      key: 'wordtrans',
+      label: 'Affichage trad',
+      short: 'Bulle',
+      active: wordTrans,
+      onClick: () => {
+        setWordTrans((v) => !v);
+        setWordBubble(null);
+      },
+      icon: ico(<><path d="M4 5h16v10H9l-5 4V5Z" /><path d="M8 9h8" /><path d="M8 12h5" /></>),
+    },
+  ];
+
   return (
     <div ref={rootRef} className={`h-full w-full overflow-hidden bg-[var(--ds-green-deep)] flex relative overflow-locked ${isFs ? 'fixed inset-0 z-[9999]' : ''}`} style={{ fontFamily: 'var(--ds-font)' }}>
       {/* ---- Rail de pilotage (gauche) : ICÔNES SEULES — l'espace au texte.
@@ -1349,19 +1436,23 @@ export default function LecturePractice() {
             <span className="text-[7px] font-bold uppercase tracking-wider">Réglages</span>
           </button>
 
-          <button
-            onClick={() => setPanelLayer(panelLayer === 'affichage' ? null : 'affichage')}
-            title="Affichage"
-            className={`flex flex-col items-center gap-0.5 w-12 py-1.5 rounded-xl transition-colors ${
-              panelLayer === 'affichage' ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
-            }`}
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            <span className="text-[7px] font-bold uppercase tracking-wider">Affichage</span>
-          </button>
+          {/* Bascules d'affichage, directement sur le rail (plus de layer à ouvrir) */}
+          <div className="w-8 h-px bg-[var(--ds-divider)] my-0.5" />
+          {displayToggles.map((t) => (
+            <button
+              key={t.key}
+              onClick={t.onClick}
+              title={t.label}
+              aria-pressed={t.active}
+              className={`flex flex-col items-center gap-0.5 w-12 py-1 rounded-xl transition-colors ${
+                t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n400)] hover:text-[var(--ds-green)]'
+              }`}
+            >
+              {t.icon}
+              <span className="text-[6.5px] font-bold uppercase tracking-wide leading-none text-center">{t.short}</span>
+            </button>
+          ))}
+          <div className="w-8 h-px bg-[var(--ds-divider)] my-0.5" />
 
           {/* Numéro de page : saisie directe sur le rail (Entrée ou sortie du champ) */}
           <input
@@ -1489,55 +1580,9 @@ export default function LecturePractice() {
               <div>
                 <p className="ds-kicker mb-2">Affichage</p>
                 <div className="flex flex-col gap-0.5">
-                  {[
-                    { label: 'Thèmes', active: showThemes, onClick: () => setShowThemes((t) => !t) },
-                    {
-                      label: '✍ Marquer',
-                      active: markingMode,
-                      onClick: () =>
-                        setMarkingMode((m) => {
-                          if (!m) {
-                            setCaptureMode(false);
-                            setVerseMenu(null);
-                            setSelected(null);
-                          } else {
-                            setSelWords(new Map());
-                          }
-                          return !m;
-                        }),
-                    },
-                    {
-                      label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
-                      active: showMistakes && mistakeWords.size > 0,
-                      onClick: () => setShowMistakes((s) => !s),
-                    },
-                    { label: 'Lexique', active: showLexicon, onClick: () => setShowLexicon((s) => !s) },
-                    {
-                      label: '➕ Ajouter un mot',
-                      active: captureMode,
-                      onClick: () => {
-                        setCaptureMode((m) => {
-                          if (!m) {
-                            setMarkingMode(false);
-                            setSelWords(new Map());
-                          }
-                          return !m;
-                        });
-                        setSelected(null);
-                      },
-                    },
-                    { label: 'Traduction FR', active: showTrans, onClick: () => setShowTrans((v) => !v) },
-                    {
-                      label: 'Affichage trad',
-                      active: wordTrans,
-                      onClick: () => {
-                        setWordTrans((v) => !v);
-                        setWordBubble(null);
-                      },
-                    },
-                  ].map((t) => (
+                  {displayToggles.map((t) => (
                     <button
-                      key={t.label}
+                      key={t.key}
                       onClick={t.onClick}
                       className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] font-bold transition-colors ${
                         t.active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n700)] hover:bg-[var(--ds-sage-100)]/60'
