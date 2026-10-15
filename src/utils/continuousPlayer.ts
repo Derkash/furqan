@@ -247,3 +247,9 @@ export function skip(delta: number) {
   const n = Math.min(state.end, Math.max(state.start, state.current + delta));
   playVerse(n);
 }
+
+/** Saute directement au verset n (curseur), borné à la session. */
+export function seekPlayer(n: number) {
+  if (!state.active) return;
+  playVerse(Math.min(state.end, Math.max(state.start, Math.round(n))));
+}

@@ -238,6 +238,8 @@ export default function LecturePractice() {
     return { ...DEFAULT_CONFIG, selMode: 'page', unitStart: startPage, unitEnd: startPage };
   });
   const [sessionActive, setSessionActive] = useState(false);
+  // Curseur de la plage (comme une vidéo) : verset visé pendant le glissement.
+  const [seekPreview, setSeekPreview] = useState<number | null>(null);
 
   // Persistance des préférences : plus jamais à re-régler en entrant.
   useEffect(() => {
@@ -603,6 +605,26 @@ export default function LecturePractice() {
       return;
     }
     stop();
+  }
+
+  // Saut dans la plage en cours (curseur) : verset (ou étape par thème) n° idx.
+  function seekTo(idx: number) {
+    if (loopTimerRef.current) {
+      clearTimeout(loopTimerRef.current);
+      loopTimerRef.current = null;
+    }
+    audioRef.current?.pause();
+    if (stepsRef.current.length) {
+      sIdxRef.current = Math.max(0, Math.min(stepsRef.current.length - 1, idx));
+      playStep();
+      return;
+    }
+    const n = selRef.current.length;
+    if (!n) return;
+    vIdxRef.current = Math.max(0, Math.min(n - 1, idx));
+    repRef.current = 0;
+    phaseRef.current = 'ar';
+    playVerseArabic();
   }
 
   // ---- Moteur PAR THÈME (versets + tafsir Ibn Kathir lu) ----
@@ -1318,6 +1340,20 @@ export default function LecturePractice() {
     return set;
   }, [right, left, pair.rightPage, pair.leftPage, verseMap]);
   const selCount = selRef.current.length;
+  // Curseur de plage : longueur, position courante, libellé d'un indice.
+  const seekLen = sessionActive ? stepsRef.current.length || selRef.current.length : 0;
+  const seekIdx = stepsRef.current.length ? sIdxRef.current : vIdxRef.current;
+  const seekLabel = (i: number) => {
+    const st = stepsRef.current[i];
+    if (st) return st.type === 'tafsir' ? `Tafsir ${st.verseKey}` : st.verseKey;
+    return selRef.current[i]?.verseKey ?? '';
+  };
+  const commitSeek = () => {
+    if (seekPreview == null) return;
+    const target = seekPreview;
+    setSeekPreview(null);
+    if (target !== seekIdx) seekTo(target);
+  };
 
   // Bascules d'affichage : directement sur le rail gauche (et dans le layer).
   const ico = (d: React.ReactNode) => (
@@ -1735,11 +1771,53 @@ export default function LecturePractice() {
             </button>
           ) : (
             <div
-              className="ds-rise-flow absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[var(--ds-divider)] px-2.5 flex items-center gap-2"
+              className={`ds-rise-flow absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-[var(--ds-divider)] px-2.5 flex items-center gap-2 ${
+                seekLen > 1 ? 'pt-5' : ''
+              }`}
               style={{ minHeight: 46, fontFamily: 'var(--ds-font)' }}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
+              {/* Curseur de la plage : glisser pour avancer / reculer, comme une vidéo */}
+              {seekLen > 1 && (
+                <div
+                  className="absolute top-1 left-3 right-3 flex items-center gap-2"
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchMove={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                >
+                  <span className="text-[9px] font-bold tabular-nums text-[var(--ds-n500)] w-10 text-right">
+                    {toArabicNumbers((seekPreview ?? seekIdx) + 1)}
+                  </span>
+                  <div className="relative flex-1 h-4 flex items-center">
+                    {seekPreview != null && (
+                      <span
+                        className="absolute -top-6 -translate-x-1/2 px-2 py-0.5 rounded-full bg-[var(--ds-green)] text-white text-[10px] font-bold whitespace-nowrap pointer-events-none"
+                        style={{ left: `${(seekPreview / (seekLen - 1)) * 100}%` }}
+                      >
+                        {seekLabel(seekPreview)}
+                      </span>
+                    )}
+                    <input
+                      type="range"
+                      min={0}
+                      max={seekLen - 1}
+                      step={1}
+                      value={seekPreview ?? seekIdx}
+                      aria-label="Position dans la plage"
+                      onChange={(e) => setSeekPreview(Number(e.target.value))}
+                      onPointerUp={commitSeek}
+                      onTouchEnd={commitSeek}
+                      onKeyUp={commitSeek}
+                      onBlur={() => setSeekPreview(null)}
+                      className="w-full h-4 accent-[var(--ds-green)] cursor-pointer"
+                    />
+                  </div>
+                  <span className="text-[9px] font-bold tabular-nums text-[var(--ds-n500)] w-10">
+                    {toArabicNumbers(seekLen)}
+                  </span>
+                </div>
+              )}
               {/* Languette de repli */}
               <button
                 type="button"

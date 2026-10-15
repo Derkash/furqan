@@ -13,6 +13,7 @@ import {
   loadLast,
   pausePlayer,
   resumePlayer,
+  seekPlayer,
   setPlayerRate,
   setSurahNames,
   skip,
@@ -44,6 +45,7 @@ export default function EcoutePage() {
   const [versePage, setVersePage] = useState<Record<string, number> | null>(null);
   const [verseText, setVerseText] = useState('');
   const [last, setLast] = useState<ReturnType<typeof loadLast>>(null);
+  const [seekPreview, setSeekPreview] = useState<number | null>(null);
 
   useEffect(() => subscribePlayer(setPlayer), []);
 
@@ -127,6 +129,13 @@ export default function EcoutePage() {
     startPlayer(bounds.startGlobal, bounds.endGlobal, rate);
   };
 
+  const commitSeek = () => {
+    if (seekPreview == null) return;
+    const target = seekPreview;
+    setSeekPreview(null);
+    if (target !== player.current) seekPlayer(target);
+  };
+
   const changeRate = (r: number) => {
     setRate(r);
     if (player.active) setPlayerRate(r);
@@ -163,9 +172,34 @@ export default function EcoutePage() {
             <p className="text-[11px] text-[var(--ds-n500)] mb-3">
               {label(player.start)} → {label(player.end)}
             </p>
-            <div className="h-1.5 bg-[var(--ds-gold)]/20 rounded-full overflow-hidden mb-3">
-              <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${progress * 100}%` }} />
-            </div>
+            {/* Curseur : glisser pour avancer / reculer dans la plage */}
+            {player.end > player.start ? (
+              <div className="mb-3">
+                <input
+                  type="range"
+                  min={player.start}
+                  max={player.end}
+                  step={1}
+                  value={seekPreview ?? player.current ?? player.start}
+                  aria-label="Position dans la plage"
+                  onChange={(e) => setSeekPreview(Number(e.target.value))}
+                  onPointerUp={commitSeek}
+                  onTouchEnd={commitSeek}
+                  onKeyUp={commitSeek}
+                  onBlur={() => setSeekPreview(null)}
+                  className="w-full h-5 accent-[var(--ds-green)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--ds-n500)] tabular-nums">
+                  <span>{label(player.start)}</span>
+                  {seekPreview != null && <span className="font-bold text-[var(--ds-green)]">→ {label(seekPreview)}</span>}
+                  <span>{label(player.end)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="h-1.5 bg-[var(--ds-gold)]/20 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${progress * 100}%` }} />
+              </div>
+            )}
             {verseText && (
               <p
                 dir="rtl"
