@@ -542,6 +542,32 @@ export default function MushafPage({
           box-shadow: 0 0 0 2.5px rgba(220, 38, 38, 0.55);
           border-radius: 6px;
         }
+        /* Fautes de lecture déclarées (mode Lecture) : point centré SOUS le
+           mot — rouge = faute, orange = « pas refaite » au moins une fois.
+           Taille relative à la police : visible sans gêner la lecture. */
+        .verse-word.mark-fault-red,
+        .verse-word.mark-fault-orange {
+          position: relative;
+        }
+        .verse-word.mark-fault-red::after,
+        .verse-word.mark-fault-orange::after {
+          content: '';
+          position: absolute;
+          left: 50%;
+          bottom: -0.06em;
+          width: 0.17em;
+          height: 0.17em;
+          border-radius: 9999px;
+          transform: translateX(-50%);
+          box-shadow: 0 0 0 0.03em rgba(255, 255, 255, 0.9);
+          pointer-events: none;
+        }
+        .verse-word.mark-fault-red::after {
+          background: #d92d20;
+        }
+        .verse-word.mark-fault-orange::after {
+          background: #f08c00;
+        }
         /* Mots du lexique personnel (mode Lecture) — vert olive. */
         .verse-word.mark-lexicon {
           background-color: rgba(74, 124, 35, 0.20);
@@ -713,7 +739,8 @@ export default function MushafPage({
                       }
                       if (shouldHide) classes.push('hidden');
                       if (isHighlighted && !mark) classes.push('highlighted');
-                      if (mark) classes.push(`mark-${mark}`);
+                      // Plusieurs marques possibles, séparées par un espace (ex. « lexicon fault-red »).
+                      if (mark) for (const m of mark.split(' ')) if (m) classes.push(`mark-${m}`);
                       if (w.isAyahMarker) classes.push('ayah-marker');
                       if (w.isAyahMarker && circledMarkerVerseKeys?.has(w.verseKey))
                         classes.push('ayah-marker-circled');

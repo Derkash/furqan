@@ -41,6 +41,17 @@ import { RailToggle, railHiddenInitial, persistRailHidden } from '@/components/A
 import OrientationControl from '@/components/OrientationControl';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import { getWordTranslation } from '@/utils/vocab/contextGlosses';
+import {
+  activeFaults,
+  clearAllFaults,
+  declareFault,
+  deleteFault,
+  markNotRepeated,
+  markRepeated,
+  subscribeFaults,
+  OK_TO_RESOLVE,
+  type FaultNote,
+} from '@/utils/exercises/faultNotes';
 
 function pairOf(page: number): PagePair {
   const right = page % 2 === 1 ? page : page - 1;
@@ -240,6 +251,14 @@ export default function LecturePractice() {
   const [sessionActive, setSessionActive] = useState(false);
   // Curseur de la plage (comme une vidéo) : verset visé pendant le glissement.
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
+  // Fautes déclarées à la main (mode « Fautes ») : point rouge/orange sous le mot.
+  const [faultMode, setFaultMode] = useState(false);
+  const [faults, setFaults] = useState<Map<string, FaultNote>>(new Map());
+  const [faultEditor, setFaultEditor] = useState<{ verseKey: string; position: number; page: number; note: string; editing: boolean } | null>(null);
+  const [faultBubble, setFaultBubble] = useState<{ key: string; x: number; y: number; below: boolean } | null>(null);
+  const [faultToast, setFaultToast] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const lastFaultTap = useRef<{ key: string; t: number } | null>(null);
 
   // Persistance des préférences : plus jamais à re-régler en entrant.
   useEffect(() => {
@@ -1031,6 +1050,46 @@ export default function LecturePractice() {
     };
   }, [wordBubble]);
 
+  // Fautes déclarées : chargement + suivi des changements (autre écran, synchro).
+  useEffect(() => {
+    const refresh = () => setFaults(activeFaults());
+    refresh();
+    return subscribeFaults(refresh);
+  }, []);
+
+  const flashFault = (msg: string) => {
+    setFaultToast(msg);
+    setTimeout(() => setFaultToast((m) => (m === msg ? null : m)), 1800);
+  };
+
+  // Tap sur un mot en mode « Fautes » : saisie si pas de faute, sinon bulle ;
+  // double tap sur un mot en faute = « je ne l'ai pas refaite ».
+  function onFaultTap(el: Element, verseKey: string, position: number, page: number) {
+    const k = `${verseKey}#${position}`;
+    const f = faults.get(k);
+    if (!f) {
+      setFaultBubble(null);
+      setFaultEditor({ verseKey, position, page, note: '', editing: false });
+      return;
+    }
+    const now = Date.now();
+    const last = lastFaultTap.current;
+    if (last && last.key === k && now - last.t < 400) {
+      lastFaultTap.current = null;
+      setFaultBubble(null);
+      const r = markNotRepeated(verseKey, position);
+      hapticLight();
+      flashFault(r && r.status === 'resolved' ? 'Faute effacée ✓' : `Pas refaite ✓ (${r?.ok ?? 0}/${OK_TO_RESOLVE})`);
+      return;
+    }
+    lastFaultTap.current = { key: k, t: now };
+    const rect = el.getBoundingClientRect();
+    const below = rect.top < 170;
+    const margin = 130;
+    const x = Math.min(window.innerWidth - margin, Math.max(margin, rect.left + rect.width / 2));
+    setFaultBubble({ key: k, x, y: below ? rect.bottom : rect.top, below });
+  }
+
   // Bulle de traduction au-dessus du mot (mode « Affichage trad »).
   function openWordBubble(el: Element, verseKey: string, position: number) {
     hapticLight();
@@ -1247,12 +1306,23 @@ export default function LecturePractice() {
     if (!verseKey) {
       setSelected(null);
       setVerseMenu(null);
+      setFaultBubble(null);
       return;
     }
     const position = Number(el?.getAttribute('data-pos'));
     const p = Number(el?.getAttribute('data-page'));
     const isMarker = el?.classList.contains('ayah-marker');
     const isLexiconWord = !isMarker && marks.get(`${verseKey}#${position}`) === 'lexicon';
+
+    // Mode « Fautes » : prioritaire sur les autres usages du tap.
+    if (faultMode) {
+      if (isMarker || !Number.isFinite(position) || !el) {
+        setFaultBubble(null);
+        return;
+      }
+      onFaultTap(el, verseKey, position, p);
+      return;
+    }
 
     // Mode « Marquer mes fautes » : sélectionne/désélectionne le mot touché.
     if (markingMode) {
@@ -1305,10 +1375,15 @@ export default function LecturePractice() {
   const combinedMarks = useMemo(() => {
     const m = new Map<string, string>();
     if (showLexicon && !showThemes) for (const [k, v] of marks) m.set(k, v);
-    if (showMistakes) for (const [k, v] of mistakeWords) m.set(k, v);
+    // Fautes déclarées à la main : point sous le mot (cumulable avec le lexique).
+    for (const [k, f] of faults) {
+      const dot = f.ok > 0 ? 'fault-orange' : 'fault-red';
+      const prev = m.get(k);
+      m.set(k, prev ? `${prev} ${dot}` : dot);
+    }
     for (const k of selWords.keys()) m.set(k, 'selected');
     return m;
-  }, [showLexicon, showThemes, marks, showMistakes, mistakeWords, selWords]);
+  }, [showLexicon, showThemes, marks, faults, selWords]);
 
   // Déclare les mots sélectionnés comme fautes (déclaration unique, mémorisée).
   const declareMistakes = () => {
@@ -1371,30 +1446,26 @@ export default function LecturePractice() {
       icon: ico(<><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></>),
     },
     {
-      key: 'mark',
-      label: '✍ Marquer',
-      short: 'Marquer',
-      active: markingMode,
-      onClick: () =>
-        setMarkingMode((m) => {
-          if (!m) {
+      key: 'faults',
+      label: faults.size > 0 ? `Fautes (${toArabicNumbers(faults.size)})` : 'Fautes',
+      short: faults.size > 0 ? `Fautes ${toArabicNumbers(faults.size)}` : 'Fautes',
+      active: faultMode,
+      onClick: () => {
+        setFaultMode((v) => {
+          if (!v) {
             setCaptureMode(false);
-            setVerseMenu(null);
-            setSelected(null);
-          } else {
+            setMarkingMode(false);
             setSelWords(new Map());
+            setSelected(null);
+            setVerseMenu(null);
+          } else {
+            setFaultBubble(null);
+            setFaultEditor(null);
           }
-          return !m;
-        }),
-      icon: ico(<><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13 7 4 4" /></>),
-    },
-    {
-      key: 'mistakes',
-      label: mistakeWords.size > 0 ? `Fautes (${toArabicNumbers(mistakeWords.size)})` : 'Fautes',
-      short: mistakeWords.size > 0 ? `Fautes ${toArabicNumbers(mistakeWords.size)}` : 'Fautes',
-      active: showMistakes && mistakeWords.size > 0,
-      onClick: () => setShowMistakes((v) => !v),
-      icon: ico(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5v.01" /></>),
+          return !v;
+        });
+      },
+      icon: ico(<><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><circle cx="18" cy="19" r="2" fill="currentColor" stroke="none" /></>),
     },
     {
       key: 'lexicon',
@@ -1413,6 +1484,7 @@ export default function LecturePractice() {
         setCaptureMode((m) => {
           if (!m) {
             setMarkingMode(false);
+            setFaultMode(false);
             setSelWords(new Map());
           }
           return !m;
@@ -1609,6 +1681,41 @@ export default function LecturePractice() {
                   ))}
                 </div>
                 <OrientationControl className="mt-4" />
+                <div className="mt-4 pt-3 border-t border-[var(--ds-divider)]">
+                  <p className="ds-kicker mb-1">Fautes</p>
+                  <p className="text-[11px] text-[var(--ds-n600)] mb-2">
+                    Efface toutes les fautes déclarées (anciennes et nouvelles), sur tous tes appareils.
+                  </p>
+                  {!confirmClear ? (
+                    <button
+                      onClick={() => setConfirmClear(true)}
+                      className="w-full py-2 rounded-xl border-2 border-red-200 text-red-700 text-[13px] font-bold"
+                    >
+                      Effacer toutes les fautes…
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmClear(false)}
+                        className="flex-1 py-2 rounded-xl border-2 border-[var(--ds-divider)] text-[var(--ds-n700)] text-[13px] font-bold"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={() => {
+                          clearAllFaults();
+                          setMistakeWords(new Map());
+                          setConfirmClear(false);
+                          setFaultBubble(null);
+                          flashFault('Toutes les fautes sont effacées');
+                        }}
+                        className="flex-1 py-2 rounded-xl bg-red-600 text-white text-[13px] font-bold"
+                      >
+                        Confirmer
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1641,6 +1748,143 @@ export default function LecturePractice() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Mode « Fautes » : saisie du texte de la faute */}
+      {faultEditor && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/30 flex items-start justify-center p-4 pt-[12vh]"
+          onClick={() => setFaultEditor(null)}
+        >
+          <div
+            dir="ltr"
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-4"
+            style={{ fontFamily: 'var(--ds-font)' }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <p className="ds-kicker mb-0.5">{faultEditor.editing ? 'Modifier la faute' : 'Nouvelle faute'}</p>
+            <p className="text-[12px] text-[var(--ds-n600)] mb-2">
+              Verset {faultEditor.verseKey} · mot {toArabicNumbers(faultEditor.position)}
+            </p>
+            <textarea
+              id="fault-note"
+              autoFocus
+              rows={3}
+              value={faultEditor.note}
+              onChange={(e) => setFaultEditor((f) => (f ? { ...f, note: e.target.value } : f))}
+              placeholder="Explique ta faute (ex. j’ai dit تَعْمَلُونَ au lieu de يَعْمَلُونَ)"
+              className="w-full px-3 py-2 rounded-xl border-2 border-[var(--ds-gold)]/30 focus:border-[var(--ds-gold)] outline-none text-[14px] text-[#1a1a1a] resize-none"
+            />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => setFaultEditor(null)}
+                className="flex-1 py-2.5 rounded-xl border-2 border-[var(--ds-divider)] text-[var(--ds-n700)] font-bold text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                disabled={!faultEditor.note.trim()}
+                onClick={() => {
+                  declareFault(faultEditor.verseKey, faultEditor.position, faultEditor.page, faultEditor.note.trim());
+                  hapticLight();
+                  flashFault(faultEditor.editing ? 'Faute modifiée ✓' : 'Faute enregistrée ✓');
+                  setFaultEditor(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--ds-green)] text-white font-bold text-sm disabled:opacity-40"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mode « Fautes » : bulle de la faute (texte + actions) */}
+      {faultBubble && faults.get(faultBubble.key) && (() => {
+        const f = faults.get(faultBubble.key)!;
+        return (
+          <div
+            className="fixed z-[65]"
+            style={{
+              left: faultBubble.x,
+              top: faultBubble.y,
+              transform: faultBubble.below ? 'translate(-50%, 12px)' : 'translate(-50%, calc(-100% - 12px))',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <div dir="ltr" className="relative w-[250px] rounded-2xl bg-white shadow-2xl border border-[var(--ds-divider)] p-3" style={{ fontFamily: 'var(--ds-font)' }}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: f.ok > 0 ? '#f08c00' : '#d92d20' }} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--ds-n500)]">
+                  {f.ok > 0 ? `Pas refaite ${f.ok}/${OK_TO_RESOLVE}` : 'Faute'} · {f.verseKey}
+                </span>
+              </div>
+              <p className="text-[14px] text-[var(--ds-text)] leading-snug whitespace-pre-wrap">{f.note}</p>
+              <p className="text-[10px] text-[var(--ds-n500)] mt-1.5">Double-tape le mot quand tu ne refais pas la faute.</p>
+              <div className="grid grid-cols-2 gap-1.5 mt-2">
+                <button
+                  onClick={() => {
+                    const r = markNotRepeated(f.verseKey, f.position);
+                    setFaultBubble(null);
+                    flashFault(r && r.status === 'resolved' ? 'Faute effacée ✓' : `Pas refaite ✓ (${r?.ok ?? 0}/${OK_TO_RESOLVE})`);
+                  }}
+                  className="py-1.5 rounded-lg bg-[var(--ds-sage-100)] text-[var(--ds-green)] text-[11px] font-bold"
+                >
+                  Pas refaite ✓
+                </button>
+                <button
+                  onClick={() => {
+                    markRepeated(f.verseKey, f.position);
+                    setFaultBubble(null);
+                    flashFault('Refaite : repasse au rouge');
+                  }}
+                  className="py-1.5 rounded-lg bg-red-50 text-red-700 text-[11px] font-bold"
+                >
+                  Refaite ✗
+                </button>
+                <button
+                  onClick={() => {
+                    setFaultBubble(null);
+                    setFaultEditor({ verseKey: f.verseKey, position: f.position, page: f.page, note: f.note, editing: true });
+                  }}
+                  className="py-1.5 rounded-lg border border-[var(--ds-divider)] text-[var(--ds-n700)] text-[11px] font-bold"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => {
+                    deleteFault(f.verseKey, f.position);
+                    setFaultBubble(null);
+                    flashFault('Faute supprimée');
+                  }}
+                  className="py-1.5 rounded-lg border border-[var(--ds-divider)] text-[var(--ds-n700)] text-[11px] font-bold"
+                >
+                  Supprimer
+                </button>
+              </div>
+              <span
+                className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-white border-[var(--ds-divider)]"
+                style={faultBubble.below ? { top: -6, borderLeftWidth: 1, borderTopWidth: 1 } : { bottom: -6, borderRightWidth: 1, borderBottomWidth: 1 }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Mode « Fautes » : confirmation brève */}
+      {faultToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[75] px-4 py-2 rounded-full bg-[var(--ds-green)] text-white text-sm font-bold shadow-lg pointer-events-none" style={{ fontFamily: 'var(--ds-font)' }}>
+          {faultToast}
+        </div>
+      )}
+      {faultMode && !faultEditor && !faultBubble && !faultToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] px-3 py-1.5 rounded-full bg-white/95 border border-[var(--ds-divider)] text-[11px] font-bold text-[var(--ds-n700)] shadow pointer-events-none" style={{ fontFamily: 'var(--ds-font)' }}>
+          Mode Fautes : touche un mot pour déclarer une faute
+        </div>
       )}
 
       {/* Bulle « Affichage trad » : traduction du mot pressé longuement */}

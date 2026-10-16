@@ -115,6 +115,10 @@ export default function AppInit() {
     const user = getCurrentUser();
     if (user) {
       hydrateVocab(user).catch(() => {});
+      // Fautes de lecture déclarées (synchro entre appareils).
+      import('@/utils/exercises/faultNotes')
+        .then((m) => m.hydrateFaults(user))
+        .catch(() => {});
       // Second filet pour le programme de récitation : s'il manque ALORS QU'UN
       // COMPTE est connecté (purge sans miroir exploitable, nouvel appareil),
       // on le récupère depuis Supabase. Jamais d'écrasement : on n'y touche que

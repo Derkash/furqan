@@ -149,6 +149,9 @@ async function hydrateFromRemote(username: string): Promise<void> {
     import('@/lib/recitation/store')
       .then((m) => m.hydrateRecitationFromRemote(username))
       .catch(() => {}),
+    import('./faultNotes')
+      .then((m) => m.hydrateFaults(username))
+      .catch(() => {}),
   ]);
   if (stats) saveStats(username, stats);
   if (setups) hydrateSetupsLocal(setups);
@@ -350,8 +353,18 @@ export function loadStats(username: string | null): UserStats {
     const raw = window.localStorage.getItem(STATS_PREFIX + username.toLowerCase());
     if (!raw) return EMPTY_STATS;
     const parsed = JSON.parse(raw) as UserStats;
+    // « Effacer toutes les fautes » (Lecture) : les fautes déclarées AVANT
+    // cette date sont ignorées partout (Hifz, progression…). Clé écrite par
+    // utils/exercises/faultNotes (lue ici sans import pour éviter un cycle).
+    let clearedAt: string | null = null;
+    try {
+      clearedAt = window.localStorage.getItem('almuraja3a:faults-cleared-at:' + username.toLowerCase());
+    } catch {
+      clearedAt = null;
+    }
+    const mistakes = Array.isArray(parsed.wordMistakes) ? parsed.wordMistakes : [];
     return {
-      wordMistakes: Array.isArray(parsed.wordMistakes) ? parsed.wordMistakes : [],
+      wordMistakes: clearedAt ? mistakes.filter((m) => m.at > clearedAt!) : mistakes,
       verseResults: Array.isArray(parsed.verseResults) ? parsed.verseResults : [],
     };
   } catch {
