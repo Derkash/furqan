@@ -24,7 +24,8 @@ type IconName =
   | 'adhkar'
   | 'progression'
   | 'downloads'
-  | 'ecoute';
+  | 'ecoute'
+  | 'ecriture';
 
 function Icon({ name }: { name: IconName }) {
   const common = {
@@ -63,6 +64,14 @@ function Icon({ name }: { name: IconName }) {
         <svg {...common}>
           <path d="M12 7v14" />
           <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+        </svg>
+      );
+    case 'ecriture':
+      return (
+        <svg {...common}>
+          <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+          <path d="m13 7 4 4" />
+          <path d="M14 20h6" />
         </svg>
       );
     case 'ecoute':
@@ -121,6 +130,7 @@ const NAV: { href: string; label: string; icon: IconName; match: (p: string) => 
   { href: '/recitation', label: 'Récitation', icon: 'recitation', match: (p) => p.startsWith('/recitation') },
   { href: '/exercises/lecture/practice', label: 'Lecture', icon: 'lecture', match: (p) => p.startsWith('/exercises/lecture') },
   { href: '/ecoute', label: 'Écoute', icon: 'ecoute', match: (p) => p.startsWith('/ecoute') },
+  { href: '/ecriture', label: 'Écriture', icon: 'ecriture', match: (p) => p.startsWith('/ecriture') },
   { href: '/vocab', label: 'Vocabulaire', icon: 'vocab', match: (p) => p.startsWith('/vocab') },
   { href: '/reperes', label: 'Repères', icon: 'reperes', match: (p) => p.startsWith('/reperes') },
   { href: '/adhkar', label: 'Adhkâr', icon: 'adhkar', match: (p) => p.startsWith('/adhkar') },
