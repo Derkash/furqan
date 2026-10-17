@@ -6,7 +6,6 @@ import MushafPage from '@/components/MushafPage';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import type { PageVerses } from '@/types';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
-import { useOrientation } from '@/hooks/useOrientation';
 import { applyOrientationPref } from '@/utils/orientation';
 import { loadStrokes, saveStrokes, type Stroke, type TraceTool } from '@/utils/traceStore';
 
@@ -152,7 +151,11 @@ export default function EcriturePage() {
   const [pageInput, setPageInput] = useState('');
   // Zone d'écriture = bloc de texte de la page (px, relatif à la page).
   const [zone, setZone] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-  const orientation = useOrientation();
+  // Portrait PERMANENT : si l'iPad passe en paysage (le verrou natif n'est pas
+  // garanti sur iPad), l'écran se contre-pivote pour rester fixe par rapport
+  // à l'appareil, comme une app qui n'existe qu'en portrait.
+  const [rot, setRot] = useState(0);
+  const rotRef = useRef(0);
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -176,6 +179,29 @@ export default function EcriturePage() {
     void applyOrientationPref('portrait');
     return () => {
       void applyOrientationPref();
+    };
+  }, []);
+
+  // Contre-rotation si l'écran est malgré tout en paysage.
+  useEffect(() => {
+    const compute = () => {
+      if (window.innerWidth <= window.innerHeight) return 0;
+      // iOS : window.orientation = 90 (appareil tourné à gauche) / -90 (à droite).
+      const wo = (window as unknown as { orientation?: number }).orientation;
+      if (typeof wo === 'number') return wo === 90 ? -90 : 90;
+      return screen.orientation?.angle === 90 ? -90 : 90;
+    };
+    const update = () => {
+      const r = compute();
+      rotRef.current = r;
+      setRot(r);
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
     };
   }, []);
 
@@ -210,9 +236,22 @@ export default function EcriturePage() {
     const box = boxRef.current;
     const content = box?.querySelector('.mushaf-content') as HTMLElement | null;
     if (!box || !content) return;
-    const b = box.getBoundingClientRect();
-    const c = content.getBoundingClientRect();
-    const z = { left: c.left - b.left, top: c.top - b.top, width: c.width, height: c.height };
+    // Coordonnées de MISE EN PAGE (offset*), insensibles à la rotation CSS.
+    let left = 0;
+    let top = 0;
+    let n: HTMLElement | null = content;
+    while (n && n !== box) {
+      left += n.offsetLeft;
+      top += n.offsetTop;
+      n = n.offsetParent as HTMLElement | null;
+    }
+    if (n !== box) {
+      const b = box.getBoundingClientRect();
+      const c = content.getBoundingClientRect();
+      left = c.left - b.left;
+      top = c.top - b.top;
+    }
+    const z = { left, top, width: content.offsetWidth, height: content.offsetHeight };
     if (z.width < 10 || z.height < 10) return;
     setZone((prev) =>
       prev && Math.abs(prev.width - z.width) < 0.5 && Math.abs(prev.height - z.height) < 0.5 && Math.abs(prev.left - z.left) < 0.5 && Math.abs(prev.top - z.top) < 0.5
@@ -294,10 +333,23 @@ export default function EcriturePage() {
   };
 
   // ---- Saisie au stylet (coordonnées normalisées sur la ZONE de texte) ----
+  /** Position locale (px) dans le canevas, rotation de l'écran annulée. */
+  const local = (clientX: number, clientY: number) => {
+    const cv = canvasRef.current!;
+    const r = cv.getBoundingClientRect();
+    const dx = clientX - (r.left + r.width / 2);
+    const dy = clientY - (r.top + r.height / 2);
+    const a = (-rotRef.current * Math.PI) / 180;
+    return {
+      x: dx * Math.cos(a) - dy * Math.sin(a) + cv.clientWidth / 2,
+      y: dx * Math.sin(a) + dy * Math.cos(a) + cv.clientHeight / 2,
+    };
+  };
   const point = (e: PointerEvent | React.PointerEvent) => {
-    const r = canvasRef.current!.getBoundingClientRect();
+    const cv = canvasRef.current!;
+    const { x, y } = local(e.clientX, e.clientY);
     const pressure = e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5;
-    return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, Number(pressure.toFixed(3))];
+    return [x / cv.clientWidth, y / cv.clientHeight, Number(pressure.toFixed(3))];
   };
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -316,8 +368,7 @@ export default function EcriturePage() {
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
-      const r = canvasRef.current!.getBoundingClientRect();
-      setHover({ x: e.clientX - r.left, y: e.clientY - r.top });
+      setHover(local(e.clientX, e.clientY));
     }
     const live = liveRef.current;
     if (!live || live.id !== e.pointerId) return;
@@ -424,7 +475,25 @@ export default function EcriturePage() {
   if (!ready) return <div className="ds-page" />;
 
   return (
-    <div dir="ltr" className="h-dvh w-full flex overflow-hidden bg-[var(--ds-green-deep)] select-none" style={{ fontFamily: 'var(--ds-font)', WebkitTouchCallout: 'none' }}>
+    <div className="fixed inset-0 overflow-hidden bg-[var(--ds-green-deep)]">
+    <div
+      dir="ltr"
+      className="flex overflow-hidden bg-[var(--ds-green-deep)] select-none"
+      style={{
+        fontFamily: 'var(--ds-font)',
+        WebkitTouchCallout: 'none',
+        ...(rot
+          ? {
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: '100dvh',
+              height: '100dvw',
+              transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+            }
+          : { width: '100%', height: '100%' }),
+      }}
+    >
       <style>{`
         .trace-guide .verse-word { color: rgba(26, 26, 26, var(--guide)) !important; transition: color .2s ease; }
         @font-face { font-family: 'AmiriQuranSignes'; src: url('/fonts/AmiriQuranSignes.ttf') format('truetype'); font-display: block; }
@@ -619,14 +688,8 @@ export default function EcriturePage() {
           <span className="absolute bottom-1 right-2 z-30 text-[10px] font-bold text-[var(--ds-n500)] pointer-events-none">p. {toArabicNumbers(page)}</span>
         </div>
 
-        {/* Paysage : l'exercice se fait en portrait */}
-        {orientation === 'landscape' && (
-          <div className="absolute inset-0 z-50 bg-[var(--ds-green-deep)]/95 flex flex-col items-center justify-center text-center p-6 text-white">
-            <p className="text-lg font-bold mb-1">Tourne l’iPad en portrait</p>
-            <p className="text-sm opacity-80">L’exercice d’écriture se fait page entière, en portrait.</p>
-          </div>
-        )}
       </div>
+    </div>
     </div>
   );
 }
