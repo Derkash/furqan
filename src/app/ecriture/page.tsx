@@ -6,6 +6,8 @@ import MushafPage from '@/components/MushafPage';
 import { fetchPageVerses } from '@/hooks/usePageVerses';
 import type { PageVerses } from '@/types';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
+import { useOrientation } from '@/hooks/useOrientation';
+import { applyOrientationPref } from '@/utils/orientation';
 import { loadStrokes, saveStrokes, type Stroke, type TraceTool } from '@/utils/traceStore';
 
 /**
@@ -29,15 +31,55 @@ const PREFS_KEY = 'almuraja3a:ecriture-prefs';
 const NIB_ANGLE = 0.95; // angle de la plume du calame (rad)
 const SIZE_UNIT = 0.0016; // taille 1 = 0,16 % de la largeur de page
 
+type GuideMode = 'text' | 'signs';
+
 interface Prefs {
   page: number;
   tool: TraceTool;
   color: string;
   size: number;
-  guide: number; // opacité des mots du modèle (0..0.6)
+  guide: number; // mode Texte : opacité des mots (0..0.6) ; mode Signes : opacité des lettres
+  guideMode: GuideMode; // 'signs' = chakl + signes de pause visibles, lettres transparentes
   penOnly: boolean;
 }
-const DEFAULT_PREFS: Prefs = { page: 1, tool: 'calame', color: COLORS[0].c, size: 4, guide: 0.14, penOnly: false };
+const DEFAULT_PREFS: Prefs = { page: 1, tool: 'calame', color: COLORS[0].c, size: 4, guide: 0.14, guideMode: 'text', penOnly: false };
+
+// Mode « Signes seuls » : police Amiri Quran COLORÉE (OFL), retouchée pour
+// l'app (public/fonts/AmiriQuranSignes.ttf). Chaque SIGNE (harakat, chadda,
+// soukoun, signes de pause, petites lettres) est un calque de couleur (palette
+// 0-3) ; le corps des lettres suit la couleur du texte et leurs POINTS ont été
+// déplacés sur l'entrée 4 de la palette. Une seule couche de texte : on rend
+// les lettres (couleur + entrée 4) transparentes et les signes foncés, sans
+// aucun décalage possible.
+const SIGN_INK = '#1a1a1a';
+
+interface QcfLine {
+  line: number;
+  type: string;
+  words?: { verseKey: string; position: number; isAyahMarker: boolean }[];
+}
+
+/** Ligne du mode « Signes seuls » (une seule couche, police colorée). */
+function SignsLine({ words }: { words: { k: string; t: string }[] }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // Réduit la police si la ligne déborde.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.fontSize = '';
+    const over = el.scrollWidth / Math.max(1, el.clientWidth);
+    if (over > 1.001) el.style.fontSize = `calc(var(--signs-size) / ${over.toFixed(3)})`;
+  });
+  return (
+    <div ref={ref} dir="rtl" className="signs-line">
+      {words.map((w) => (
+        <span key={w.k} className="signs-word">
+          {w.t}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type Action = { type: 'add'; stroke: Stroke } | { type: 'clear'; prev: Stroke[] };
 
@@ -98,6 +140,8 @@ export default function EcriturePage() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [ready, setReady] = useState(false);
   const [verses, setVerses] = useState<PageVerses | null>(null);
+  const [lines, setLines] = useState<QcfLine[]>([]);
+  const [uthmani, setUthmani] = useState<Record<string, string> | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [undoStack, setUndoStack] = useState<Action[]>([]);
   const [redoStack, setRedoStack] = useState<Action[]>([]);
@@ -105,8 +149,10 @@ export default function EcriturePage() {
   const [hideGuide, setHideGuide] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
-  const [gotoPage, setGotoPage] = useState('');
-  const [pageW, setPageW] = useState(0);
+  const [pageInput, setPageInput] = useState('');
+  // Zone d'écriture = bloc de texte de la page (px, relatif à la page).
+  const [zone, setZone] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const orientation = useOrientation();
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -116,13 +162,21 @@ export default function EcriturePage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const penSeen = useRef(false);
 
-  const { page, tool, color, size, guide, penOnly } = prefs;
+  const { page, tool, color, size, guide, guideMode, penOnly } = prefs;
   const setPref = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setPrefs((p) => ({ ...p, [k]: v }));
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setPrefs(loadPrefs());
     setReady(true);
+  }, []);
+
+  // Portrait imposé pendant l'exercice (app native) ; préférence rétablie en sortant.
+  useEffect(() => {
+    void applyOrientationPref('portrait');
+    return () => {
+      void applyOrientationPref();
+    };
   }, []);
 
   useEffect(() => {
@@ -134,7 +188,6 @@ export default function EcriturePage() {
     }
   }, [prefs, ready]);
 
-  // Redessine tout (changement de page, taille, annuler…).
   const redraw = useCallback(() => {
     const cv = canvasRef.current;
     if (!cv) return;
@@ -152,35 +205,64 @@ export default function EcriturePage() {
     ctx.globalCompositeOperation = 'source-over';
   }, []);
 
-  // Taille du canevas = taille de la page affichée (retina).
+  // Mesure de la zone de texte de la page (et taille du canevas qui la couvre).
+  const measure = useCallback(() => {
+    const box = boxRef.current;
+    const content = box?.querySelector('.mushaf-content') as HTMLElement | null;
+    if (!box || !content) return;
+    const b = box.getBoundingClientRect();
+    const c = content.getBoundingClientRect();
+    const z = { left: c.left - b.left, top: c.top - b.top, width: c.width, height: c.height };
+    if (z.width < 10 || z.height < 10) return;
+    setZone((prev) =>
+      prev && Math.abs(prev.width - z.width) < 0.5 && Math.abs(prev.height - z.height) < 0.5 && Math.abs(prev.left - z.left) < 0.5 && Math.abs(prev.top - z.top) < 0.5
+        ? prev
+        : z
+    );
+  }, []);
+
   useEffect(() => {
     const box = boxRef.current;
-    const cv = canvasRef.current;
-    if (!box || !cv) return;
-    const ro = new ResizeObserver(() => {
-      const r = box.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      sizeRef.current = { W: r.width, H: r.height };
-      setPageW(r.width);
-      cv.width = Math.round(r.width * dpr);
-      cv.height = Math.round(r.height * dpr);
-      cv.style.width = `${r.width}px`;
-      cv.style.height = `${r.height}px`;
-      redraw();
-    });
+    if (!box) return;
+    const ro = new ResizeObserver(() => measure());
     ro.observe(box);
-    return () => ro.disconnect();
-  }, [redraw, ready]);
+    const t = setTimeout(measure, 50);
+    return () => {
+      ro.disconnect();
+      clearTimeout(t);
+    };
+  }, [measure, ready, page]);
 
-  // Changement de page : versets (pour le rendu) + tracés enregistrés.
+  // Le canevas suit la zone.
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv || !zone) return;
+    const dpr = window.devicePixelRatio || 1;
+    sizeRef.current = { W: zone.width, H: zone.height };
+    cv.width = Math.round(zone.width * dpr);
+    cv.height = Math.round(zone.height * dpr);
+    redraw();
+  }, [zone, redraw]);
+
+  // Changement de page : versets, lignes, texte Uthmani, tracés enregistrés.
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    const padded = String(page).padStart(3, '0');
     fetchPageVerses(page).then((v) => !cancelled && setVerses(v));
-    loadStrokes(page).then((s) => {
+    fetch(`/qcf-data/page-${padded}.json`)
+      .then((r) => r.json())
+      .then((d) => !cancelled && setLines(Array.isArray(d.lines) ? d.lines : []))
+      .catch(() => !cancelled && setLines([]));
+    setUthmani(null);
+    fetch(`/uthmani/page-${padded}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => !cancelled && setUthmani(d))
+      .catch(() => {});
+    loadStrokes(page).then((st) => {
       if (cancelled) return;
-      strokesRef.current = s;
-      setStrokes(s);
+      strokesRef.current = st;
+      setStrokes(st);
       setUndoStack([]);
       setRedoStack([]);
       setConfirmClear(false);
@@ -211,9 +293,9 @@ export default function EcriturePage() {
     persist(next);
   };
 
-  // ---- Saisie au stylet ----
+  // ---- Saisie au stylet (coordonnées normalisées sur la ZONE de texte) ----
   const point = (e: PointerEvent | React.PointerEvent) => {
-    const r = boxRef.current!.getBoundingClientRect();
+    const r = canvasRef.current!.getBoundingClientRect();
     const pressure = e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5;
     return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, Number(pressure.toFixed(3))];
   };
@@ -234,7 +316,7 @@ export default function EcriturePage() {
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
-      const r = boxRef.current!.getBoundingClientRect();
+      const r = canvasRef.current!.getBoundingClientRect();
       setHover({ x: e.clientX - r.left, y: e.clientY - r.top });
     }
     const live = liveRef.current;
@@ -247,7 +329,7 @@ export default function EcriturePage() {
       const s = live.stroke;
       const n = s.p.length / 3;
       const lx = s.p[(n - 1) * 3], ly = s.p[(n - 1) * 3 + 1];
-      if (Math.hypot((x - lx) * W, (y - ly) * H) < 0.7) continue; // filtre le bruit
+      if (Math.hypot((x - lx) * W, (y - ly) * H) < 0.7) continue;
       s.p.push(Number(x.toFixed(5)), Number(y.toFixed(5)), p);
       if (ctx) drawSeg(ctx, s, s.p.length / 3 - 1, W, H);
     }
@@ -262,7 +344,6 @@ export default function EcriturePage() {
     commit([...strokesRef.current, live.stroke], { type: 'add', stroke: live.stroke });
   };
 
-  // ---- Historique ----
   const undo = () => {
     const a = undoStack[undoStack.length - 1];
     if (!a) return;
@@ -290,60 +371,124 @@ export default function EcriturePage() {
   };
 
   const goPage = (p: number) => {
-    const n = Math.max(1, Math.min(604, p));
+    if (!Number.isFinite(p) || p < 1) return;
+    const n = Math.max(1, Math.min(604, Math.round(p)));
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
-      void saveStrokes(page, strokesRef.current); // pas de perte en changeant de page
+      void saveStrokes(page, strokesRef.current);
     }
     setPref('page', n);
   };
+  const submitPage = () => {
+    const n = Number(pageInput.replace(/[^\d]/g, ''));
+    if (n) goPage(n);
+    setPageInput('');
+  };
 
-  const guideOpacity = reveal ? 1 : hideGuide ? 0 : guide;
-  const brushPx = Math.max(3, size * SIZE_UNIT * pageW * (tool === 'erase' ? 3.2 : 1));
+  // Opacités : mode Texte = mots QCF ; mode Signes = mots QCF cachés, lettres Unicode réglables.
+  const textOpacity = guideMode === 'signs' ? 0 : reveal ? 1 : hideGuide ? 0 : guide;
+  const letterOpacity = reveal ? 1 : hideGuide ? 0 : guide;
+  const brushPx = Math.max(3, size * SIZE_UNIT * (zone?.width ?? 0) * (tool === 'erase' ? 3.2 : 1));
 
-  const btn = (active: boolean) =>
-    `h-9 min-w-9 px-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
-      active ? 'bg-[var(--ds-green)] text-white' : 'bg-white text-[var(--ds-n700)] border border-[var(--ds-divider)] hover:bg-[var(--ds-sage-100)]'
+  const railBtn = (active: boolean) =>
+    `flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl text-[8px] font-bold uppercase tracking-wide transition-colors disabled:opacity-35 ${
+      active ? 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]' : 'text-[var(--ds-n500)] hover:text-[var(--ds-green)]'
     }`;
   const ico = (d: React.ReactNode) => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       {d}
     </svg>
   );
+  const sep = <div className="w-9 h-px bg-[var(--ds-divider)] my-1 flex-none" />;
+  const step = (label: string, value: string, dec: () => void, inc: () => void) => (
+    <div className="flex flex-col items-center w-14 flex-none">
+      <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ds-n500)]">{label}</span>
+      <div className="flex items-center gap-0.5">
+        <button onClick={dec} className="w-5 h-6 rounded-md text-[var(--ds-green)] font-bold" aria-label={`${label} moins`}>−</button>
+        <span className="text-[11px] font-bold tabular-nums text-[var(--ds-text)] w-6 text-center">{value}</span>
+        <button onClick={inc} className="w-5 h-6 rounded-md text-[var(--ds-green)] font-bold" aria-label={`${label} plus`}>+</button>
+      </div>
+    </div>
+  );
+
+  // Mots Uthmani par ligne (mode Signes).
+  const signLines = lines.map((l) => ({
+    line: l.line,
+    words: (l.words ?? [])
+      .filter((w) => !w.isAyahMarker)
+      .map((w) => ({ k: `${w.verseKey}:${w.position}`, t: uthmani?.[`${w.verseKey}:${w.position}`] ?? '' }))
+      .filter((w) => w.t),
+  }));
+  const lineCount = Math.max(15, lines.length);
 
   if (!ready) return <div className="ds-page" />;
 
   return (
-    <div className="h-dvh w-full flex flex-col bg-[var(--ds-bg)] overflow-hidden select-none" style={{ fontFamily: 'var(--ds-font)', WebkitTouchCallout: 'none' }}>
+    <div dir="ltr" className="h-dvh w-full flex overflow-hidden bg-[var(--ds-green-deep)] select-none" style={{ fontFamily: 'var(--ds-font)', WebkitTouchCallout: 'none' }}>
       <style>{`
         .trace-guide .verse-word { color: rgba(26, 26, 26, var(--guide)) !important; transition: color .2s ease; }
-        .trace-guide .verse-word.ayah-marker { color: rgba(26, 26, 26, calc(var(--guide) * 1.3)) !important; }
+        @font-face { font-family: 'AmiriQuranSignes'; src: url('/fonts/AmiriQuranSignes.ttf') format('truetype'); font-display: block; }
+        @font-palette-values --signes {
+          font-family: 'AmiriQuranSignes';
+          override-colors: 0 ${SIGN_INK}, 1 ${SIGN_INK}, 2 ${SIGN_INK}, 3 ${SIGN_INK}, 4 rgba(26, 26, 26, ${letterOpacity});
+        }
+        .signs-line { position: absolute; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center;
+          white-space: nowrap; font-family: 'AmiriQuranSignes', serif; font-palette: --signes;
+          color: rgba(26, 26, 26, ${letterOpacity}); font-size: var(--signs-size); line-height: 1.9; }
+        .signs-word { white-space: nowrap; }
       `}</style>
 
-      {/* Barre d'outils */}
-      <div dir="ltr" className="flex-none flex flex-wrap items-center gap-2 px-3 py-2 bg-[var(--ds-bg)] border-b border-[var(--ds-divider)]">
-        <Link href="/exercises" aria-label="Retour" className="h-9 w-9 rounded-full bg-[var(--ds-green)] text-white flex items-center justify-center">
-          {ico(<path d="m15 18-6-6 6-6" />)}
+      {/* ---- Rail d'outils (gauche), comme la Lecture ---- */}
+      <aside dir="ltr" className="flex w-[68px] flex-none flex-col items-center bg-white overflow-y-auto py-3 gap-1 z-40">
+        <Link href="/exercises" title="Accueil" className="flex flex-col items-center gap-0.5 mb-1 flex-none">
+          <span className="text-[20px] leading-none text-[var(--ds-gold)]" dir="rtl" style={{ fontFamily: "'Amiri','Scheherazade New',serif" }}>ع</span>
+          <span className="text-[6px] font-extrabold tracking-[0.16em] text-[var(--ds-n600)]">MURAJA3A</span>
         </Link>
 
-        {/* Outils */}
-        <div className="flex gap-1">
-          <button className={btn(tool === 'calame')} onClick={() => setPref('tool', 'calame')} title="Calame (largeur selon la direction)">
-            {ico(<><path d="M4 20 15 9" /><path d="m13 7 4-4 4 4-4 4" /></>)}
-            Calame
-          </button>
-          <button className={btn(tool === 'pen')} onClick={() => setPref('tool', 'pen')} title="Stylo (pression du stylet)">
-            {ico(<><path d="M4 20h4L19 9l-4-4L4 16v4Z" /></>)}
-            Stylo
-          </button>
-          <button className={btn(tool === 'erase')} onClick={() => setPref('tool', 'erase')} title="Gomme">
-            {ico(<><path d="m7 21-4-4 11-11 7 7-7 8H7Z" /><path d="M22 21H7" /></>)}
-            Gomme
-          </button>
+        {/* Page */}
+        <div className="flex flex-col items-center gap-1 flex-none">
+          <span className="text-[8px] font-bold uppercase tracking-wide text-[var(--ds-n500)]">Page</span>
+          <input
+            id="ecriture-page"
+            type="text"
+            inputMode="numeric"
+            enterKeyHint="go"
+            value={pageInput}
+            placeholder={String(page)}
+            onChange={(e) => setPageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                submitPage();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            className="w-14 h-9 rounded-lg border-2 border-[var(--ds-gold)]/40 text-center text-[14px] font-bold outline-none focus:border-[var(--ds-gold)] placeholder:text-[var(--ds-text)]"
+            aria-label="Numéro de page"
+          />
+          {pageInput ? (
+            <button onClick={submitPage} className="w-14 h-7 rounded-lg bg-[var(--ds-green)] text-white text-[11px] font-bold">Aller</button>
+          ) : (
+            <div className="flex gap-1">
+              <button onClick={() => goPage(page + 1)} disabled={page >= 604} className="w-6 h-7 rounded-lg bg-[var(--ds-sage-100)] text-[var(--ds-green)] disabled:opacity-35" aria-label="Page suivante">‹</button>
+              <button onClick={() => goPage(page - 1)} disabled={page <= 1} className="w-6 h-7 rounded-lg bg-[var(--ds-sage-100)] text-[var(--ds-green)] disabled:opacity-35" aria-label="Page précédente">›</button>
+            </div>
+          )}
         </div>
+        {sep}
+
+        {/* Outils */}
+        <button className={railBtn(tool === 'calame')} onClick={() => setPref('tool', 'calame')} title="Calame (largeur selon la direction)">
+          {ico(<><path d="M4 20 15 9" /><path d="m13 7 4-4 4 4-4 4" /></>)}Calame
+        </button>
+        <button className={railBtn(tool === 'pen')} onClick={() => setPref('tool', 'pen')} title="Stylo (pression)">
+          {ico(<path d="M4 20h4L19 9l-4-4L4 16v4Z" />)}Stylo
+        </button>
+        <button className={railBtn(tool === 'erase')} onClick={() => setPref('tool', 'erase')} title="Gomme">
+          {ico(<><path d="m7 21-4-4 11-11 7 7-7 8H7Z" /><path d="M22 21H7" /></>)}Gomme
+        </button>
 
         {/* Couleurs */}
-        <div className="flex gap-1.5 items-center px-1">
+        <div className="grid grid-cols-2 gap-1.5 py-1 flex-none">
           {COLORS.map((k) => (
             <button
               key={k.c}
@@ -353,168 +498,134 @@ export default function EcriturePage() {
               }}
               aria-label={k.name}
               title={k.name}
-              className="w-7 h-7 rounded-full transition-transform"
-              style={{
-                background: k.c,
-                boxShadow: color === k.c && tool !== 'erase' ? '0 0 0 2px var(--ds-bg), 0 0 0 4px ' + k.c : 'none',
-                transform: color === k.c && tool !== 'erase' ? 'scale(1.05)' : 'none',
-              }}
+              className="w-5 h-5 rounded-full"
+              style={{ background: k.c, boxShadow: color === k.c && tool !== 'erase' ? `0 0 0 2px #fff, 0 0 0 3.5px ${k.c}` : 'none' }}
             />
           ))}
         </div>
+        {step('Épaisseur', String(size), () => setPref('size', Math.max(1, size - 0.5)), () => setPref('size', Math.min(12, size + 0.5)))}
+        {sep}
 
-        {/* Épaisseur */}
-        <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--ds-n600)]">
-          Épaisseur
-          <input
-            id="ecriture-size"
-            type="range"
-            min={1}
-            max={12}
-            step={0.5}
-            value={size}
-            onChange={(e) => setPref('size', Number(e.target.value))}
-            className="w-24 accent-[var(--ds-green)]"
-          />
-        </label>
-
-        {/* Historique */}
-        <div className="flex gap-1">
-          <button className={btn(false)} onClick={undo} disabled={!undoStack.length} title="Annuler" aria-label="Annuler">
-            {ico(<><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></>)}
+        <button className={railBtn(false)} onClick={undo} disabled={!undoStack.length} title="Annuler">
+          {ico(<><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></>)}Annuler
+        </button>
+        <button className={railBtn(false)} onClick={redo} disabled={!redoStack.length} title="Rétablir">
+          {ico(<><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h3" /></>)}Rétablir
+        </button>
+        {!confirmClear ? (
+          <button className={railBtn(false)} onClick={() => setConfirmClear(true)} disabled={!strokes.length} title="Effacer la page">
+            {ico(<><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /></>)}Effacer
           </button>
-          <button className={btn(false)} onClick={redo} disabled={!redoStack.length} title="Rétablir" aria-label="Rétablir">
-            {ico(<><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h3" /></>)}
-          </button>
-          {!confirmClear ? (
-            <button className={btn(false)} onClick={() => setConfirmClear(true)} disabled={!strokes.length} title="Effacer la page">
-              {ico(<><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /></>)}
-              Effacer
-            </button>
-          ) : (
-            <span className="flex gap-1">
-              <button className="h-9 px-2.5 rounded-xl text-[12px] font-bold bg-red-600 text-white" onClick={clearPage}>
-                Effacer la page
-              </button>
-              <button className={btn(false)} onClick={() => setConfirmClear(false)}>
-                Annuler
-              </button>
-            </span>
-          )}
-        </div>
+        ) : (
+          <div className="flex flex-col gap-1 flex-none">
+            <button onClick={clearPage} className="w-14 py-1.5 rounded-lg bg-red-600 text-white text-[9px] font-bold">Effacer ?</button>
+            <button onClick={() => setConfirmClear(false)} className="w-14 py-1 rounded-lg bg-[var(--ds-sage-100)] text-[var(--ds-n700)] text-[9px] font-bold">Non</button>
+          </div>
+        )}
+        {sep}
 
         {/* Modèle */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--ds-n600)]">
-            Modèle
-            <input
-              id="ecriture-guide"
-              type="range"
-              min={0.03}
-              max={0.6}
-              step={0.01}
-              value={guide}
-              disabled={hideGuide}
-              onChange={(e) => setPref('guide', Number(e.target.value))}
-              className="w-24 accent-[var(--ds-gold)]"
-            />
-          </label>
-          <button className={btn(hideGuide)} onClick={() => setHideGuide((v) => !v)} title="Écrire de mémoire (modèle masqué)">
-            {hideGuide ? 'Masqué' : 'Masquer'}
-          </button>
-          <button
-            className={btn(reveal)}
-            onPointerDown={() => setReveal(true)}
-            onPointerUp={() => setReveal(false)}
-            onPointerLeave={() => setReveal(false)}
-            onPointerCancel={() => setReveal(false)}
-            title="Maintenir pour voir le modèle en clair"
-          >
-            Révéler
-          </button>
-        </div>
-
-        <button className={btn(penOnly)} onClick={() => setPref('penOnly', !penOnly)} title="Ignorer les doigts et la paume">
-          {ico(<><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /></>)}
-          Stylet seul
+        <button className={railBtn(guideMode === 'text')} onClick={() => setPref('guideMode', 'text')} title="Modèle : texte du Mushaf en transparence">
+          {ico(<><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h10" /></>)}Texte
         </button>
+        <button className={railBtn(guideMode === 'signs')} onClick={() => setPref('guideMode', 'signs')} title="Modèle : chakl et signes de pause visibles, lettres transparentes">
+          {ico(<><circle cx="7" cy="7" r="1.5" fill="currentColor" /><path d="M12 6h6" /><circle cx="16" cy="17" r="1.5" fill="currentColor" /><path d="M5 17h6" /></>)}Signes
+        </button>
+        {step(guideMode === 'signs' ? 'Lettres' : 'Contraste', `${Math.round(guide * 100)}`, () => setPref('guide', Math.max(guideMode === 'signs' ? 0 : 0.03, Number((guide - 0.03).toFixed(2)))), () => setPref('guide', Math.min(0.6, Number((guide + 0.03).toFixed(2)))))}
+        <button className={railBtn(hideGuide)} onClick={() => setHideGuide((v) => !v)} title="Écrire de mémoire">
+          {ico(<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><path d="M3 3l18 18" /></>)}{hideGuide ? 'Masqué' : 'Masquer'}
+        </button>
+        <button
+          className={railBtn(reveal)}
+          onPointerDown={() => setReveal(true)}
+          onPointerUp={() => setReveal(false)}
+          onPointerLeave={() => setReveal(false)}
+          onPointerCancel={() => setReveal(false)}
+          title="Maintenir pour voir le modèle en clair"
+        >
+          {ico(<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>)}Révéler
+        </button>
+        {sep}
+        <button className={railBtn(penOnly)} onClick={() => setPref('penOnly', !penOnly)} title="Ignorer les doigts et la paume">
+          {ico(<><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /></>)}Stylet seul
+        </button>
+      </aside>
 
-        {/* Pages (RTL : suivante à gauche) */}
-        <div className="flex items-center gap-1 ml-auto">
-          <button className={btn(false)} onClick={() => goPage(page + 1)} disabled={page >= 604} aria-label="Page suivante">
-            {ico(<path d="m15 18-6-6 6-6" />)}
-          </button>
-          <input
-            id="ecriture-page"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={604}
-            value={gotoPage}
-            placeholder={String(page)}
-            onChange={(e) => setGotoPage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const n = Number(gotoPage);
-                if (n) goPage(n);
-                setGotoPage('');
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-            onBlur={() => {
-              const n = Number(gotoPage);
-              if (n) goPage(n);
-              setGotoPage('');
-            }}
-            className="w-14 h-9 px-1 rounded-xl border border-[var(--ds-divider)] text-center text-[13px] font-bold outline-none focus:border-[var(--ds-gold)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            title="Aller à la page"
-          />
-          <button className={btn(false)} onClick={() => goPage(page - 1)} disabled={page <= 1} aria-label="Page précédente">
-            {ico(<path d="m9 18 6-6-6-6" />)}
-          </button>
-        </div>
-      </div>
-
-      {/* Page + couche d'écriture */}
-      <div className="flex-1 min-h-0 flex items-center justify-center p-2">
+      {/* ---- Page + zone d'écriture ---- */}
+      <div className="flex-1 min-w-0 h-full flex items-center justify-center p-2 relative">
         <div
           ref={boxRef}
           className="trace-guide relative h-full max-w-full"
-          style={{ aspectRatio: '759 / 1080', ['--guide' as string]: String(guideOpacity) }}
+          style={{ aspectRatio: '759 / 1080', ['--guide' as string]: String(textOpacity) }}
         >
           <MushafPage pageNumber={page} pageVerses={verses} loading={!verses} />
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 z-20"
-            style={{ touchAction: 'none', cursor: 'none' }}
-            onPointerDown={onDown}
-            onPointerMove={onMove}
-            onPointerUp={onUp}
-            onPointerCancel={onUp}
-            onPointerLeave={(e) => {
-              if (e.pointerType !== 'touch') setHover(null);
-            }}
-          />
-          {/* Aperçu du pinceau au survol du Pencil */}
-          {hover && (
-            <span
-              aria-hidden
-              className="absolute z-30 rounded-full pointer-events-none"
-              style={{
-                left: hover.x,
-                top: hover.y,
-                width: brushPx,
-                height: brushPx,
-                transform: 'translate(-50%, -50%)',
-                border: `1.5px solid ${tool === 'erase' ? '#6b7280' : color}`,
-                background: tool === 'erase' ? 'rgba(255,255,255,0.4)' : 'transparent',
-              }}
-            />
+
+          {zone && (
+            <>
+              {/* Mode « Signes seuls » : chakl + signes visibles, lettres transparentes */}
+              {guideMode === 'signs' && (
+                <div
+                  className="absolute z-[15] pointer-events-none"
+                  style={{ left: zone.left, top: zone.top, width: zone.width, height: zone.height, ['--signs-size' as string]: `${(zone.height / lineCount) * 0.52}px` }}
+                >
+                  {signLines.map((l) => (
+                    <div key={l.line} style={{ position: 'absolute', left: 0, right: 0, top: `${((l.line - 1) * 100) / lineCount}%`, height: `${100 / lineCount}%` }}>
+                      {l.words.length > 0 && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
+                          <SignsLine words={l.words} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {!uthmani && <p className="absolute inset-0 flex items-center justify-center text-[12px] text-[var(--ds-n500)]">Chargement du texte…</p>}
+                </div>
+              )}
+
+              {/* Contour de la zone d'écriture : seule cette zone reçoit le stylet */}
+              <div
+                aria-hidden
+                className="absolute z-[18] pointer-events-none rounded-md"
+                style={{ left: zone.left - 4, top: zone.top - 4, width: zone.width + 8, height: zone.height + 8, border: '1.5px dashed rgba(167, 123, 42, 0.55)' }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute z-20"
+                style={{ left: zone.left, top: zone.top, width: zone.width, height: zone.height, touchAction: 'none', cursor: 'none' }}
+                onPointerDown={onDown}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={onUp}
+                onPointerLeave={(e) => {
+                  if (e.pointerType !== 'touch') setHover(null);
+                }}
+              />
+              {hover && (
+                <span
+                  aria-hidden
+                  className="absolute z-30 rounded-full pointer-events-none"
+                  style={{
+                    left: zone.left + hover.x,
+                    top: zone.top + hover.y,
+                    width: brushPx,
+                    height: brushPx,
+                    transform: 'translate(-50%, -50%)',
+                    border: `1.5px solid ${tool === 'erase' ? '#6b7280' : color}`,
+                    background: tool === 'erase' ? 'rgba(255,255,255,0.4)' : 'transparent',
+                  }}
+                />
+              )}
+            </>
           )}
-          <span className="absolute bottom-1 right-2 z-30 text-[10px] font-bold text-[var(--ds-n500)] pointer-events-none">
-            p. {toArabicNumbers(page)}
-          </span>
+          <span className="absolute bottom-1 right-2 z-30 text-[10px] font-bold text-[var(--ds-n500)] pointer-events-none">p. {toArabicNumbers(page)}</span>
         </div>
+
+        {/* Paysage : l'exercice se fait en portrait */}
+        {orientation === 'landscape' && (
+          <div className="absolute inset-0 z-50 bg-[var(--ds-green-deep)]/95 flex flex-col items-center justify-center text-center p-6 text-white">
+            <p className="text-lg font-bold mb-1">Tourne l’iPad en portrait</p>
+            <p className="text-sm opacity-80">L’exercice d’écriture se fait page entière, en portrait.</p>
+          </div>
+        )}
       </div>
     </div>
   );
