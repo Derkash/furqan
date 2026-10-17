@@ -36,8 +36,8 @@ type Assist = 'off' | 'light' | 'strong';
 // Guidage : l'encre reste pleine SUR les lettres (+ une petite marge) et est
 // seulement ATTÉNUÉE au-delà — rien n'est rempli automatiquement.
 const ASSIST: Record<Exclude<Assist, 'off'>, { margin: number; outside: number; label: string }> = {
-  light: { margin: 0.011, outside: 0.45, label: 'Léger' },
-  strong: { margin: 0.007, outside: 0.18, label: 'Fort' },
+  light: { margin: 0.018, outside: 0.55, label: 'Léger' },
+  strong: { margin: 0.012, outside: 0.3, label: 'Fort' },
 };
 
 interface Prefs {
@@ -138,7 +138,7 @@ function drawSeg(ctx: CanvasRenderingContext2D, s: Stroke, i: number, W: number,
 function drawDot(ctx: CanvasRenderingContext2D, s: Stroke, W: number, H: number) {
   ctx.globalCompositeOperation = s.t === 'erase' ? 'destination-out' : 'source-over';
   ctx.fillStyle = s.c;
-  const r = Math.max(0.6, segWidth(s, W, 0, 0, 1, 0, s.p[2])) / 2;
+  const r = Math.max(1.2, segWidth(s, W, 0, 0, 1, 0, Math.max(0.6, s.p[2]))) / 2;
   ctx.beginPath();
   ctx.arc(s.p[0] * W, s.p[1] * H, r, 0, Math.PI * 2);
   ctx.fill();
@@ -158,6 +158,15 @@ export default function EcriturePage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [pageInput, setPageInput] = useState('');
   const [zone, setZone] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // Zoom / déplacement de la page (boutons, pincement, glisser au doigt).
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
+  const [renderZoom, setRenderZoom] = useState(1); // zoom « stable » pour la netteté des canevas
+  const [base, setBase] = useState({ w: 0, h: 0, vw: 0, vh: 0 }); // page ajustée à l'écran (zoom 1)
+  const [barsHidden, setBarsHidden] = useState(false);
+  // « Ma copie » : calque du modèle retiré (texte ET signes) pour se relire,
+  // encre affichée brute (sans l'atténuation du guidage).
+  const [copyOnly, setCopyOnly] = useState(false);
+  const copyOnlyRef = useRef(false);
   // Palette rapide (double toucher / pression du Pencil) : position écran.
   const [palette, setPalette] = useState<{ x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -169,12 +178,18 @@ export default function EcriturePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null); // affichage
   const inkRef = useRef<HTMLCanvasElement | null>(null); // encre brute (hors écran)
   const maskRef = useRef<HTMLCanvasElement | null>(null); // masque de guidage (hors écran)
-  const hoverRef = useRef<HTMLSpanElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const viewRef = useRef({ z: 1, x: 0, y: 0 });
+  const fittedRef = useRef(false);
+  const touchesRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<{ z: number; x: number; y: number; mid: { x: number; y: number }; dist: number } | null>(null);
   const sizeRef = useRef({ W: 0, H: 0, dpr: 1 });
   const strokesRef = useRef<Stroke[]>([]);
   const liveRef = useRef<{ stroke: Stroke; id: number; sx: number; sy: number; sp: number; pred: number[] } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
+  const compositeRef = useRef<(() => void) | null>(null);
   const penSeen = useRef(false);
   const prevToolRef = useRef<TraceTool>('calame');
   const maskOnRef = useRef(false);
@@ -189,6 +204,18 @@ export default function EcriturePage() {
   useEffect(() => {
     zoneRef.current = zone;
   }, [zone]);
+  useEffect(() => {
+    copyOnlyRef.current = copyOnly;
+    if (rafRef.current == null) rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      compositeRef.current?.();
+    });
+  }, [copyOnly]);
+  useEffect(() => {
+    viewRef.current = view;
+    const t = setTimeout(() => setRenderZoom(view.z), 180); // netteté après le geste
+    return () => clearTimeout(t);
+  }, [view]);
 
   const flash = (m: string) => {
     setToast(m);
@@ -253,7 +280,7 @@ export default function EcriturePage() {
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.drawImage(ink, 0, 0);
-    if (maskOnRef.current && maskRef.current) {
+    if (maskOnRef.current && maskRef.current && !copyOnlyRef.current) {
       ctx.globalCompositeOperation = 'destination-in';
       ctx.drawImage(maskRef.current, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
@@ -275,6 +302,10 @@ export default function EcriturePage() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
   }, []);
+
+  useEffect(() => {
+    compositeRef.current = composite;
+  }, [composite]);
 
   const schedule = useCallback(() => {
     if (rafRef.current == null) rafRef.current = requestAnimationFrame(composite);
@@ -367,6 +398,25 @@ export default function EcriturePage() {
     schedule();
   }, [schedule]);
 
+  // Page « contenue » dans la zone d'affichage (zoom 1).
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const ro = new ResizeObserver(() => {
+      const vw = vp.clientWidth;
+      const vh = vp.clientHeight;
+      let h = vh;
+      let w = (h * 759) / 1080;
+      if (w > vw) {
+        w = vw;
+        h = (w * 1080) / 759;
+      }
+      setBase({ w, h, vw, vh });
+    });
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [ready]);
+
   // Mesure de la zone de texte (coordonnées de mise en page, insensibles à la rotation).
   const measure = useCallback(() => {
     const box = boxRef.current;
@@ -405,7 +455,9 @@ export default function EcriturePage() {
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || !zone) return;
-    const dpr = window.devicePixelRatio || 1;
+    // Résolution des canevas = écran × zoom (net en zoom), plafonnée (mémoire iOS).
+    const cap = Math.sqrt(12e6 / Math.max(1, zone.width * zone.height));
+    const dpr = Math.min((window.devicePixelRatio || 1) * Math.max(1, renderZoom), cap);
     sizeRef.current = { W: zone.width, H: zone.height, dpr };
     const w = Math.round(zone.width * dpr);
     const h = Math.round(zone.height * dpr);
@@ -417,7 +469,7 @@ export default function EcriturePage() {
     }
     redrawInk();
     buildMask();
-  }, [zone, redrawInk, buildMask]);
+  }, [zone, renderZoom, redrawInk, buildMask]);
 
   // Le masque suit la page (police chargée + mise en page faite) et le réglage.
   useEffect(() => {
@@ -433,6 +485,41 @@ export default function EcriturePage() {
       clearTimeout(t2);
     };
   }, [zone, page, verses, assist, buildMask]);
+
+  // Cadrage « Ajuster » : le bloc de texte occupe toute la largeur de l'écran.
+  const fitText = useCallback(() => {
+    const z0 = zoneRef.current;
+    const box = boxRef.current;
+    if (!z0 || !base.vw || !box) return;
+    // Étendue RÉELLE des mots (le texte déborde un peu du bloc de mise en page).
+    let l = z0.left, r = z0.left + z0.width, t = z0.top, b = z0.top + z0.height;
+    box.querySelectorAll<HTMLElement>('.verse-word').forEach((el) => {
+      let x = 0;
+      let y = 0;
+      let n: HTMLElement | null = el;
+      while (n && n !== box) {
+        x += n.offsetLeft;
+        y += n.offsetTop;
+        n = n.offsetParent as HTMLElement | null;
+      }
+      if (n !== box) return;
+      l = Math.min(l, x);
+      r = Math.max(r, x + el.offsetWidth);
+      t = Math.min(t, y);
+      b = Math.max(b, y + el.offsetHeight);
+    });
+    const z = Math.min(4, Math.max(0.6, (base.vw - 20) / (r - l)));
+    const x = base.vw / 2 - ((l + r) / 2) * z;
+    const tall = (b - t) * z > base.vh;
+    const y = tall ? 10 - t * z : base.vh / 2 - ((t + b) / 2) * z;
+    setView({ z, x, y });
+  }, [base]);
+
+  useEffect(() => {
+    if (fittedRef.current || !zone || !base.vw) return;
+    fittedRef.current = true;
+    fitText();
+  }, [zone, base, fitText]);
 
   // Changement de page.
   useEffect(() => {
@@ -512,6 +599,79 @@ export default function EcriturePage() {
     persist(next);
   };
 
+  // ---- Zoom et déplacement ----
+  const clampZ = (z: number) => Math.min(4, Math.max(0.6, z));
+  const applyStage = (v: { z: number; x: number; y: number }) => {
+    viewRef.current = v;
+    if (stageRef.current) stageRef.current.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
+  };
+  const zoomBy = (f: number) => {
+    const v = viewRef.current;
+    const z = clampZ(v.z * f);
+    const cx = base.vw / 2;
+    const cy = base.vh / 2;
+    setView({ z, x: cx - ((cx - v.x) * z) / v.z, y: cy - ((cy - v.y) * z) / v.z });
+  };
+  // Position dans la zone d'affichage (repère de la page, rotation annulée).
+  const viewLocal = (clientX: number, clientY: number) => {
+    const vp = viewportRef.current!;
+    const r = vp.getBoundingClientRect();
+    const dx = clientX - (r.left + r.width / 2);
+    const dy = clientY - (r.top + r.height / 2);
+    const a = (-rotRef.current * Math.PI) / 180;
+    return { x: dx * Math.cos(a) - dy * Math.sin(a) + vp.clientWidth / 2, y: dx * Math.sin(a) + dy * Math.cos(a) + vp.clientHeight / 2 };
+  };
+  const startGesture = () => {
+    const pts = [...touchesRef.current.values()];
+    if (!pts.length) {
+      gestureRef.current = null;
+      return;
+    }
+    const mid = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
+    const dist = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    gestureRef.current = { ...viewRef.current, mid, dist };
+  };
+  // Doigts : glisser = déplacer (si « Stylet seul »), pincer = zoomer.
+  const onViewDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'touch') return;
+    touchesRef.current.set(e.pointerId, viewLocal(e.clientX, e.clientY));
+    const n = touchesRef.current.size;
+    if (!prefsRef.current.penOnly && n === 1) return; // un doigt écrit
+    if (n >= 2 && liveRef.current) {
+      liveRef.current = null; // le 2e doigt annule le trait commencé au doigt
+      redrawInk();
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture refusée */
+    }
+    startGesture();
+  };
+  const onViewMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'touch' || !touchesRef.current.has(e.pointerId)) return;
+    touchesRef.current.set(e.pointerId, viewLocal(e.clientX, e.clientY));
+    const g = gestureRef.current;
+    if (!g) return;
+    const pts = [...touchesRef.current.values()];
+    const mid = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length };
+    const z = pts.length > 1 && g.dist > 0 ? clampZ((g.z * Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)) / g.dist) : g.z;
+    const cx = (g.mid.x - g.x) / g.z;
+    const cy = (g.mid.y - g.y) / g.z;
+    applyStage({ z, x: mid.x - cx * z, y: mid.y - cy * z });
+  };
+  const onViewUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'touch') return;
+    touchesRef.current.delete(e.pointerId);
+    if (gestureRef.current) {
+      if (touchesRef.current.size) startGesture();
+      else {
+        gestureRef.current = null;
+        setView({ ...viewRef.current });
+      }
+    }
+  };
+
   // ---- Saisie (coordonnées locales du canevas, rotation annulée) ----
   const local = (clientX: number, clientY: number) => {
     const cv = canvasRef.current!;
@@ -519,9 +679,10 @@ export default function EcriturePage() {
     const dx = clientX - (r.left + r.width / 2);
     const dy = clientY - (r.top + r.height / 2);
     const a = (-rotRef.current * Math.PI) / 180;
+    const sc = (rotRef.current ? r.height : r.width) / Math.max(1, cv.clientWidth);
     return {
-      x: dx * Math.cos(a) - dy * Math.sin(a) + cv.clientWidth / 2,
-      y: dx * Math.sin(a) + dy * Math.cos(a) + cv.clientHeight / 2,
+      x: (dx * Math.cos(a) - dy * Math.sin(a)) / sc + cv.clientWidth / 2,
+      y: (dx * Math.sin(a) + dy * Math.cos(a)) / sc + cv.clientHeight / 2,
     };
   };
   const norm = (e: PointerEvent | React.PointerEvent) => {
@@ -529,12 +690,6 @@ export default function EcriturePage() {
     const { x, y } = local(e.clientX, e.clientY);
     const pressure = e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5;
     return [x / cv.clientWidth, y / cv.clientHeight, pressure];
-  };
-  const moveHover = (x: number, y: number) => {
-    const h = hoverRef.current;
-    if (!h) return;
-    h.style.display = 'block';
-    h.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
   };
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -544,6 +699,7 @@ export default function EcriturePage() {
       if (!penOnly) setPref('penOnly', true); // paume ignorée dès qu'un stylet est vu
     }
     if (penOnly && e.pointerType === 'touch') return;
+    if (e.pointerType === 'touch' && (touchesRef.current.size > 0 || gestureRef.current)) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const [x, y, p] = norm(e);
     const stroke: Stroke = { t: tool, c: color, w: size * SIZE_UNIT, p: [x, y, Number(p.toFixed(3))] };
@@ -554,10 +710,6 @@ export default function EcriturePage() {
   };
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
-      const { x, y } = local(e.clientX, e.clientY);
-      moveHover(x, y);
-    }
     const live = liveRef.current;
     if (!live || live.id !== e.pointerId) return;
     const ne = e.nativeEvent;
@@ -567,13 +719,15 @@ export default function EcriturePage() {
     for (const ev of events.length ? events : [ne]) {
       const [x, y, p] = norm(ev);
       // Lissage léger (stabilisation) de la position et de la pression.
-      live.sx += (x - live.sx) * 0.6;
-      live.sy += (y - live.sy) * 0.6;
-      live.sp += (p - live.sp) * 0.35;
+      // Lissage léger, nul sur les premiers points (points, petits ronds).
+      const k = live.stroke.p.length / 3 < 4 ? 1 : 0.8;
+      live.sx += (x - live.sx) * k;
+      live.sy += (y - live.sy) * k;
+      live.sp += (p - live.sp) * 0.4;
       const s = live.stroke;
       const n = s.p.length / 3;
       const lx = s.p[(n - 1) * 3], ly = s.p[(n - 1) * 3 + 1];
-      if (Math.hypot((live.sx - lx) * W, (live.sy - ly) * H) < 0.6) continue;
+      if (Math.hypot((live.sx - lx) * W, (live.sy - ly) * H) < 0.35) continue;
       s.p.push(Number(live.sx.toFixed(5)), Number(live.sy.toFixed(5)), Number(live.sp.toFixed(3)));
       if (ctx) drawSeg(ctx, s, s.p.length / 3 - 1, W, H);
     }
@@ -593,7 +747,7 @@ export default function EcriturePage() {
     const s = live.stroke;
     const n = s.p.length / 3;
     const { W, H } = sizeRef.current;
-    if (n >= 1 && Math.hypot((x - s.p[(n - 1) * 3]) * W, (y - s.p[(n - 1) * 3 + 1]) * H) > 0.6) {
+    if (n >= 1 && Math.hypot((x - s.p[(n - 1) * 3]) * W, (y - s.p[(n - 1) * 3 + 1]) * H) > 0.35) {
       s.p.push(Number(x.toFixed(5)), Number(y.toFixed(5)), s.p[(n - 1) * 3 + 2]);
       const ctx = inkCtx();
       if (ctx) drawSeg(ctx, s, s.p.length / 3 - 1, W, H);
@@ -649,9 +803,8 @@ export default function EcriturePage() {
     setPref('tool', t);
   };
 
-  const textOpacity = guideMode === 'signs' ? 0 : reveal ? 1 : hideGuide ? 0 : guide;
+  const textOpacity = copyOnly ? 0 : guideMode === 'signs' ? 0 : reveal ? 1 : hideGuide ? 0 : guide;
   const letterOpacity = reveal ? 1 : hideGuide ? 0 : guide;
-  const brushPx = Math.max(3, size * SIZE_UNIT * (zone?.width ?? 0) * (tool === 'erase' ? 3.2 : 1));
 
   const tb = (active: boolean) =>
     `h-10 min-w-10 px-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-35 ${
@@ -735,7 +888,8 @@ export default function EcriturePage() {
           .signs-word { white-space: nowrap; }
         `}</style>
 
-        {/* ---- Barre du HAUT : navigation, page, outils, couleurs, épaisseur ---- */}
+        {/* ---- Barre du HAUT : navigation, page, outils, couleurs, épaisseur, zoom ---- */}
+        {!barsHidden && (
         <div className="flex-none flex flex-wrap items-center gap-2 px-3 pt-2 pb-2 border-b border-[var(--ds-divider)]" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}>
           <Link href="/exercises" aria-label="Retour" className="h-10 w-10 rounded-full bg-[var(--ds-green)] text-white flex items-center justify-center flex-none">
             {ico(<path d="m15 18-6-6 6-6" />)}
@@ -770,15 +924,39 @@ export default function EcriturePage() {
           <div className="flex items-center gap-1.5">{colorButtons(26)}</div>
           {vline}
           {sizeControl}
+          {vline}
+          <div className="flex items-center gap-1">
+            <button className={tb(false)} onClick={() => zoomBy(1 / 1.25)} aria-label="Dézoomer">{ico(<><circle cx="11" cy="11" r="7" /><path d="M8 11h6" /><path d="m20 20-3.5-3.5" /></>)}</button>
+            <span className="text-[11px] font-bold tabular-nums text-[var(--ds-n600)] w-10 text-center">{Math.round(view.z * 100)} %</span>
+            <button className={tb(false)} onClick={() => zoomBy(1.25)} aria-label="Zoomer">{ico(<><circle cx="11" cy="11" r="7" /><path d="M8 11h6" /><path d="M11 8v6" /><path d="m20 20-3.5-3.5" /></>)}</button>
+            <button className={tb(false)} onClick={fitText}>Ajuster</button>
+          </div>
+          <button className={`${tb(false)} ml-auto`} onClick={() => setBarsHidden(true)} title="Masquer tous les réglages">
+            {ico(<><path d="m18 15-6-6-6 6" /></>)}Masquer réglages
+          </button>
         </div>
+        )}
 
         {/* ---- Page + zone d'écriture ---- */}
-        <div className="flex-1 min-h-0 flex items-center justify-center p-2 relative bg-[var(--ds-green-deep)]">
-          <div ref={boxRef} className="trace-guide relative h-full max-w-full" style={{ aspectRatio: '759 / 1080', ['--guide' as string]: String(textOpacity) }}>
+        <div
+          ref={viewportRef}
+          className="flex-1 min-h-0 relative overflow-hidden bg-[var(--ds-green-deep)]"
+          style={{ touchAction: 'none' }}
+          onPointerDown={onViewDown}
+          onPointerMove={onViewMove}
+          onPointerUp={onViewUp}
+          onPointerCancel={onViewUp}
+        >
+          <div
+            ref={stageRef}
+            className="absolute left-0 top-0"
+            style={{ width: base.w, height: base.h, transformOrigin: '0 0', transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
+          >
+          <div ref={boxRef} className="trace-guide relative w-full h-full" style={{ ['--guide' as string]: String(textOpacity) }}>
             <MushafPage pageNumber={page} pageVerses={verses} loading={!verses} />
             {zone && (
               <>
-                {guideMode === 'signs' && (
+                {guideMode === 'signs' && !copyOnly && (
                   <div
                     className="absolute z-[15] pointer-events-none"
                     style={{ left: zone.left, top: zone.top, width: zone.width, height: zone.height, ['--signs-size' as string]: `${(zone.height / lineCount) * 0.52}px` }}
@@ -807,34 +985,33 @@ export default function EcriturePage() {
                   onPointerMove={onMove}
                   onPointerUp={onUp}
                   onPointerCancel={onUp}
-                  onPointerLeave={(e) => {
-                    if (e.pointerType !== 'touch' && hoverRef.current) hoverRef.current.style.display = 'none';
-                  }}
-                />
-                {/* Aperçu du pinceau au survol : déplacé sans re-rendu (fluidité). */}
-                <span
-                  ref={hoverRef}
-                  aria-hidden
-                  className="absolute z-30 rounded-full pointer-events-none"
-                  style={{
-                    display: 'none',
-                    left: zone.left,
-                    top: zone.top,
-                    width: brushPx,
-                    height: brushPx,
-                    border: `1.5px solid ${tool === 'erase' ? '#6b7280' : color}`,
-                    background: tool === 'erase' ? 'rgba(255,255,255,0.4)' : 'transparent',
-                  }}
                 />
               </>
             )}
           </div>
+          </div>
+          {/* Réglages masqués : rappel discret + zoom */}
+          {barsHidden && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 bg-white/90 backdrop-blur rounded-full shadow-lg px-1.5 py-1" style={{ marginTop: 'env(safe-area-inset-top)' }}>
+              <button className="h-9 px-3 rounded-full text-[12px] font-bold text-[var(--ds-green)]" onClick={() => setBarsHidden(false)}>Réglages</button>
+              <button
+                className={`h-9 px-3 rounded-full text-[12px] font-bold ${copyOnly ? 'bg-[var(--ds-green)] text-white' : 'text-[var(--ds-green)]'}`}
+                onClick={() => setCopyOnly((v) => !v)}
+              >
+                {copyOnly ? 'Ma copie' : 'Modèle'}
+              </button>
+              <button className="h-9 w-9 rounded-full text-[var(--ds-green)] text-lg font-bold" onClick={() => zoomBy(1 / 1.25)} aria-label="Dézoomer">−</button>
+              <button className="h-9 w-9 rounded-full text-[var(--ds-green)] text-lg font-bold" onClick={() => zoomBy(1.25)} aria-label="Zoomer">+</button>
+              <button className="h-9 px-3 rounded-full text-[12px] font-bold text-[var(--ds-green)]" onClick={fitText}>Ajuster</button>
+            </div>
+          )}
           {toast && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full bg-[var(--ds-green)] text-white text-[13px] font-bold shadow-lg pointer-events-none">{toast}</div>
           )}
         </div>
 
         {/* ---- Barre du BAS : historique, modèle, guidage, stylet seul ---- */}
+        {!barsHidden && (
         <div className="flex-none flex flex-wrap items-center gap-2 px-3 pt-2 border-t border-[var(--ds-divider)]" style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
           <button className={tb(false)} onClick={undo} disabled={!undoStack.length} title="Annuler">{ico(<><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></>)}</button>
           <button className={tb(false)} onClick={redo} disabled={!redoStack.length} title="Rétablir">{ico(<><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h3" /></>)}</button>
@@ -847,6 +1024,9 @@ export default function EcriturePage() {
             </span>
           )}
           {vline}
+          <button className={tb(copyOnly)} onClick={() => setCopyOnly((v) => !v)} title="Retirer le modèle pour relire ton écriture">
+            {ico(<><path d="M12 3 3 8l9 5 9-5-9-5Z" /><path d="m3 13 9 5 9-5" /></>)}{copyOnly ? 'Ma copie' : 'Modèle'}
+          </button>
           <button className={tb(guideMode === 'text')} onClick={() => setPref('guideMode', 'text')}>Texte</button>
           <button className={tb(guideMode === 'signs')} onClick={() => setPref('guideMode', 'signs')}>Signes</button>
           <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--ds-n600)]">
@@ -871,8 +1051,9 @@ export default function EcriturePage() {
             </button>
           ))}
           {vline}
-          <button className={tb(penOnly)} onClick={() => setPref('penOnly', !penOnly)} title="Ignorer les doigts et la paume">Stylet seul</button>
+          <button className={tb(penOnly)} onClick={() => setPref('penOnly', !penOnly)} title="Ignorer les doigts et la paume (les doigts déplacent la page)">Stylet seul</button>
         </div>
+        )}
 
         {/* ---- Palette rapide : double toucher / pression du Pencil ---- */}
         {palette && (
