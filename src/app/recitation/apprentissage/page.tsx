@@ -222,6 +222,27 @@ export default function ApprentissagePage() {
               </section>
             )}
 
+            {/* Activation : couper la séance sans perdre la sourate ni sa progression */}
+            <section className="ds-card p-5">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-extrabold">
+                  Réviser cette sourate chaque jour
+                  <span className="block text-[12px] font-normal text-[var(--ds-n600)]">
+                    {config.enabled === false
+                      ? 'Désactivé : aucune séance ni rappel, votre progression est conservée.'
+                      : 'Une séance dédiée est ajoutée à votre journée.'}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={config.enabled !== false}
+                  onChange={(e) => persist({ ...config, enabled: e.target.checked })}
+                  className="w-5 h-5 accent-[var(--ds-gold)] flex-none ml-3"
+                />
+              </label>
+            </section>
+
+            {config.enabled !== false && (<>
             {/* Séance du jour */}
             <section className="ds-card p-5">
               <p className="text-sm font-extrabold mb-1">Votre séance d’aujourd’hui</p>
@@ -358,13 +379,14 @@ export default function ApprentissagePage() {
                 </div>
               )}
             </section>
+            </>)}
 
             <button
               type="button"
               onClick={() => persist(null)}
               className="ds-btn-ghost px-5 py-3 text-sm self-start"
             >
-              Arrêter la séance quotidienne
+              Retirer la sourate en cours
             </button>
           </>
         )}

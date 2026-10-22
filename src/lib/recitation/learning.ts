@@ -96,7 +96,7 @@ export function buildLearningSlot(
   programCreatedAt: string,
   todayKey: string
 ): PlannedSlot | null {
-  if (!config) return null;
+  if (!config || config.enabled === false) return null;
   const pages = learningPagesForDay(config, learningDayIndex(programCreatedAt, todayKey));
   const slot = learningSlot(config, schedule, pages.length);
   if (!slot || !pages.length) return null;

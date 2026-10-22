@@ -142,6 +142,12 @@ export interface LearningConfig {
    * null = tout réciter chaque jour.
    */
   dailyCap: number | null;
+  /**
+   * Révision quotidienne active. false = la sourate et sa progression sont
+   * conservées mais aucune séance n'est planifiée (ni notification, ni widget).
+   * Absent = active (compatibilité des programmes déjà enregistrés).
+   */
+  enabled?: boolean;
 }
 
 export interface Program {
