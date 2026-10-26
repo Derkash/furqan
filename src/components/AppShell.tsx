@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { computeHomeStats } from '@/utils/homeStats';
 import OrientationControl from '@/components/OrientationControl';
+import { isTafsirUser } from '@/utils/tafsir/tafsirData';
 
 /**
  * Coque de l'app (design Application2).
@@ -25,6 +26,7 @@ type IconName =
   | 'progression'
   | 'downloads'
   | 'ecoute'
+  | 'tafsir'
   | 'ecriture';
 
 function Icon({ name }: { name: IconName }) {
@@ -82,6 +84,16 @@ function Icon({ name }: { name: IconName }) {
           <rect x="17" y="14" width="4" height="6" rx="1.5" />
         </svg>
       );
+    case 'tafsir':
+      // Livre ouvert + ondes sonores : l'explication écoutée.
+      return (
+        <svg {...common}>
+          <path d="M2 6.5c2.5-1 5-1 7 .5v12c-2-1.5-4.5-1.5-7-.5z" />
+          <path d="M9 7c1.2-.9 2.6-1.3 4-1.3" />
+          <path d="M16 8.5a4 4 0 0 1 0 7" />
+          <path d="M19 6a7.5 7.5 0 0 1 0 12" />
+        </svg>
+      );
     case 'vocab':
       return (
         <svg {...common}>
@@ -125,11 +137,12 @@ function Icon({ name }: { name: IconName }) {
 }
 
 // Le logo Muraja3a (en haut) sert d'Accueil — pas d'entrée « Accueil » dédiée.
-const NAV: { href: string; label: string; icon: IconName; match: (p: string) => boolean }[] = [
+const NAV: { href: string; label: string; icon: IconName; match: (p: string) => boolean; ownerOnly?: boolean }[] = [
   { href: '/revision', label: 'Révision', icon: 'revision', match: (p) => p.startsWith('/revision') || /^\/exercises\/(?!lecture)[a-z-]+\//.test(p) },
   { href: '/recitation', label: 'Récitation', icon: 'recitation', match: (p) => p.startsWith('/recitation') },
   { href: '/exercises/lecture/practice', label: 'Lecture', icon: 'lecture', match: (p) => p.startsWith('/exercises/lecture') },
   { href: '/ecoute', label: 'Écoute', icon: 'ecoute', match: (p) => p.startsWith('/ecoute') },
+  { href: '/tafsir', label: 'Tafsir', icon: 'tafsir', match: (p) => p.startsWith('/tafsir'), ownerOnly: true },
   { href: '/ecriture', label: 'Écriture', icon: 'ecriture', match: (p) => p.startsWith('/ecriture') },
   { href: '/vocab', label: 'Vocabulaire', icon: 'vocab', match: (p) => p.startsWith('/vocab') },
   { href: '/reperes', label: 'Repères', icon: 'reperes', match: (p) => p.startsWith('/reperes') },
@@ -137,6 +150,17 @@ const NAV: { href: string; label: string; icon: IconName; match: (p: string) => 
   { href: '/dashboard', label: 'Progression', icon: 'progression', match: (p) => p.startsWith('/dashboard') },
   { href: '/telechargements', label: 'Audio', icon: 'downloads', match: (p) => p.startsWith('/telechargements') },
 ];
+
+/** Entrées du menu visibles pour le compte connecté (tafsir : propriétaire seul). */
+function useNavItems() {
+  const [owner, setOwner] = useState(false);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setOwner(isTafsirUser());
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  return NAV.filter((item) => !item.ownerOnly || owner);
+}
 
 function NavItem({
   item,
@@ -163,6 +187,7 @@ function NavItem({
 /** Barre de pilotage verticale (≥ md) — partagée hub / exercices. */
 export function Sidebar() {
   const pathname = usePathname() ?? '';
+  const navItems = useNavItems();
   const [streak, setStreak] = useState(0);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -187,7 +212,7 @@ export function Sidebar() {
         <span className="text-[8px] font-extrabold tracking-[0.22em] text-[var(--ds-n600)]">MURAJA3A</span>
       </Link>
       <nav className="flex flex-col items-center gap-1.5 flex-1">
-        {NAV.map((item) => (
+        {navItems.map((item) => (
           <NavItem key={item.href} item={item} active={item.match(pathname)} />
         ))}
       </nav>
@@ -206,9 +231,10 @@ export function Sidebar() {
 /** Barre horizontale (petit écran) — hub uniquement. */
 function MobileNav() {
   const pathname = usePathname() ?? '';
+  const navItems = useNavItems();
   return (
     <nav className="md:hidden sticky top-0 z-30 flex items-center gap-1 overflow-x-auto bg-white/95 backdrop-blur border-b border-[var(--ds-divider)] px-2 py-1.5 app-topbar-safe">
-      {NAV.map((item) => (
+      {navItems.map((item) => (
         <NavItem key={item.href} item={item} active={item.match(pathname)} compact />
       ))}
     </nav>

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
-import { loadHizbQuarters, unitToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
-import { fromGlobalAyahNumber, toGlobalAyahNumber } from '@/utils/ayahMapping';
+import { loadHizbQuarters, rangeToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
+import { fromGlobalAyahNumber } from '@/utils/ayahMapping';
 import { getVersePageMap, getVerseText } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
@@ -96,26 +96,10 @@ export default function EcoutePage() {
   }, [currentGlobal]);
 
   // Bornes au verset près de la plage choisie.
-  const bounds = useMemo(() => {
-    const { mode, start, end } = range;
-    if (start == null || end == null) return null;
-    if (mode === 'page') {
-      if (!versePage) return null;
-      const lo = Math.min(start, end);
-      const hi = Math.max(start, end);
-      let a = Infinity;
-      let b = -Infinity;
-      for (const [vk, p] of Object.entries(versePage)) {
-        if (p < lo || p > hi) continue;
-        const [s, v] = vk.split(':').map(Number);
-        const g = toGlobalAyahNumber(s, v);
-        if (g < a) a = g;
-        if (g > b) b = g;
-      }
-      return Number.isFinite(a) ? { startGlobal: a, endGlobal: b } : null;
-    }
-    return unitToGlobalBounds(mode, start, end, quarters);
-  }, [range, quarters, versePage]);
+  const bounds = useMemo(
+    () => rangeToGlobalBounds(range.mode, range.start, range.end, quarters, versePage),
+    [range, quarters, versePage]
+  );
 
   const chapterName = (surah: number) =>
     units?.chapters.find((c) => c.id === surah)?.name_simple ?? `Sourate ${surah}`;

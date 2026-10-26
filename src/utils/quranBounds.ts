@@ -85,3 +85,31 @@ export function inGlobalBounds(globalNumber: number, bounds: GlobalBounds | null
   if (!bounds) return true;
   return globalNumber >= bounds.startGlobal && globalNumber <= bounds.endGlobal;
 }
+
+/**
+ * Bornes au verset près d'une plage, tous modes confondus : le mode page passe
+ * par la carte verset → page (getVersePageMap), les autres par unitToGlobalBounds.
+ */
+export function rangeToGlobalBounds(
+  mode: RangeMode,
+  start: number | null,
+  end: number | null,
+  quarters: HizbQuarter[] | null,
+  versePage: Record<string, number> | null
+): GlobalBounds | null {
+  if (start == null || end == null) return null;
+  if (mode !== 'page') return unitToGlobalBounds(mode, start, end, quarters);
+  if (!versePage) return null;
+  const lo = Math.min(start, end);
+  const hi = Math.max(start, end);
+  let a = Infinity;
+  let b = -Infinity;
+  for (const [vk, p] of Object.entries(versePage)) {
+    if (p < lo || p > hi) continue;
+    const [s, v] = vk.split(':').map(Number);
+    const g = SURAH_START_AYAH[s] + v - 1;
+    if (g < a) a = g;
+    if (g > b) b = g;
+  }
+  return Number.isFinite(a) ? { startGlobal: a, endGlobal: b } : null;
+}

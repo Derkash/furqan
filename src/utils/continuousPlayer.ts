@@ -199,9 +199,15 @@ function onError() {
   }
 }
 
+// Le tafsir audio (utils/tafsir/tafsirPlayer) se met en pause à ce signal.
+function announceFocus() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('almuraja3a:ecoute-start'));
+}
+
 /** Lance une session du verset `start` au verset `end` (n° globaux). */
 export function startPlayer(start: number, end: number, rate: number, from?: number) {
   ensureElements();
+  announceFocus();
   bindMediaHandlers();
   retries = 0;
   const lo = Math.min(start, end);
@@ -222,6 +228,7 @@ export function resumePlayer() {
     playVerse(state.current);
     return;
   }
+  announceFocus();
   main.playbackRate = state.rate;
   main.play().catch(() => {});
 }
