@@ -19,6 +19,7 @@ export interface TafsirItem {
   to: number;
   whole?: boolean; // sourate entière en un seul fichier
   kind?: 'intro';
+  lesson?: number; // cours numérotés (An-Nisa) : plusieurs leçons sur les mêmes versets
   dur: number; // secondes
   path: string;
 }

@@ -52,6 +52,16 @@ function collect() {
     if (!m) throw new Error(`Nom inattendu : ${f}`);
     items.push({ source: `03-Al Imrân/${f}`, surah: 3, from: +m[1], to: +(m[2] ?? m[1]) });
   }
+  // An-Nisa (cours du Cheikh Al-Fawzan) : les noms ne donnent pas les versets,
+  // relevés à la transcription des débuts/fins de leçon → nisa-verses.json.
+  if (fs.existsSync(path.join(src, '04-An nissa'))) {
+    const verses = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/tafsir/nisa-verses.json'), 'utf8'));
+    for (const f of listMp3('04-An nissa')) {
+      const r = verses[f.slice(0, 2)];
+      if (!r) throw new Error(`Versets inconnus pour ${f} (nisa-verses.json)`);
+      items.push({ source: `04-An nissa/${f}`, surah: 4, from: r[0], to: r[1], lesson: +f.slice(0, 2) });
+    }
+  }
   for (const f of listMp3('Juz-30')) {
     const n = +f.match(/^(\d+)/)[1];
     if (n === 1) {
@@ -74,6 +84,8 @@ async function duration(file) {
 function remotePath(it) {
   if (it.kind === 'intro') return `${pad(it.surah)}/intro.m4a`;
   if (it.whole) return `${pad(it.surah)}/all.m4a`;
+  // Leçons : deux leçons peuvent commenter le même verset (fin/début) → n° de leçon dans le nom.
+  if (it.lesson) return `${pad(it.surah)}/L${String(it.lesson).padStart(2, '0')}_${pad(it.from)}-${pad(it.to)}.m4a`;
   return `${pad(it.surah)}/${pad(it.from)}-${pad(it.to)}.m4a`;
 }
 
@@ -111,7 +123,7 @@ await pool(items, Math.max(2, os.cpus().length - 2), async (it) => {
 const order = (it) => {
   // Ordre du mushaf ; l'introduction du Juz 'Amma avant An-Naba.
   if (it.kind === 'intro') return 78 * 1000 - 1;
-  return it.surah * 1000 + it.from;
+  return it.surah * 1000 + (it.lesson ? it.lesson / 100 : it.from);
 };
 items.sort((a, b) => order(a) - order(b));
 
@@ -125,6 +137,7 @@ const manifest = {
     to: it.to,
     ...(it.whole ? { whole: true } : {}),
     ...(it.kind ? { kind: it.kind } : {}),
+    ...(it.lesson ? { lesson: it.lesson } : {}),
     dur: it.dur,
     path: it.path,
   })),

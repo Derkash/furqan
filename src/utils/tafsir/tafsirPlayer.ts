@@ -121,7 +121,8 @@ function itemTitle(it: TafsirItem): string {
   const name = surahNames[it.surah] ?? `Sourate ${it.surah}`;
   if (it.kind === 'intro') return "Introduction au Juz 'Amma";
   if (it.whole) return `${name} (sourate entière)`;
-  return it.from === it.to ? `${name} — verset ${it.from}` : `${name} — versets ${it.from} à ${it.to}`;
+  const head = it.lesson ? `${name} — leçon ${it.lesson}` : name;
+  return it.from === it.to ? `${head} — verset ${it.from}` : `${head} — versets ${it.from} à ${it.to}`;
 }
 
 function updateMediaSession() {

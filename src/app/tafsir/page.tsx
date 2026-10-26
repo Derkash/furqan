@@ -219,7 +219,8 @@ export default function TafsirPage() {
   const verseRangeLabel = (it: TafsirItem) => {
     if (it.kind === 'intro') return "Introduction au Juz 'Amma";
     if (it.whole) return 'Sourate entière';
-    return it.from === it.to ? `Verset ${it.from}` : `Versets ${it.from} → ${it.to}`;
+    const v = it.from === it.to ? `Verset ${it.from}` : `Versets ${it.from} → ${it.to}`;
+    return it.lesson ? `Leçon ${it.lesson} · ${v.toLowerCase()}` : v;
   };
 
   const statusText = (it: TafsirItem) => {
@@ -249,7 +250,9 @@ export default function TafsirPage() {
         <StatusDot status={st} />
         <button onClick={onPlay} className="flex-1 min-w-0 text-left">
           <span className="block text-sm font-semibold text-[var(--ds-text)] truncate">
-            {it.kind || it.whole ? chapterName(it.surah) : `${chapterName(it.surah)} · ${it.from === it.to ? it.from : `${it.from}–${it.to}`}`}
+            {it.kind || it.whole
+              ? chapterName(it.surah)
+              : `${chapterName(it.surah)}${it.lesson ? ` · leçon ${it.lesson}` : ''} · ${it.from === it.to ? it.from : `${it.from}–${it.to}`}`}
             {it.kind === 'intro' && ' · introduction'}
           </span>
           <span className="block text-[11px] text-[var(--ds-n500)] tabular-nums">
@@ -563,8 +566,9 @@ export default function TafsirPage() {
           {[
             { key: 2, title: 'Al-Baqarah', list: items.filter((i) => i.surah === 2) },
             { key: 3, title: 'Al Imran', list: items.filter((i) => i.surah === 3) },
+            { key: 4, title: 'An-Nisa', list: items.filter((i) => i.surah === 4) },
             { key: 30, title: "Juz 'Amma + Al-Fatiha", list: items.filter((i) => i.surah === 1 || i.surah >= 78) },
-          ].map(({ key, title, list }) => {
+          ].filter((g) => g.list.length > 0).map(({ key, title, list }) => {
             const done = list.filter((it) => progress.files[it.id]?.done).length;
             const total = list.reduce((s, it) => s + it.dur, 0);
             const open = openSurah === key;
