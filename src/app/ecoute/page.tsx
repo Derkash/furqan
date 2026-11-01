@@ -77,11 +77,21 @@ function PauseIcon() {
 }
 function LoopIcon() {
   return (
-    <svg {...ICON} className="w-7 h-7">
+    <svg {...ICON} className="w-4 h-4">
       <path d="M17 2l4 4-4 4" />
       <path d="M3 12V10a4 4 0 014-4h14" />
       <path d="M7 22l-4-4 4-4" />
       <path d="M21 12v2a4 4 0 01-4 4H3" />
+    </svg>
+  );
+}
+
+function PageIcon() {
+  return (
+    <svg {...ICON} className="w-4 h-4">
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 12h6M9 16h6" />
     </svg>
   );
 }
@@ -195,6 +205,49 @@ export default function EcoutePage() {
     };
   }, [currentGlobal]);
 
+  const cur = player.current != null ? fromGlobalAyahNumber(player.current) : null;
+
+  // Pour chaque page du mushaf : premier et dernier verset (n° global).
+  const pageBounds = useMemo(() => {
+    const m = new Map<number, { lo: number; hi: number }>();
+    if (!versePage) return m;
+    for (const [key, page] of Object.entries(versePage)) {
+      const [su, ve] = key.split(':').map(Number);
+      if (!su || !ve) continue;
+      const g = toGlobalAyahNumber(su, ve);
+      const b = m.get(page);
+      if (!b) m.set(page, { lo: g, hi: g });
+      else {
+        if (g < b.lo) b.lo = g;
+        if (g > b.hi) b.hi = g;
+      }
+    }
+    return m;
+  }, [versePage]);
+  const curPage = cur && versePage ? versePage[`${cur.surah}:${cur.verse}`] : undefined;
+  const curPageBounds = curPage != null ? pageBounds.get(curPage) : undefined;
+
+  // Boucle page : si l'on change de page (saut, verset suivant…), la boucle suit la page en cours.
+  useEffect(() => {
+    if (player.loop !== 'page' || !curPageBounds) return;
+    const lo = Math.max(player.start, curPageBounds.lo);
+    const hi = Math.min(player.end, curPageBounds.hi);
+    if (lo !== player.loopLo || hi !== player.loopHi) setPlayerLoop('page', lo, hi);
+  }, [player.loop, player.loopLo, player.loopHi, player.start, player.end, curPageBounds]);
+
+  const toggleLoop = (mode: 'verse' | 'page') => {
+    if (player.loop === mode) {
+      setPlayerLoop('off');
+      return;
+    }
+    if (mode === 'page') {
+      if (!curPageBounds) return;
+      setPlayerLoop('page', Math.max(player.start, curPageBounds.lo), Math.min(player.end, curPageBounds.hi));
+    } else {
+      setPlayerLoop('verse');
+    }
+  };
+
   // Bornes au verset près de la plage choisie.
   const bounds = useMemo(
     () => rangeToGlobalBounds(range.mode, range.start, range.end, quarters, versePage),
@@ -225,7 +278,6 @@ export default function EcoutePage() {
     if (player.active) setPlayerRate(r);
   };
 
-  const cur = player.current != null ? fromGlobalAyahNumber(player.current) : null;
 
   // Sourates couvertes par la session et bornes de versets pour la sourate choisie.
   const sessStart = fromGlobalAyahNumber(player.start);
@@ -271,7 +323,7 @@ export default function EcoutePage() {
               </p>
               <span className="text-[11px] text-[var(--ds-n500)] tabular-nums">
                 {player.loading ? 'chargement…' : player.playing ? 'en lecture' : 'en pause'}
-                {player.loop ? ' · en boucle' : ''}
+                {player.loop === 'verse' ? ' · boucle verset' : player.loop === 'page' && curPage != null ? ` · boucle page ${curPage}` : ''}
               </span>
             </div>
             <p className="text-[11px] text-[var(--ds-n500)] mb-3">
@@ -370,13 +422,36 @@ export default function EcoutePage() {
               <RoundButton onClick={() => skip(1)} label="Verset suivant">
                 <NextIcon />
               </RoundButton>
-              <RoundButton
-                onClick={() => setPlayerLoop(!player.loop)}
-                label={player.loop ? 'Arrêter la boucle sur ce verset' : 'Répéter ce verset en boucle'}
-                pressed={player.loop}
+            </div>
+            {/* Répétition : verset en cours ou page du mushaf en cours */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="ds-kicker">Répéter</span>
+              <button
+                onClick={() => toggleLoop('verse')}
+                aria-pressed={player.loop === 'verse'}
+                className={`h-10 px-4 rounded-full border-2 flex items-center gap-1.5 text-sm font-bold active:scale-95 transition-all ${
+                  player.loop === 'verse'
+                    ? 'bg-[var(--ds-green)] border-[var(--ds-green)] text-white'
+                    : 'border-[var(--ds-gold)]/40 text-[var(--ds-green)]'
+                }`}
               >
                 <LoopIcon />
-              </RoundButton>
+                Verset
+              </button>
+              <button
+                onClick={() => toggleLoop('page')}
+                disabled={!curPageBounds}
+                aria-pressed={player.loop === 'page'}
+                className={`h-10 px-4 rounded-full border-2 flex items-center gap-1.5 text-sm font-bold active:scale-95 transition-all disabled:opacity-40 ${
+                  player.loop === 'page'
+                    ? 'bg-[var(--ds-green)] border-[var(--ds-green)] text-white'
+                    : 'border-[var(--ds-gold)]/40 text-[var(--ds-green)]'
+                }`}
+              >
+                <LoopIcon />
+                <PageIcon />
+                Page{curPage != null ? ` ${curPage}` : ''}
+              </button>
             </div>
             {verseText && (
               <div className="mb-3">

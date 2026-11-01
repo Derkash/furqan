@@ -16,6 +16,8 @@
 import { fromGlobalAyahNumber } from '@/utils/ayahMapping';
 import { getLocalAudioUrl, remoteAudioUrl } from '@/utils/audioStore';
 
+export type LoopMode = 'off' | 'verse' | 'page';
+
 export interface PlayerState {
   active: boolean; // une session existe (en lecture ou en pause)
   playing: boolean;
@@ -24,7 +26,9 @@ export interface PlayerState {
   start: number;
   end: number;
   rate: number;
-  loop: boolean; // répète le verset en cours jusqu'à désactivation
+  loop: LoopMode; // 'verse' = répète le verset ; 'page' = répète la plage loopLo..loopHi
+  loopLo: number;
+  loopHi: number;
   error: string | null;
 }
 
@@ -40,7 +44,9 @@ let state: PlayerState = {
   start: 1,
   end: 1,
   rate: 1,
-  loop: false,
+  loop: 'off',
+  loopLo: 1,
+  loopHi: 1,
   error: null,
 };
 const listeners = new Set<Listener>();
@@ -157,7 +163,7 @@ function playVerse(n: number) {
   emit({ current: n, loading: true, error: null });
   main.src = urlFor(n);
   main.playbackRate = state.rate;
-  main.loop = state.loop;
+  main.loop = state.loop === 'verse';
   main.play().catch(() => {
     /* l'erreur éventuelle passe par l'événement 'error' */
   });
@@ -175,8 +181,13 @@ function onEnded() {
   if (n == null) return;
   // Boucle sur le verset : normalement gérée nativement (main.loop), ceci
   // couvre les cas où l'élément émet quand même 'ended'.
-  if (state.loop) {
+  if (state.loop === 'verse') {
     playVerse(n);
+    return;
+  }
+  // Boucle sur la page : fin de page → retour au premier verset de la page.
+  if (state.loop === 'page') {
+    playVerse(n + 1 > state.loopHi ? state.loopLo : n + 1);
     return;
   }
   if (n + 1 > state.end) {
@@ -257,10 +268,15 @@ export function setPlayerRate(rate: number) {
   if (state.current != null) saveLast(state.current);
 }
 
-/** Active / désactive la répétition en boucle du verset en cours. */
-export function setPlayerLoop(loop: boolean) {
-  emit({ loop });
-  if (main) main.loop = loop;
+/** Mode de répétition : 'off', 'verse' (verset en cours) ou 'page' (plage lo..hi, bornée à la session). */
+export function setPlayerLoop(loop: LoopMode, lo?: number, hi?: number) {
+  const patch: Partial<PlayerState> = { loop };
+  if (loop === 'page' && lo != null && hi != null) {
+    patch.loopLo = Math.max(state.start, Math.min(lo, hi));
+    patch.loopHi = Math.min(state.end, Math.max(lo, hi));
+  }
+  emit(patch);
+  if (main) main.loop = loop === 'verse';
 }
 
 /** Verset suivant (+1) ou précédent (-1), borné à la session. */
