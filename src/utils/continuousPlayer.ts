@@ -29,6 +29,8 @@ export interface PlayerState {
   loop: LoopMode; // 'verse' = répète le verset ; 'page' = répète la plage loopLo..loopHi
   loopLo: number;
   loopHi: number;
+  repeats: number; // chaque verset est lu N fois avant de passer au suivant
+  repeatIndex: number; // lecture en cours du verset (0-based)
   error: string | null;
 }
 
@@ -47,12 +49,16 @@ let state: PlayerState = {
   loop: 'off',
   loopLo: 1,
   loopHi: 1,
+  repeats: 1,
+  repeatIndex: 0,
   error: null,
 };
 const listeners = new Set<Listener>();
 let main: HTMLAudioElement | null = null;
 let preloader: HTMLAudioElement | null = null;
 let retries = 0;
+let repeatIdx = 0; // n° de la lecture en cours du verset courant
+let lastPlayed: number | null = null;
 let surahNames: Record<number, string> = {};
 
 function emit(patch: Partial<PlayerState>) {
@@ -160,7 +166,11 @@ function bindMediaHandlers() {
 function playVerse(n: number) {
   ensureElements();
   if (!main) return;
-  emit({ current: n, loading: true, error: null });
+  if (n !== lastPlayed) {
+    repeatIdx = 0;
+    lastPlayed = n;
+  }
+  emit({ current: n, loading: true, error: null, repeatIndex: repeatIdx });
   main.src = urlFor(n);
   main.playbackRate = state.rate;
   main.loop = state.loop === 'verse';
@@ -182,6 +192,12 @@ function onEnded() {
   // Boucle sur le verset : normalement gérée nativement (main.loop), ceci
   // couvre les cas où l'élément émet quand même 'ended'.
   if (state.loop === 'verse') {
+    playVerse(n);
+    return;
+  }
+  // Lecture multiple : on rejoue le même verset tant que le quota n'est pas atteint.
+  if (state.repeats > 1 && repeatIdx + 1 < state.repeats) {
+    repeatIdx++;
     playVerse(n);
     return;
   }
@@ -230,6 +246,8 @@ export function startPlayer(start: number, end: number, rate: number, from?: num
   announceFocus();
   bindMediaHandlers();
   retries = 0;
+  repeatIdx = 0;
+  lastPlayed = null;
   const lo = Math.min(start, end);
   const hi = Math.max(start, end);
   emit({ active: true, start: lo, end: hi, rate, error: null });
@@ -266,6 +284,12 @@ export function setPlayerRate(rate: number) {
   emit({ rate });
   if (main) main.playbackRate = rate;
   if (state.current != null) saveLast(state.current);
+}
+
+/** Nombre de lectures de chaque verset (1 = lecture simple). S'applique aussi à la session en cours. */
+export function setPlayerRepeats(n: number) {
+  const repeats = Math.max(1, Math.min(99, Math.round(n) || 1));
+  emit({ repeats });
 }
 
 /** Mode de répétition : 'off', 'verse' (verset en cours) ou 'page' (plage lo..hi, bornée à la session). */

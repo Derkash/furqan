@@ -16,6 +16,7 @@ import {
   seekPlayer,
   setPlayerLoop,
   setPlayerRate,
+  setPlayerRepeats,
   setSurahNames,
   skip,
   startPlayer,
@@ -31,6 +32,7 @@ import {
  */
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+const REPEATS = [1, 2, 3, 5];
 const PREFS_KEY = 'almuraja3a:ecoute-prefs';
 
 function fmtRate(s: number) {
@@ -128,6 +130,8 @@ export default function EcoutePage() {
   const [player, setPlayer] = useState<PlayerState>(getPlayerState());
   const [range, setRange] = useState<RangePickerValue>({ mode: 'surah', start: null, end: null });
   const [rate, setRate] = useState(1);
+  const [repeats, setRepeats] = useState(1);
+  const [repeatsInput, setRepeatsInput] = useState('');
   const [quarters, setQuarters] = useState<HizbQuarter[] | null>(null);
   const [versePage, setVersePage] = useState<Record<string, number> | null>(null);
   const [verseText, setVerseText] = useState('');
@@ -167,6 +171,7 @@ export default function EcoutePage() {
         const p = JSON.parse(raw);
         if (p.range) setRange(p.range);
         if (p.rate) setRate(p.rate);
+        if (p.repeats) setRepeats(p.repeats);
       }
     } catch {
       /* préférences illisibles */
@@ -179,11 +184,16 @@ export default function EcoutePage() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ range, rate }));
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ range, rate, repeats }));
     } catch {
       /* stockage indisponible */
     }
-  }, [range, rate]);
+  }, [range, rate, repeats]);
+
+  // Le moteur est un singleton : le nombre de lectures par verset le suit en permanence.
+  useEffect(() => {
+    setPlayerRepeats(repeats);
+  }, [repeats]);
 
   // Noms de sourates pour l'écran verrouillé.
   useEffect(() => {
@@ -323,6 +333,7 @@ export default function EcoutePage() {
               </p>
               <span className="text-[11px] text-[var(--ds-n500)] tabular-nums">
                 {player.loading ? 'chargement…' : player.playing ? 'en lecture' : 'en pause'}
+                {player.repeats > 1 && player.loop !== 'verse' ? ` ${player.repeatIndex + 1}/${player.repeats}` : ''}
                 {player.loop === 'verse' ? ' · boucle verset' : player.loop === 'page' && curPage != null ? ` · boucle page ${curPage}` : ''}
               </span>
             </div>
@@ -505,6 +516,45 @@ export default function EcoutePage() {
               </button>
             ))}
           </div>
+          <p className="ds-kicker mt-4 mb-2">Lectures par verset</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {REPEATS.map((n) => (
+              <button
+                key={n}
+                onClick={() => {
+                  setRepeats(n);
+                  setRepeatsInput('');
+                }}
+                className={`px-3 py-1.5 rounded-full text-sm font-bold tabular-nums transition-colors ${
+                  repeats === n ? 'bg-[var(--ds-green)] text-white' : 'bg-[var(--ds-sage-100)] text-[var(--ds-green)]'
+                }`}
+              >
+                ×{n}
+              </button>
+            ))}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={99}
+              value={repeatsInput || (REPEATS.includes(repeats) ? '' : String(repeats))}
+              onChange={(e) => {
+                setRepeatsInput(e.target.value);
+                const v = parseInt(e.target.value, 10);
+                if (v >= 1 && v <= 99) setRepeats(v);
+              }}
+              placeholder="autre"
+              aria-label="Nombre de lectures par verset"
+              className={`w-20 h-9 px-3 rounded-full border-2 text-sm font-bold tabular-nums text-center placeholder:font-normal ${
+                !REPEATS.includes(repeats)
+                  ? 'bg-[var(--ds-green)] border-[var(--ds-green)] text-white placeholder:text-white/70'
+                  : 'border-[var(--ds-gold)]/40 text-[var(--ds-green)] placeholder:text-[var(--ds-n500)]'
+              }`}
+            />
+          </div>
+          <p className="text-xs text-[var(--ds-n600)] mt-2">
+            Chaque verset de la plage est lu {repeats > 1 ? `${repeats} fois` : 'une fois'} avant de passer au suivant.
+          </p>
         </section>
 
         {/* Nouvelle session */}
