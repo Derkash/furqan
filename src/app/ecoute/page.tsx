@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadHizbQuarters, rangeToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
 import { fromGlobalAyahNumber, toGlobalAyahNumber } from '@/utils/ayahMapping';
-import { getVersePageMap, getVerseText } from '@/utils/vocab/morphology';
+import { getVersePageMap } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
   getPlayerState,
@@ -134,12 +134,8 @@ export default function EcoutePage() {
   const [repeatsInput, setRepeatsInput] = useState('');
   const [quarters, setQuarters] = useState<HizbQuarter[] | null>(null);
   const [versePage, setVersePage] = useState<Record<string, number> | null>(null);
-  const [verseText, setVerseText] = useState('');
   const [last, setLast] = useState<ReturnType<typeof loadLast>>(null);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [clamped, setClamped] = useState(false);
-  const textRef = useRef<HTMLParagraphElement>(null);
   // « Aller au verset » : sourate choisie + numéro saisi, bornés à la plage de la session.
   const [gotoSurah, setGotoSurah] = useState<number | null>(null);
   const [gotoVerse, setGotoVerse] = useState('');
@@ -156,12 +152,6 @@ export default function EcoutePage() {
   }, [player.start, player.end]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Le texte dépasse-t-il 2 lignes ? (pour n'afficher « Voir plus » qu'à bon escient)
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el || expanded) return;
-    setClamped(el.scrollHeight > el.clientHeight + 1);
-  }, [verseText, expanded]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -203,17 +193,6 @@ export default function EcoutePage() {
     setSurahNames(names);
   }, [units]);
 
-  // Texte arabe du verset en cours (affichage seul, ne pilote rien).
-  const currentGlobal = player.current;
-  useEffect(() => {
-    if (currentGlobal == null) return;
-    const { surah, verse } = fromGlobalAyahNumber(currentGlobal);
-    let cancelled = false;
-    getVerseText(`${surah}:${verse}`).then((t) => !cancelled && setVerseText(t));
-    return () => {
-      cancelled = true;
-    };
-  }, [currentGlobal]);
 
   const cur = player.current != null ? fromGlobalAyahNumber(player.current) : null;
 
@@ -418,8 +397,8 @@ export default function EcoutePage() {
               </button>
             </form>
             {gotoMsg && <p className="text-xs text-[#7a3030] -mt-2 mb-3">{gotoMsg}</p>}
-            {/* Contrôles : au-dessus du texte, donc jamais déplacés par la longueur du verset */}
-            <div className="flex items-center justify-center gap-3 mb-4">
+            {/* Contrôles : position fixe */}
+            <div className="flex items-center justify-center gap-3 mb-3">
               <RoundButton onClick={() => skip(-1)} label="Verset précédent">
                 <PrevIcon />
               </RoundButton>
@@ -464,33 +443,6 @@ export default function EcoutePage() {
                 Page{curPage != null ? ` ${curPage}` : ''}
               </button>
             </div>
-            {verseText && (
-              <div className="mb-3">
-                <p
-                  ref={textRef}
-                  dir="rtl"
-                  className="text-[var(--ds-text)] text-center"
-                  style={{
-                    fontFamily: "'UthmanicHafs','Amiri',serif",
-                    fontSize: '1.35em',
-                    lineHeight: 2,
-                    ...(expanded
-                      ? {}
-                      : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
-                  }}
-                >
-                  {verseText}
-                </p>
-                {(clamped || expanded) && (
-                  <button
-                    onClick={() => setExpanded((v) => !v)}
-                    className="block mx-auto mt-1 text-xs font-bold text-[var(--ds-sage)] underline"
-                  >
-                    {expanded ? 'Voir moins' : 'Voir plus'}
-                  </button>
-                )}
-              </div>
-            )}
             {player.error && <p className="text-xs text-red-600 text-center mb-2">{player.error}</p>}
             <div className="text-center">
               <button onClick={stopPlayer} className="text-xs font-bold text-[#7a3030] underline">
