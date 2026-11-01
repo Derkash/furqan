@@ -24,6 +24,7 @@ export interface PlayerState {
   start: number;
   end: number;
   rate: number;
+  loop: boolean; // répète le verset en cours jusqu'à désactivation
   error: string | null;
 }
 
@@ -39,6 +40,7 @@ let state: PlayerState = {
   start: 1,
   end: 1,
   rate: 1,
+  loop: false,
   error: null,
 };
 const listeners = new Set<Listener>();
@@ -155,6 +157,7 @@ function playVerse(n: number) {
   emit({ current: n, loading: true, error: null });
   main.src = urlFor(n);
   main.playbackRate = state.rate;
+  main.loop = state.loop;
   main.play().catch(() => {
     /* l'erreur éventuelle passe par l'événement 'error' */
   });
@@ -170,6 +173,12 @@ function playVerse(n: number) {
 function onEnded() {
   const n = state.current;
   if (n == null) return;
+  // Boucle sur le verset : normalement gérée nativement (main.loop), ceci
+  // couvre les cas où l'élément émet quand même 'ended'.
+  if (state.loop) {
+    playVerse(n);
+    return;
+  }
   if (n + 1 > state.end) {
     emit({ playing: false, loading: false });
     if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
@@ -246,6 +255,12 @@ export function setPlayerRate(rate: number) {
   emit({ rate });
   if (main) main.playbackRate = rate;
   if (state.current != null) saveLast(state.current);
+}
+
+/** Active / désactive la répétition en boucle du verset en cours. */
+export function setPlayerLoop(loop: boolean) {
+  emit({ loop });
+  if (main) main.loop = loop;
 }
 
 /** Verset suivant (+1) ou précédent (-1), borné à la session. */

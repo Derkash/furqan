@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
@@ -14,6 +14,7 @@ import {
   pausePlayer,
   resumePlayer,
   seekPlayer,
+  setPlayerLoop,
   setPlayerRate,
   setSurahNames,
   skip,
@@ -36,6 +37,77 @@ function fmtRate(s: number) {
   return `×${String(s).replace('.', ',')}`;
 }
 
+/* Pictogrammes dessinés ici (pas de bibliothèque d'icônes). */
+const ICON = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+
+function PrevIcon() {
+  return (
+    <svg {...ICON} className="w-7 h-7">
+      <path d="M6 5v14" />
+      <path d="M19 6l-10 6 10 6z" fill="currentColor" />
+    </svg>
+  );
+}
+function NextIcon() {
+  return (
+    <svg {...ICON} className="w-7 h-7">
+      <path d="M18 5v14" />
+      <path d="M5 6l10 6-10 6z" fill="currentColor" />
+    </svg>
+  );
+}
+function PlayIcon() {
+  return (
+    <svg {...ICON} className="w-12 h-12 translate-x-[3px]">
+      <path d="M7 4.5l13 7.5-13 7.5z" fill="currentColor" />
+    </svg>
+  );
+}
+function PauseIcon() {
+  return (
+    <svg {...ICON} className="w-12 h-12">
+      <path d="M8 5v14M16 5v14" strokeWidth={4} />
+    </svg>
+  );
+}
+function LoopIcon() {
+  return (
+    <svg {...ICON} className="w-7 h-7">
+      <path d="M17 2l4 4-4 4" />
+      <path d="M3 12V10a4 4 0 014-4h14" />
+      <path d="M7 22l-4-4 4-4" />
+      <path d="M21 12v2a4 4 0 01-4 4H3" />
+    </svg>
+  );
+}
+
+function RoundButton({
+  onClick,
+  label,
+  pressed,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  pressed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={pressed}
+      className={`w-14 h-14 rounded-full border-2 flex items-center justify-center active:scale-95 transition-all ${
+        pressed
+          ? 'bg-[var(--ds-green)] border-[var(--ds-green)] text-white'
+          : 'border-[var(--ds-gold)]/40 text-[var(--ds-green)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function EcoutePage() {
   const { data: units } = useQuranUnits();
   const [player, setPlayer] = useState<PlayerState>(getPlayerState());
@@ -46,8 +118,18 @@ export default function EcoutePage() {
   const [verseText, setVerseText] = useState('');
   const [last, setLast] = useState<ReturnType<typeof loadLast>>(null);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => subscribePlayer(setPlayer), []);
+
+  // Le texte dépasse-t-il 2 lignes ? (pour n'afficher « Voir plus » qu'à bon escient)
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el || expanded) return;
+    setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [verseText, expanded]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -151,6 +233,7 @@ export default function EcoutePage() {
               </p>
               <span className="text-[11px] text-[var(--ds-n500)] tabular-nums">
                 {player.loading ? 'chargement…' : player.playing ? 'en lecture' : 'en pause'}
+                {player.loop ? ' · en boucle' : ''}
               </span>
             </div>
             <p className="text-[11px] text-[var(--ds-n500)] mb-3">
@@ -184,38 +267,56 @@ export default function EcoutePage() {
                 <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${progress * 100}%` }} />
               </div>
             )}
-            {verseText && (
-              <p
-                dir="rtl"
-                className="text-[var(--ds-text)] text-center mb-4"
-                style={{ fontFamily: "'UthmanicHafs','Amiri',serif", fontSize: '1.35em', lineHeight: 2 }}
-              >
-                {verseText}
-              </p>
-            )}
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <button
-                onClick={() => skip(-1)}
-                aria-label="Verset précédent"
-                className="w-11 h-11 rounded-full border-2 border-[var(--ds-gold)]/40 text-[var(--ds-green)] font-bold"
-              >
-                ⏮
-              </button>
+            {/* Contrôles : au-dessus du texte, donc jamais déplacés par la longueur du verset */}
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <RoundButton onClick={() => skip(-1)} label="Verset précédent">
+                <PrevIcon />
+              </RoundButton>
               <button
                 onClick={() => (player.playing ? pausePlayer() : resumePlayer())}
                 aria-label={player.playing ? 'Pause' : 'Lecture'}
-                className="w-16 h-16 rounded-full bg-[var(--ds-green)] text-white text-2xl font-bold active:scale-95 transition-all"
+                className="w-[88px] h-[88px] rounded-full bg-[var(--ds-green)] text-white flex items-center justify-center shadow-lg shadow-[var(--ds-green)]/25 active:scale-95 transition-all"
               >
-                {player.playing ? '❚❚' : '▶'}
+                {player.playing ? <PauseIcon /> : <PlayIcon />}
               </button>
-              <button
-                onClick={() => skip(1)}
-                aria-label="Verset suivant"
-                className="w-11 h-11 rounded-full border-2 border-[var(--ds-gold)]/40 text-[var(--ds-green)] font-bold"
+              <RoundButton onClick={() => skip(1)} label="Verset suivant">
+                <NextIcon />
+              </RoundButton>
+              <RoundButton
+                onClick={() => setPlayerLoop(!player.loop)}
+                label={player.loop ? 'Arrêter la boucle sur ce verset' : 'Répéter ce verset en boucle'}
+                pressed={player.loop}
               >
-                ⏭
-              </button>
+                <LoopIcon />
+              </RoundButton>
             </div>
+            {verseText && (
+              <div className="mb-3">
+                <p
+                  ref={textRef}
+                  dir="rtl"
+                  className="text-[var(--ds-text)] text-center"
+                  style={{
+                    fontFamily: "'UthmanicHafs','Amiri',serif",
+                    fontSize: '1.35em',
+                    lineHeight: 2,
+                    ...(expanded
+                      ? {}
+                      : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+                  }}
+                >
+                  {verseText}
+                </p>
+                {(clamped || expanded) && (
+                  <button
+                    onClick={() => setExpanded((v) => !v)}
+                    className="block mx-auto mt-1 text-xs font-bold text-[var(--ds-sage)] underline"
+                  >
+                    {expanded ? 'Voir moins' : 'Voir plus'}
+                  </button>
+                )}
+              </div>
+            )}
             {player.error && <p className="text-xs text-red-600 text-center mb-2">{player.error}</p>}
             <div className="text-center">
               <button onClick={stopPlayer} className="text-xs font-bold text-[#7a3030] underline">
