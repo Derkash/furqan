@@ -5,7 +5,7 @@ import AppShell from '@/components/AppShell';
 import RangePicker, { type RangePickerValue } from '@/components/exercises/RangePicker';
 import { useQuranUnits } from '@/hooks/exercises/useQuranUnits';
 import { loadHizbQuarters, rangeToGlobalBounds, type HizbQuarter } from '@/utils/quranBounds';
-import { fromGlobalAyahNumber } from '@/utils/ayahMapping';
+import { fromGlobalAyahNumber, toGlobalAyahNumber } from '@/utils/ayahMapping';
 import { getVersePageMap, getVerseText } from '@/utils/vocab/morphology';
 import { toArabicNumbers } from '@/utils/arabicNumbers';
 import {
@@ -35,6 +35,11 @@ const PREFS_KEY = 'almuraja3a:ecoute-prefs';
 
 function fmtRate(s: number) {
   return `×${String(s).replace('.', ',')}`;
+}
+
+const LAST_GLOBAL = 6236;
+function versesCount(surah: number) {
+  return (surah >= 114 ? LAST_GLOBAL + 1 : toGlobalAyahNumber(surah + 1, 1)) - toGlobalAyahNumber(surah, 1);
 }
 
 /* Pictogrammes dessinés ici (pas de bibliothèque d'icônes). */
@@ -121,8 +126,21 @@ export default function EcoutePage() {
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
+  // « Aller au verset » : sourate choisie + numéro saisi, bornés à la plage de la session.
+  const [gotoSurah, setGotoSurah] = useState<number | null>(null);
+  const [gotoVerse, setGotoVerse] = useState('');
+  const [gotoMsg, setGotoMsg] = useState<string | null>(null);
 
   useEffect(() => subscribePlayer(setPlayer), []);
+
+  // Nouvelle session : on repart de la sourate en cours, saisie vidée.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setGotoSurah(null);
+    setGotoVerse('');
+    setGotoMsg(null);
+  }, [player.start, player.end]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Le texte dépasse-t-il 2 lignes ? (pour n'afficher « Voir plus » qu'à bon escient)
   useEffect(() => {
@@ -208,6 +226,26 @@ export default function EcoutePage() {
   };
 
   const cur = player.current != null ? fromGlobalAyahNumber(player.current) : null;
+
+  // Sourates couvertes par la session et bornes de versets pour la sourate choisie.
+  const sessStart = fromGlobalAyahNumber(player.start);
+  const sessEnd = fromGlobalAyahNumber(player.end);
+  const sessSurahs: number[] = [];
+  for (let sIdx = sessStart.surah; sIdx <= sessEnd.surah; sIdx++) sessSurahs.push(sIdx);
+  const gotoS = gotoSurah ?? cur?.surah ?? sessStart.surah;
+  const gotoMin = gotoS === sessStart.surah ? sessStart.verse : 1;
+  const gotoMax = gotoS === sessEnd.surah ? sessEnd.verse : versesCount(gotoS);
+
+  const goToVerse = () => {
+    const v = parseInt(gotoVerse, 10);
+    if (!Number.isFinite(v) || v < gotoMin || v > gotoMax) {
+      setGotoMsg(`Entre un numéro entre ${toArabicNumbers(gotoMin)} et ${toArabicNumbers(gotoMax)} pour ${chapterName(gotoS)}.`);
+      return;
+    }
+    setGotoMsg(null);
+    setGotoVerse('');
+    seekPlayer(toGlobalAyahNumber(gotoS, v));
+  };
   const progress =
     player.current != null && player.end > player.start
       ? (player.current - player.start) / (player.end - player.start)
@@ -267,6 +305,56 @@ export default function EcoutePage() {
                 <div className="h-full bg-[var(--ds-sage)] transition-all" style={{ width: `${progress * 100}%` }} />
               </div>
             )}
+            {/* Aller directement à un verset de la plage */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                goToVerse();
+              }}
+              className="flex items-center gap-2 mb-4"
+            >
+              {sessSurahs.length > 1 ? (
+                <select
+                  value={gotoS}
+                  onChange={(e) => {
+                    setGotoSurah(Number(e.target.value));
+                    setGotoMsg(null);
+                  }}
+                  aria-label="Sourate"
+                  className="flex-1 min-w-0 h-11 px-2 rounded-xl border-2 border-[var(--ds-gold)]/40 bg-white text-sm font-bold text-[var(--ds-green)]"
+                >
+                  {sessSurahs.map((sNum) => (
+                    <option key={sNum} value={sNum}>
+                      {sNum}. {chapterName(sNum)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="flex-1 min-w-0 text-sm font-bold text-[var(--ds-green)] truncate">{chapterName(gotoS)}</span>
+              )}
+              <input
+                type="number"
+                inputMode="numeric"
+                min={gotoMin}
+                max={gotoMax}
+                value={gotoVerse}
+                onChange={(e) => {
+                  setGotoVerse(e.target.value);
+                  setGotoMsg(null);
+                }}
+                placeholder={`verset ${gotoMin}–${gotoMax}`}
+                aria-label="Numéro de verset"
+                className="w-32 h-11 px-3 rounded-xl border-2 border-[var(--ds-gold)]/40 bg-white text-sm font-bold tabular-nums text-[var(--ds-text)] placeholder:font-normal placeholder:text-[var(--ds-n500)]"
+              />
+              <button
+                type="submit"
+                disabled={!gotoVerse}
+                className="h-11 px-4 rounded-xl bg-[var(--ds-sage)] text-white text-sm font-bold disabled:opacity-40 active:scale-95 transition-all"
+              >
+                Aller
+              </button>
+            </form>
+            {gotoMsg && <p className="text-xs text-[#7a3030] -mt-2 mb-3">{gotoMsg}</p>}
             {/* Contrôles : au-dessus du texte, donc jamais déplacés par la longueur du verset */}
             <div className="flex items-center justify-center gap-3 mb-4">
               <RoundButton onClick={() => skip(-1)} label="Verset précédent">
