@@ -8,41 +8,47 @@ const audioCache = new Map<string, string>();
 // Requêtes en cours (dédupliquées) : un même texte n'est jamais synthétisé deux fois.
 const pending = new Map<string, Promise<string | null>>();
 
-/** Récupère (ou synthétise) l'audio d'un texte, avec cache et déduplication. */
-export function fetchTTS(text: string): Promise<string | null> {
-  const cached = audioCache.get(text);
+export type SpeechLang = 'fr' | 'ar';
+
+const cacheKey = (text: string, lang: SpeechLang) => `${lang}:${text}`;
+
+/** Récupère (ou synthétise) l'audio d'un texte, avec cache et déduplication.
+ *  `lang` choisit la voix : française (défaut) ou arabe native (adhkar). */
+export function fetchTTS(text: string, lang: SpeechLang = 'fr'): Promise<string | null> {
+  const key = cacheKey(text, lang);
+  const cached = audioCache.get(key);
   if (cached) return Promise.resolve(cached);
-  if (!pending.has(text)) {
+  if (!pending.has(key)) {
     pending.set(
-      text,
+      key,
       fetch(apiUrl('/api/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, lang }),
       })
         .then(async (res) => {
           if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
           const url = URL.createObjectURL(await res.blob());
-          audioCache.set(text, url);
+          audioCache.set(key, url);
           return url;
         })
         .catch(() => null)
         .finally(() => {
-          pending.delete(text);
+          pending.delete(key);
         })
     );
   }
-  return pending.get(text)!;
+  return pending.get(key)!;
 }
 
 /** Précharge l'audio d'un texte en tâche de fond (sans le jouer). */
-export function prefetchSpeech(text: string | null | undefined) {
-  if (text) void fetchTTS(text);
+export function prefetchSpeech(text: string | null | undefined, lang: SpeechLang = 'fr') {
+  if (text) void fetchTTS(text, lang);
 }
 
 /**
- * Lecture vocale française de qualité : le texte est synthétisé côté serveur
- * (/api/tts, voix neurale Microsoft) et joué en MP3. `loading` pendant la
+ * Lecture vocale de qualité (française par défaut, arabe avec `lang: 'ar'`) :
+ * le texte est synthétisé côté serveur (/api/tts, voix neurale Microsoft) et joué en MP3. `loading` pendant la
  * synthèse, `speaking` pendant la lecture.
  */
 export function useSpeech() {
@@ -65,15 +71,15 @@ export function useSpeech() {
     setProgress(0);
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, lang: SpeechLang = 'fr') => {
     const requestId = ++requestIdRef.current;
     if (audioRef.current) audioRef.current.pause();
     setSpeaking(false);
 
-    let url = audioCache.get(text) ?? null;
+    let url = audioCache.get(cacheKey(text, lang)) ?? null;
     if (!url) {
       setLoading(true);
-      url = await fetchTTS(text);
+      url = await fetchTTS(text, lang);
       if (requestId !== requestIdRef.current) return; // annulé entre-temps
       setLoading(false);
       if (!url) return;

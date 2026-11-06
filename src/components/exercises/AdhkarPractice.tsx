@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { prefetchSpeech, useSpeech } from '@/hooks/exercises/useSpeech';
 
 interface SurahItem {
   name: string;
@@ -91,6 +92,9 @@ export default function AdhkarPractice() {
   const [counted, setCounted] = useState(0); // compteur d'une invocation simple
   const [surahCounts, setSurahCounts] = useState<number[]>([]); // compteurs de la carte « sourates »
   const [showTrans, setShowTrans] = useState(false);
+  // Écoute de l'invocation : voix arabe native (synthèse serveur), un bouton
+  // qui lance / arrête la lecture.
+  const speech = useSpeech();
 
   // Aucune orientation imposée : les Adkar se lisent aussi bien en portrait
   // qu'en paysage. Le sens d'affichage suit l'appareil (web) ou le réglage
@@ -110,14 +114,25 @@ export default function AdhkarPractice() {
   const hasCounter = !!card && !isSurahs && (card.count ?? 1) > 1;
   const done = hasCounter && counted >= (card!.count ?? 1);
 
-  // Réinitialise compteurs + traduction à chaque changement de carte.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Réinitialise compteurs + traduction + lecture à chaque changement de carte,
+  // et précharge l'audio de la carte suivante pour une écoute sans attente.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     setCounted(0);
     setShowTrans(false);
     setSurahCounts(card?.surahs ? card.surahs.map(() => 0) : []);
+    speech.stop();
+    const next = list[index + 1];
+    if (next && next.kind !== 'surahs') prefetchSpeech(next.ar, 'ar');
   }, [index, session]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+
+  const canListen = !!card && !isSurahs && !!card.ar;
+  const toggleListen = () => {
+    if (!canListen) return;
+    if (speech.speaking || speech.loading) speech.stop();
+    else void speech.speak(card!.ar!, 'ar');
+  };
 
   const go = (dir: -1 | 1) => setIndex((i) => Math.max(0, Math.min(total - 1, i + dir)));
   const meta = session ? META[session] : null;
@@ -263,6 +278,19 @@ export default function AdhkarPractice() {
             >
               ‹ Préc.
             </button>
+            {canListen && (
+              <button
+                onClick={toggleListen}
+                aria-label={speech.speaking ? "Arrêter l'écoute" : "Écouter l'invocation"}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 active:scale-95 flex items-center justify-center gap-1.5 transition-colors ${
+                  speech.speaking
+                    ? 'bg-[var(--ds-gold)] border-[var(--ds-gold)] text-[#1a1a1a]'
+                    : 'border-[var(--ds-gold)] text-[var(--ds-green)]'
+                } ${speech.loading ? 'opacity-70' : ''}`}
+              >
+                {speech.loading ? '⏳ Chargement…' : speech.speaking ? '⏹ Arrêter' : '🔊 Écouter'}
+              </button>
+            )}
             <button
               onClick={() => setShowTrans(true)}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold border-2 border-[var(--ds-green)] text-[var(--ds-green)] active:scale-95 flex items-center justify-center gap-1.5"
